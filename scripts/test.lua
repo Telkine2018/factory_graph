@@ -18,7 +18,40 @@ local excluded_categories = {
      stacking = true, 
      unstacking = true,
      barrelling = true,
-     ["barreling-pump"] = true
+     ["barreling-pump"] = true,
+     
+     -- Creative mod
+    ["creative-mod_free-fluids"] = true,
+    ["creative-mod_energy-absorption"] = true,
+
+    -- Editor extensions
+    ["ee-testing-tool"] = true,
+
+    -- Deep storage unit
+    ["deep-storage-item"] = true,
+    ["deep-storage-fluid"] = true,
+    ["deep-storage-item-big"] = true,
+    ["deep-storage-fluid-big"] = true,
+    ["deep-storage-item-mk2/3"] = true,
+    ["deep-storage-fluid-mk2/3"] = true,
+
+    -- Krastorio 2
+    ["void-crushing"] = true, -- This doesn't actually exist yet, but will soon!
+    -- Mining drones
+    ["mining-depot"] = true,
+        -- Pyanodon's
+    ["py-incineration"] = true,
+    ["py-runoff"] = true,
+    ["py-venting"] = true,
+    -- Reverse factory
+    ["recycle-intermediates"] = true,
+    ["recycle-productivity"] = true,
+    ["recycle-products"] = true,
+    ["recycle-with-fluids"] = true,
+    -- Transport drones
+    ["fuel-depot"] = true,
+    ["transport-drone-request"] = true,
+    ["transport-fluid-request"] = true,
     
 }
 

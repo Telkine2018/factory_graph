@@ -13,6 +13,7 @@ local function np(name)
 end
 
 local recipe_selection_frame_name = np("recipe_selection_frame")
+tools.add_panel_name(recipe_selection_frame_name)
 
 ---@param player LuaPlayer
 ---@param g Graph
@@ -95,80 +96,94 @@ function recipe_selection.open(player, g, product, src)
     local recipe_table = scroll.add { type = "table", column_count = 1, draw_horizontal_lines = true, name = "recipe_table" };
 
     local sorted_list = {}
-    for _, r in pairs(recipes) do
-        table.insert(sorted_list, { recipe = r, localised = translations.get_recipe_name(player_index, r.name) })
+    for _, grecipe in pairs(recipes) do
+        local recipe = game.recipe_prototypes[grecipe.name]
+        if recipe then
+            table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
+        else
+            table.insert(sorted_list, { grecipe = grecipe, localised = gutils.get_recipe_name(player, grecipe) })
+        end
     end
     if #sorted_list == 0 then return end
 
     table.sort(sorted_list, function(r1, r2) return r1.localised < r2.localised end)
     for _, recipe_element in pairs(sorted_list) do
         local recipe_line = recipe_table.add { type = "flow", direction = "vertical" }
-        local recipe_name = recipe_element.recipe.name
+        local recipe_name = recipe_element.grecipe.name
         recipe_line.tags = { recipe_name = recipe_name }
         local state = g.selection[recipe_name] ~= nil
 
-        local tooltip_builder = {}
-        local recipe = game.recipe_prototypes[recipe_name]
-        local start = true
-        for _, i in pairs(recipe.ingredients) do
-            if start then
-                start = false
-            else
-                table.insert(tooltip_builder, "\n")
+        local recipe = recipe_element.recipe
+        if recipe then
+            local tooltip_builder = {}
+            local start = true
+                for _, i in pairs(recipe.ingredients) do
+                if start then
+                    start = false
+                else
+                    table.insert(tooltip_builder, "\n")
+                end
+                if i.type == "item" then
+                    table.insert(tooltip_builder,
+                        "[img=item/" .. i.name .. "] "
+                        .. tostring(i.amount) .. " x "
+                        .. translations.get_item_name(player_index, i.name)
+                    )
+                else
+                    table.insert(tooltip_builder,
+                        "[img=fluid/" .. i.name .. "] "
+                        .. tostring(i.amount) .. " x "
+                        .. translations.get_fluid_name(player_index, i.name))
+                end
             end
-            if i.type == "item" then
-                table.insert(tooltip_builder,
-                    "[img=item/" .. i.name .. "] "
-                    .. tostring(i.amount) .. " x "
-                    .. translations.get_item_name(player_index, i.name)
-                )
-            else
-                table.insert(tooltip_builder,
-                    "[img=fluid/" .. i.name .. "] "
-                    .. tostring(i.amount) .. " x "
-                    .. translations.get_fluid_name(player_index, i.name))
-            end
-        end
-        table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
+            table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
 
-        start = true
-        for _, p in pairs(recipe.products) do
-            if start then
-                start = false
-            else
-                table.insert(tooltip_builder, "\n")
+            start = true
+            for _, p in pairs(recipe.products) do
+                if start then
+                    start = false
+                else
+                    table.insert(tooltip_builder, "\n")
+                end
+                local amount = ""
+                if p.amount then
+                    amount = tostring(p.amount)
+                elseif p.amount_min and p.amount_max then
+                    amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
+                end
+                if p.probability and p.probability < 1 then
+                    amount = amount .. "(" .. tostring(p.probability * 100) .. ")"
+                end
+                if p.type == "item" then
+                    table.insert(tooltip_builder,
+                        "[img=item/" .. p.name .. "] "
+                        .. amount .. " x "
+                        .. translations.get_item_name(player_index, p.name))
+                else
+                    table.insert(tooltip_builder,
+                        "[img=fluid/" .. p.name .. "] "
+                        .. amount .. " x "
+                        .. translations.get_fluid_name(player_index, p.name))
+                end
             end
-            local amount = ""
-            if p.amount then
-                amount = tostring(p.amount)
-            elseif p.amount_min and p.amount_max then
-                amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
-            end
-            if p.probability and p.probability < 1 then
-                amount = amount .. "(" .. tostring(p.probability * 100) .. ")"
-            end
-            if p.type == "item" then
-                table.insert(tooltip_builder,
-                    "[img=item/" .. p.name .. "] "
-                    .. amount .. " x "
-                    .. translations.get_item_name(player_index, p.name))
-            else
-                table.insert(tooltip_builder,
-                    "[img=fluid/" .. p.name .. "] "
-                    .. amount .. " x "
-                    .. translations.get_fluid_name(player_index, p.name))
-            end
-        end
-        table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
+            table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
-        local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
-        recipe_line.add {
-            type = "checkbox",
-            state = state,
-            caption = "[img=recipe/" .. recipe_name .. "] " .. recipe_element.localised,
-            name = "cb",
-            tooltip = tooltip
-        }
+            local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
+            recipe_line.add {
+                type = "checkbox",
+                state = state,
+                caption = "[img=recipe/" .. recipe_name .. "] " .. recipe_element.localised,
+                name = "cb",
+                tooltip = tooltip
+            }
+        else
+            recipe_line.add {
+                type = "checkbox",
+                state = state,
+                caption = "[img=" .. recipe_name .. "] " .. recipe_element.localised,
+                name = "cb"
+            }
+        end
     end
 
     local button_flow = frame.add { type = "flow", direction = "horizontal" }

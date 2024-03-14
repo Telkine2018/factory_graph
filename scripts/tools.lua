@@ -907,4 +907,26 @@ function tools.text_to_number(text)
     return tonumber(text)
 end
 
+local panel_names = {}
+
+---@param name string
+function tools.add_panel_name(name)
+
+    panel_names[name] = true
+end
+
+---@param player LuaPlayer
+function tools.close_panels(player)
+
+    for name, _ in pairs(panel_names) do
+        local frame = player.gui.screen[name]
+        if frame then frame.destroy() end
+        frame = player.gui.top[name]
+        if frame then frame.destroy() end
+        frame = player.gui.left[name]
+        if frame then frame.destroy() end
+    end
+
+end
+
 return tools

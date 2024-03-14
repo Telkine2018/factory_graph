@@ -26,23 +26,23 @@ local tools = require("scripts.tools")
 ---@class GElement
 ---@field name string     @ name of product or recipe
 ---@field unit_number integer
----@field x integer
----@field y integer
 ---@field graph_symbol_id integer
----@field line integer?
----@field col integer?
 ---@field entity LuaEntity?
 
 ---@class GProduct : GElement
 ---@field ingredient_of {[string]:GRecipe}
 ---@field product_of {[string]:GRecipe}
----@field is_root boolean
+---@field is_root boolean?
+---@field root_recipe GRecipe?
 ---@field color Color
 
 ---@class GRecipe : GElement
+---@field line integer?
+---@field col integer?
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
 ---@field selector_positions {[string]:MapPosition}
+---@field is_product boolean?
 
 ---@class GCol
 ---@field col integer

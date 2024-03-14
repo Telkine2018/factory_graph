@@ -18,9 +18,15 @@ local commons = {
     product_selector_name = prefix .. "-product-selector",
 
     selector_size = 0.1,
-    grid_size = 3
+    grid_size = 3,
 
+    ingredient_and_product_selection = "ingredient_and_product",
+    ingredient_selection = "ingredient",
+    product_selection = "product",
+    non_selection = "none"
 }
+
+commons.default_selection = commons.ingredient_and_product_selection
 
 ---@param name string
 ---@return string

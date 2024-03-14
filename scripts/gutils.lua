@@ -100,4 +100,23 @@ function gutils.get_graph(player)
     return tools.get_vars(player).graph
 end
 
+---@param player LuaPlayer
+---@param grecipe GRecipe
+---@return LocalisedString
+function gutils.get_recipe_name(player, grecipe)
+    ---@type LocalisedString
+    local localised_name
+
+    if grecipe.is_product then
+        if tools.starts_with(grecipe.name, "item/") then
+            localised_name = translations.get_item_name(player.index, string.sub(grecipe.name, 6))
+        else -- fluid
+            localised_name = translations.get_fluid_name(player.index, string.sub(grecipe.name, 7))
+        end
+    else
+        localised_name = translations.get_recipe_name(player.index, grecipe.name)
+    end
+    return localised_name
+end
+
 return gutils

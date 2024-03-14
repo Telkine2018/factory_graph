@@ -13,7 +13,6 @@ local tile_name = commons.tile_name
 local graph = {}
 local recipe_sprite_scale = 0.5
 local product_sprite_scale = 0.7
-local default_select_mode = "ingredient"
 
 local e_recipe_name = commons.recipe_symbol_name
 local e_product_name = commons.product_symbol_name
@@ -80,6 +79,7 @@ end
 function graph.exit(player)
     local vars = tools.get_vars(player)
 
+    tools.close_panels(player)
     local character = vars.character
     player.teleport(character.position, character.surface)
     player.associate_character(vars.character)
@@ -99,7 +99,7 @@ function graph.new(surface)
         selection = {},
         gcols = {},
         root_products = {},
-        select_mode = default_select_mode,
+        select_mode = commons.default_selection,
         x_routing = {},
         y_routing = {},
         grid_size = commons.grid_size,
@@ -163,6 +163,43 @@ function graph.add_recipes(g, recipes, excluded_categories)
             end
         end
     end
+
+    local resources = game.get_filtered_entity_prototypes { { filter = "type", type = "resource" } }
+    for _, resource in pairs(resources) do
+        local minable = resource.mineable_properties
+        if minable and minable.minable and minable.products then
+            for _, p in pairs(minable.products) do
+                local pname = p.type .. "/" .. p.name
+                local product = get_product(g, pname)
+                product.is_root = true
+            end
+        end
+    end
+
+    local pumps = game.get_filtered_entity_prototypes { { filter = "type", type = "offshore-pump" } }
+    for _, pump in pairs(pumps) do
+        local fluid = pump.fluid
+        if fluid then
+            local product = get_product(g, "fluid/" .. fluid.name)
+            product.is_root = true
+        end
+    end
+
+    for _, product in pairs(g.products) do
+        if product.is_root then
+            local name = product.name
+            ---@type GRecipe
+            local grecipe = {
+                name = name,
+                ingredients = {},
+                products = { product },
+                is_product = true
+            }
+            g.recipes[name] = grecipe
+            product.root_recipe = grecipe
+            product.product_of[name] = grecipe
+        end
+    end
 end
 
 ---@param gcol GCol
@@ -186,12 +223,12 @@ end
 
 ---@param gcol GCol
 ---@param line integer
----@param element GElement
+---@param recipe GRecipe
 ---@return integer
-function set_free_line(gcol, line, element)
-    element.line = line
-    element.col = gcol.col
-    gcol.line_set[line] = element
+function set_free_line(gcol, line, recipe)
+    recipe.line = line
+    recipe.col = gcol.col
+    gcol.line_set[line] = recipe
     if not gcol.max_line then
         gcol.max_line = line
         gcol.min_line = line
@@ -204,11 +241,11 @@ end
 
 ---@param gcol GCol
 ---@param initial integer
----@param element GElement
+---@param recipe GRecipe
 ---@return integer
-function alloc_free_line(gcol, initial, element)
+function alloc_free_line(gcol, initial, recipe)
     local line = find_free_line(gcol, initial)
-    set_free_line(gcol, line, element)
+    set_free_line(gcol, line, recipe)
     return line
 end
 
@@ -217,6 +254,9 @@ function graph.do_layout(g)
     -- Processed product
     ---@type {[string]:GProduct}
     local processed_products = {}
+
+    local gcols = {}
+    g.gcols = gcols
 
     ---@type {[string]:GRecipe}
     local remaining_recipes = {}
@@ -233,33 +273,31 @@ function graph.do_layout(g)
         end
     end
 
-    local root_col = {
+    gcol = {
         col = 1,
         line_set = {}
     }
+    gcols[1] = gcol
     for _, product in pairs(g.products) do
-        if product.is_root then
+        local recipe = product.root_recipe
+        if recipe then
             add_processed_product(product)
-            product.col = 1
-            product.line = product_line
-            root_col[product_line] = product
+            recipe.col = 1
+            recipe.line = product_line
+            set_free_line(gcol, product_line, recipe)
             product_line = product_line + 1
             root_products[product.name] = product
         end
     end
 
     for _, recipe in pairs(g.recipes) do
-        if #recipe.ingredients == 0 then
+        if #recipe.ingredients == 0 and not recipe.line then
             table.insert(remaining_recipes, recipe)
         end
     end
 
     local initial_col = 2
     local current_col = initial_col
-    local min_line = 1
-    local max_line = 1
-    local gcols = {}
-    g.gcols = gcols
     while next(remaining_recipes) do
         ---@type {[string]:GRecipe}
         local processed_recipes = {}
@@ -318,35 +356,13 @@ function graph.do_layout(g)
             end
 
             add_processed_product(found_product)
-            local found_line = 0
-            for _, grecipe in pairs(found_product.ingredient_of) do
-                for _, gproduct in pairs(grecipe.ingredients) do
-                    if gproduct.line then
-                        found_line = gproduct.line
-                        goto line_found
-                    end
-                end
-            end
-            for _, grecipe in pairs(found_product.product_of) do
-                for _, gproduct in pairs(grecipe.products) do
-                    if gproduct.line then
-                        found_line = gproduct.line
-                        goto line_found
-                    end
-                end
-            end
 
             ::line_found::
-            alloc_free_line(root_col, found_line, found_product)
             goto restart
         end
 
         for name, grecipe in pairs(processed_recipes) do
             remaining_recipes[name] = nil
-
-            if name == "fill-crude-oil-barrel" then
-                log("Wait")
-            end
 
             local line = 0
             local count = 0
@@ -370,22 +386,30 @@ function graph.do_layout(g)
             end
             if count == 0 then
                 for _, ingredient in pairs(grecipe.ingredients) do
-                    line = line + ingredient.line
-                    count = count + 1
+                    for _, irecipe in pairs(ingredient.product_of) do
+                        if irecipe.line then
+                            line = line + irecipe.line
+                            count = count + 1
+                        end
+                    end
                 end
             end
             if count == 0 then
                 for _, product in pairs(grecipe.products) do
-                    if not product.line then
-                        product.col = 1
-                        product.line = product_line
-                        product_line = product_line + 1
+                    for _, precipe in pairs(product.ingredient_of) do
+                        if precipe.line then
+                            line = line + precipe.line
+                            count = count + 1
+                        end
                     end
-                    line = line + product.line
-                    count = count + 1
                 end
             end
-            line = math.ceil(line / count)
+            if count == 0 then
+                line = product_line
+                product = product_line + 1
+            else
+                line = math.ceil(line / count)
+            end
 
             local found_dist
             local found_line
@@ -422,12 +446,6 @@ function graph.do_layout(g)
             end
 
             grecipe.col = found_col
-            for _, gproduct in pairs(grecipe.products) do
-                if not gproduct.line then
-                    gproduct.line = line
-                    gproduct.col = found_col
-                end
-            end
         end
 
         for _, gproduct in pairs(new_products) do
@@ -443,16 +461,16 @@ function graph.do_layout(g)
     end
 
     graph.reverse_equalize_recipes(g)
-    graph.equalize_roots(g)
     graph.equalize_recipes(g)
+    --[[
     graph.reverse_equalize_recipes(g)
-    graph.equalize_roots(g)
+    ]]
 end
 
 ---@param g Graph
 function graph.reverse_equalize_recipes(g)
     local gcols = g.gcols
-    for i = #gcols, 2, -1 do
+    for i = #gcols, 1, -1 do
         local gcol = gcols[i]
         local new_cols = {
             col = gcol.col,
@@ -478,7 +496,6 @@ function graph.reverse_equalize_recipes(g)
                     end
                 end
             end
-
             if count == 0 then
                 alloc_free_line(new_cols, line_recipe.line, line_recipe)
             else
@@ -513,10 +530,10 @@ function graph.equalize_roots(g)
         end
 
         if count == 0 then
-            alloc_free_line(root_col, product.line, product)
+            alloc_free_line(root_col, product.line, product.root_recipe)
         else
             line = math.ceil(line / count)
-            alloc_free_line(root_col, line, product)
+            alloc_free_line(root_col, line, product.root_recipe)
         end
     end
 end
@@ -524,7 +541,7 @@ end
 ---@param g Graph
 function graph.equalize_recipes(g)
     local gcols = g.gcols
-    for i = 2, #gcols do
+    for i = 1, #gcols do
         local gcol = gcols[i]
         local new_col = {
             col = gcol.col,
@@ -583,41 +600,28 @@ local function draw_recipe(g, grecipe)
     if not grecipe.line then
         return
     end
+    local sprite_name
+    local entity_name
+    if grecipe.is_product then
+        sprite_name = grecipe.name
+        entity_name = e_product_name
+    else
+        sprite_name = "recipe/" .. grecipe.name
+        entity_name = e_recipe_name
+    end
     local surface = g.surface
     local x = grecipe.col * g.grid_size + 0.5
     local y = grecipe.line * g.grid_size + 0.5
-    local e_recipe = surface.create_entity { name = e_recipe_name, position = { x, y }, force = g.player.force_index, create_build_effect_smoke = false }
+    local e_recipe = surface.create_entity { name = entity_name, position = { x, y }, force = g.player.force_index, create_build_effect_smoke = false }
     ---@cast e_recipe -nil
     local scale = recipe_sprite_scale
-    rendering.draw_sprite { surface = surface, sprite = "recipe/" .. grecipe.name, target = e_recipe, x_scale = scale, y_scale = scale }
+    rendering.draw_sprite { surface = surface, sprite = sprite_name, target = e_recipe, x_scale = scale, y_scale = scale }
     grecipe.entity = e_recipe
     g.entity_map[e_recipe.unit_number] = grecipe
 end
 
 ---@param g Graph
----@param gproduct GProduct
-local function draw_product(g, gproduct)
-    if not gproduct.line then
-        return
-    end
-    local surface = g.surface
-    local x = gproduct.col * g.grid_size + 0.5
-    local y = gproduct.line * g.grid_size + 0.5
-    local e_product = surface.create_entity { name = e_product_name, position = { x, y }, force = g.player.force_index }
-    ---@cast e_product -nil
-    local scale = product_sprite_scale
-    rendering.draw_sprite { surface = surface, sprite = gproduct.name, target = e_product, x_scale = scale, y_scale = scale }
-    gproduct.entity = e_product
-    g.entity_map[e_product.unit_number] = gproduct
-end
-
----@param g Graph
 function graph.draw(g)
-    for _, gproduct in pairs(g.products) do
-        if gproduct.is_root then
-            draw_product(g, gproduct)
-        end
-    end
     for _, grecipe in pairs(g.recipes) do
         draw_recipe(g, grecipe)
     end
