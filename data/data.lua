@@ -1,4 +1,3 @@
-
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local prefix = commons.prefix
@@ -35,15 +34,6 @@ add({
   key_sequence = "mouse-button-1",
   name = prefix .. "-click"
 })
-
-local ground_tile = table.deepcopy(data.raw["tile"]["grass-1"])
-local outofmap = data.raw["tile"]["out-of-map"]
-ground_tile.name = prefix .. "-ground"
-ground_tile.minable = nil
-ground_tile.layer = 0
-ground_tile.map_color = outofmap.map_color
-ground_tile.variants = outofmap.variants
-add(ground_tile)
 
 ---------------------------------------------
 local function create_symbol(name, filename)
@@ -123,7 +113,7 @@ local sprite = {
 }
 add(sprite)
 
-local sprite = {
+sprite = {
   type = "sprite",
   name = prefix .. "_sep",
   filename = png("sep"),
@@ -132,5 +122,14 @@ local sprite = {
 }
 add(sprite)
 
+sprite = {
+  type = "sprite",
+  name = prefix .. "_arrow",
+  filename = png("arrow"),
+  width = 16,
+  height = 16
+}
+add(sprite)
+
 data:extend(declarations)
--- log(serpent.block(entity))
+

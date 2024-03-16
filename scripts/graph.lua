@@ -36,21 +36,24 @@ function graph.enter(player)
         starting_points = {},
         terrain_segmentation = "none",
         autoplace_settings = {
-            entity = { frequency = "none" },
-            --tile = { frequency = "none" },
+            entity = { treat_missing_as_default = false, frequency = "none" },
             tile = {
                 treat_missing_as_default = false,
                 settings = {
-                    [tile_name] = {}
+                    [tile_name] = {
+                        frequency = 6,
+                        size = 6,
+                        richness = 6
+                    }
                 }
             },
-            decorative = { frequency = "none" }
+            decorative = { treat_missing_as_default = false, frequency = "none" }
         },
         property_expression_names = {
             cliffiness = 0,
             ["tile:water:probability"] = -1000,
             ["tile:deep-water:probability"] = -1000,
-            ["tile:" .. tile_name .. ":probability"] = math.huge
+            ["tile:" .. tile_name .. ":probability"] = 1 / 0
         }
     }
 
@@ -134,31 +137,33 @@ function graph.add_recipes(g, recipes, excluded_categories)
     g.excluded_categories = excluded_categories
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] then
-            ---@type GRecipe
-            local grecipe = {
-                name = name,
-                ingredients = {},
-                products = {}
-            }
-            g.recipes[name] = grecipe
-            if recipe.ingredients then
-                for _, ingredient in pairs(recipe.ingredients) do
-                    local iname = ingredient.type .. "/" .. ingredient.name
-                    local gproduct = get_product(g, iname)
+            if not recipe.hidden or g.show_hidden then
+                ---@type GRecipe
+                local grecipe = {
+                    name = name,
+                    ingredients = {},
+                    products = {}
+                }
+                g.recipes[name] = grecipe
+                if recipe.ingredients then
+                    for _, ingredient in pairs(recipe.ingredients) do
+                        local iname = ingredient.type .. "/" .. ingredient.name
+                        local gproduct = get_product(g, iname)
 
-                    table.insert(grecipe.ingredients, gproduct)
-                    gproduct.ingredient_of[recipe.name] = grecipe
+                        table.insert(grecipe.ingredients, gproduct)
+                        gproduct.ingredient_of[recipe.name] = grecipe
+                    end
                 end
-            end
 
-            if recipe.products then
-                for _, production in pairs(recipe.products) do
-                    local iname = production.type .. "/" .. production.name
-                    local gproduct = get_product(g, iname)
+                if recipe.products then
+                    for _, production in pairs(recipe.products) do
+                        local iname = production.type .. "/" .. production.name
+                        local gproduct = get_product(g, iname)
 
-                    table.insert(grecipe.products, gproduct)
-                    gproduct.product_of[recipe.name] = grecipe
-                    gproduct.is_root = nil
+                        table.insert(grecipe.products, gproduct)
+                        gproduct.product_of[recipe.name] = grecipe
+                        gproduct.is_root = nil
+                    end
                 end
             end
         end

@@ -52,21 +52,9 @@ local null_value
 local function get_product_label(player_index, product)
     local size = 0
     local caption = { "" }
-    table.insert(caption, "[" .. product.type .. "=" .. product.name .. "]")
+    table.insert(caption, "[" .. product.type .. "=" .. product.name .. "] ")
     size = 0
-    local lname
-    if product.type == "item" then
-        lname = translations.get_item_name(player_index, product.name)
-    else
-        lname = translations.get_fluid_name(player_index, product.name)
-    end
-    if not lname then
-        lname = product.name
-    end
-    table.insert(caption, " " .. lname)
-    size = size + #lname + 1
-    table.insert(caption, " x ")
-    size = size + 3
+
     local s
     if product.amount then
         s = tostring(product.amount)
@@ -86,6 +74,22 @@ local function get_product_label(player_index, product)
         table.insert(caption, s)
         size = size + #s
     end
+
+    table.insert(caption, " x ")
+    size = size + 3
+
+    local lname
+    if product.type == "item" then
+        lname = translations.get_item_name(player_index, product.name)
+    else
+        lname = translations.get_fluid_name(player_index, product.name)
+    end
+    if not lname then
+        lname = product.name
+    end
+    table.insert(caption, " " .. lname)
+    size = size + #lname + 1
+
     return caption, size
 end
 
@@ -105,6 +109,13 @@ local function clear_selection(g)
             p.recipe[p.product_name] = nil
         end
         g.select_product_positions = nil
+    end
+
+    if g.product_selectors then
+        for _, entity in pairs(g.product_selectors) do
+            entity.destroy()
+        end
+        g.product_selectors = nil
     end
 end
 
@@ -563,13 +574,16 @@ local function draw_select_ingredients(g, ids, base_recipe)
         local is_in_selection = g.selection[base_recipe.name]
 
         for _, recipe in pairs(ingredient.product_of) do
-            if not is_in_selection or not g.selection[recipe.name] then
+            if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
+                goto cont
+            else
                 table.insert(connected_recipes, recipe)
             end
         end
         if #connected_recipes > 1 then
             draw_recipe_connections(g, ids, ingredient, connected_recipes, color, true)
         end
+        ::cont::
     end
 end
 
@@ -582,13 +596,18 @@ local function draw_select_products(g, ids, base_recipe)
         local connected_recipes = { base_recipe }
         local is_in_selection = g.selection[base_recipe.name]
 
-        for _, recipe in pairs(product.ingredient_of) do
-            if not is_in_selection or not g.selection[recipe.name] then
-                table.insert(connected_recipes, recipe)
+        if not g.selection[product.name] then
+            for _, recipe in pairs(product.ingredient_of) do
+                if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
+                    goto cont
+                else
+                    table.insert(connected_recipes, recipe)
+                end
             end
-        end
-        if #connected_recipes > 1 then
-            draw_recipe_connections(g, ids, product, connected_recipes, color, true)
+            if #connected_recipes > 1 then
+                draw_recipe_connections(g, ids, product, connected_recipes, color, true)
+            end
+            ::cont::
         end
     end
 end
@@ -739,13 +758,6 @@ local function draw_selected_entity(player, entity, grecipe)
         vertical_alignment = "top", alignment = "center", scale = recipe_font_size }
     table.insert(ids, id)
 
-    if g.product_selectors then
-        for _, entity in pairs(g.product_selectors) do
-            entity.destroy()
-        end
-        g.product_selectors = nil
-    end
-
     if grecipe.selector_positions then
         ---@type {[string]:LuaEntity}
         local selectors = {}
@@ -766,50 +778,136 @@ local function draw_selected_entity(player, entity, grecipe)
     end
 end
 
+---@param player_index integer
+---@param grecipe GRecipe
+local function create_recipe_panel(player_index, grecipe)
+    local player = game.players[player_index]
+    local g = gutils.get_graph(player)
+
+    ---@type LuaRecipePrototype
+    local recipe = game.recipe_prototypes[grecipe.name]
+
+    ---@type LocalisedString
+    local name = translations.get_recipe_name(player_index, grecipe.name)
+
+    if add_debug_info then
+        name = { "", name, "[", grecipe.name, "]" }
+    end
+
+    local frame = player.gui.left.add { type = "frame", caption = name, name = select_panel_name }
+    frame.style.minimal_width = 300
+    g.select_graph_panel = frame
+
+    local flow = frame.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding"
+    }
+    local max = 0
+    if recipe.ingredients then
+        for _, p in pairs(recipe.ingredients) do
+            local caption, size = get_product_label(player_index, p)
+            if size > max then
+                max = size
+            end
+            if add_debug_info then
+                caption = { "", caption, " [", p.name, "]" }
+            end
+            flow.add { type = "label", caption = caption }
+        end
+    end
+
+    local line_margin = 5
+    local line = flow.add { type = "line" }
+    line.style.top_margin = line_margin
+    line.style.bottom_margin = line_margin
+    if recipe.products then
+        for _, p in pairs(recipe.products) do
+            local caption, size = get_product_label(player_index, p)
+            if size > max then
+                max = size
+            end
+            if add_debug_info then
+                caption = { "", caption, " [", p.name, "]" }
+            end
+            flow.add { type = "label", caption = caption }
+        end
+    end
+
+    line = flow.add { type = "line" }
+    line.style.top_margin = line_margin
+    line.style.bottom_margin = line_margin
+
+    flow.add { type = "label", caption = { np("speed"), tostring(recipe.energy) } }
+end
+
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)
     local player_index = e.player_index
     ---@type LuaPlayer
     local player = game.players[player_index]
-    local vars = tools.get_vars(player)
     local surface = player.surface
 
     if string.sub(surface.name, 1, #surface_prefix) ~= surface_prefix then
         return
     end
 
-    local g = vars.graph;
+    local g = gutils.get_graph(player);
     if not g then return end
 
     local entity = player.selected
     -- game.print("[" .. game.tick .. "] => " .. serpent.block(entity and (entity.name .. ":" .. tools.strip(entity.position)) or "null"))
 
-    if (vars.selector_id) then
-        rendering.destroy(vars.selector_id)
-        vars.selector_id = nil
+    if (g.selector_id) then
+        rendering.destroy(g.selector_id)
+        g.selector_id = nil
     end
-    if entity then
+    if g.selector_product_name_id then
+        rendering.destroy(g.selector_product_name_id)
+        g.selector_product_name_id = nil
+    end
+
+    if entity and entity.valid then
         if entity.name == commons.product_selector_name then
-            vars.selector_id = rendering.draw_rectangle {
+            g.selector_id = rendering.draw_rectangle {
                 surface = surface,
                 color = { 1, 0, 0 },
                 left_top = entity, left_top_offset = { -commons.selector_size, -commons.selector_size },
                 right_bottom = entity, right_bottom_offset = { commons.selector_size, commons.selector_size },
                 width = 0.5
             }
+            local grecipe = g.selected_recipe
+            if grecipe then
+                local product = drawing.get_product_from_selected(player, g, entity)
+                if product then
+                    if entity.valid then
+                        g.selector_product_name = product.name
+                        local text = gutils.get_product_name(player, product.name)
+                        g.selector_product_name_id = rendering.draw_text {
+                            color = { 1, 1, 1 },
+                            surface = surface,
+                            target = entity,
+                            target_offset = { 0, -0.4 },
+                            alignment = "center",
+                            text = text,
+                            scale = 0.4
+                        }
+                    end
+                end
+            end
             return
         end
 
         if entity.name == commons.recipe_symbol_name then
             local grecipe = g.entity_map[entity.unit_number]
-            if grecipe and grecipe.name and grecipe == vars.selected_recipe then
+            if grecipe and grecipe.name and grecipe == g.selected_recipe then
                 return
             end
         end
     end
 
-    vars.selected_recipe = nil
-    vars.selected_recipe_entity = nil
+    g.selected_recipe = nil
+    g.selected_recipe_entity = nil
 
     local select_panel = player.gui.left[select_panel_name]
     if select_panel then
@@ -818,9 +916,9 @@ local function on_selected_entity_changed(e)
 
     clear_selection(g)
 
-    if vars.select_graph_panel then
-        vars.select_graph_panel.destroy()
-        vars.select_graph_panel = nil
+    if g.select_graph_panel then
+        g.select_graph_panel.destroy()
+        g.select_graph_panel = nil
     end
 
     if not entity then
@@ -829,54 +927,14 @@ local function on_selected_entity_changed(e)
 
     ---@cast entity LuaEntity
     if entity.name == commons.recipe_symbol_name or entity.name == commons.product_symbol_name then
+        ---@type GRecipe
         local grecipe = g.entity_map[entity.unit_number]
         if grecipe then
-            ---@type LuaRecipePrototype
-            local recipe = game.recipe_prototypes[grecipe.name]
-            if recipe then
-                ---@type LocalisedString
-                local name = translations.get_recipe_name(player_index, grecipe.name)
-
-                if add_debug_info then
-                    name = { "", name, "[", grecipe.name, "]" }
-                end
-
-                local frame = player.gui.left.add { type = "frame", caption = name, name = select_panel_name }
-                frame.style.width = 400
-                vars.select_graph_panel = frame
-
-                local flow = frame.add { type = "flow", direction = "vertical" }
-                local max = 0
-                if recipe.ingredients then
-                    for _, p in pairs(recipe.ingredients) do
-                        local caption, size = get_product_label(player_index, p)
-                        if size > max then
-                            max = size
-                        end
-                        if add_debug_info then
-                            caption = { "", caption, " [", p.name, "]" }
-                        end
-                        flow.add { type = "label", caption = caption }
-                    end
-                end
-
-                flow.add { type = "line" }
-                if recipe.products then
-                    for _, p in pairs(recipe.products) do
-                        local caption, size = get_product_label(player_index, p)
-                        if size > max then
-                            max = size
-                        end
-                        if add_debug_info then
-                            caption = { "", caption, " [", p.name, "]" }
-                        end
-                        flow.add { type = "label", caption = caption }
-                    end
-                end
+            if not grecipe.is_product then
+                create_recipe_panel(player_index, grecipe)
             end
-
-            vars.selected_recipe = grecipe
-            vars.selected_recipe_entity = entity
+            g.selected_recipe = grecipe
+            g.selected_recipe_entity = entity
             draw_selected_entity(player, entity, grecipe)
         end
     end
@@ -888,8 +946,12 @@ local function on_gui_opened(e)
     local player = game.players[e.player_index]
 
     local entity = e.entity
+
     ---@type Graph
-    local g = tools.get_vars(player).graph
+    local g = gutils.get_graph(player)
+    ---@type GRecipe
+    local grecipe = g.selected_recipe
+
     if not g then return end
     if entity then
         local entity_name = entity.name
@@ -909,21 +971,9 @@ local function on_gui_opened(e)
 
             player.opened = nil
         elseif entity_name == commons.product_selector_name then
-            for product_name, selector in pairs(g.product_selectors) do
-                if selector == entity then
-                    local vars = tools.get_vars(player)
-                    local grecipe = vars.selected_recipe
-
-                    if grecipe then
-                        if not g.selection[grecipe.name] then
-                            g.selection[grecipe.name] = grecipe
-                            draw_graph(g)
-                            draw_selected_entity(player, vars.selected_recipe_entity, grecipe)
-                        end
-                        local product = g.products[product_name]
-                        recipe_selection.open(player, g, product, grecipe)
-                    end
-                end
+            local product = drawing.get_product_from_selected(player, g, entity)
+            if product then
+                recipe_selection.open(player, g, product, grecipe)
             end
             player.opened = nil
         end
@@ -931,16 +981,31 @@ local function on_gui_opened(e)
 end
 tools.on_event(defines.events.on_gui_opened, on_gui_opened)
 
+
+---@param player LuaPlayer
+---@param g Graph
+---@param entity LuaEntity
+---@return GProduct?
+function drawing.get_product_from_selected(player, g, entity)
+    local g = gutils.get_graph(player)
+    for product_name, selector in pairs(g.product_selectors) do
+        if selector == entity then
+            local product = g.products[product_name]
+            return product
+        end
+    end
+    return nil
+end
+
 ---@param player LuaPlayer
 function drawing.update_drawing(player)
-    local vars = tools.get_vars(player)
     ---@type Graph
-    local g = vars.graph
+    local g = gutils.get_graph(player)
 
     clear_selection(g)
     draw_graph(g)
-    if vars.selected_recipe and vars.selected_recipe_entity then
-        draw_selected_entity(player, vars.selected_recipe_entity, vars.selected_recipe)
+    if g.selected_recipe and g.selected_recipe_entity then
+        draw_selected_entity(player, g.selected_recipe_entity, g.selected_recipe)
     end
 end
 

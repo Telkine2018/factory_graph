@@ -56,7 +56,7 @@ local excluded_categories = {
 }
 
 ---@param e EventData.on_lua_shortcut
-local function test_surface(e)
+local function switch_surface(e)
     local player = game.players[e.player_index]
     local character = player.character
 
@@ -78,9 +78,9 @@ local function test_surface(e)
         graph.exit(player)
     end
 end
-script.on_event(prefix .. "-alt_k", test_surface)
+script.on_event(prefix .. "-alt_k", switch_surface)
 
-tools.on_gui_click(switch_button_name, test_surface)
+tools.on_gui_click(switch_button_name, switch_surface)
 
 ---@param e EventData.on_lua_shortcut
 local function test_click(e)

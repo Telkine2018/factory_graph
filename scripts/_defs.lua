@@ -17,11 +17,21 @@ local tools = require("scripts.tools")
 ---@field x_routing RoutingSet
 ---@field y_routing RoutingSet
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
----@field product_selectors {[string]:LuaEntity}
 ---@field grid_size integer
+---@field show_hidden boolean?
 ---@field color_index integer
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
 ---@field graph_select_ids integer[]?
+---@field selected_recipe GRecipe?
+---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
+---@field selector_product_name string?             @ selected product
+---@field selector_id integer?                      @ selector rectangle id 
+---@field selector_product_name_id integer?         @ selector text id
+---@field rs_recipe GRecipe?                        @ recipe for product selection
+---@field rs_product GProduct?                      @ product for product selection
+---@field rs_location GuiLocation?
+---@field product_selectors {[string]:LuaEntity}    @ product name => entity
+---@field select_graph_panel LuaGuiElement?         @ panel for current recipe
 
 ---@class GElement
 ---@field name string     @ name of product or recipe
@@ -74,3 +84,4 @@ local tools = require("scripts.tools")
 ---@class GRecipeProductPosition
 ---@field product_name string
 ---@field recipe GRecipe
+

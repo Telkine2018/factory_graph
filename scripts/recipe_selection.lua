@@ -13,7 +13,11 @@ local function np(name)
 end
 
 local recipe_selection_frame_name = np("recipe_selection_frame")
+local cb_name = np("cb")
+
 tools.add_panel_name(recipe_selection_frame_name)
+
+local sprite_button_size = 30
 
 ---@param player LuaPlayer
 ---@param g Graph
@@ -21,6 +25,9 @@ tools.add_panel_name(recipe_selection_frame_name)
 ---@param src GRecipe
 function recipe_selection.open(player, g, product, src)
     local player_index = player.index
+
+    g.rs_product = product
+    g.rs_recipe = src
 
     recipe_selection.close(player_index)
 
@@ -40,15 +47,6 @@ function recipe_selection.open(player, g, product, src)
     local recipe_count = table_size(recipes)
     if recipe_count == 0 then return end
 
-    if recipe_count == 1 then
-        local _, found_recipe = next(recipes)
-        if not g.selection[found_recipe.name] then
-            g.selection[found_recipe.name] = found_recipe
-            recipe_selection.update_drawing(player)
-            return
-        end
-    end
-
     local frame = player.gui.screen.add {
         type = "frame",
         direction = 'vertical',
@@ -58,10 +56,12 @@ function recipe_selection.open(player, g, product, src)
     --frame.style.width = 600
     --frame.style.minimal_height = 300
 
+    local product_name = gutils.get_product_name(player, product.name)
+
     local titleflow = frame.add { type = "flow" }
-    local title_label = titleflow.add {
+    titleflow.add {
         type = "label",
-        caption = { np("title") },
+        caption = { np("title"), product_name },
         style = "frame_title",
         ignored_by_interaction = true
     }
@@ -89,11 +89,12 @@ function recipe_selection.open(player, g, product, src)
         direction = "vertical",
         style = "inside_shallow_frame_with_padding"
     }
+    flow.style.horizontally_stretchable = true
 
     local scroll = flow.add { type = "scroll-pane", horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
     scroll.style.maximal_height = 700
 
-    local recipe_table = scroll.add { type = "table", column_count = 1, draw_horizontal_lines = true, name = "recipe_table" };
+    local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
 
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
@@ -107,34 +108,49 @@ function recipe_selection.open(player, g, product, src)
     if #sorted_list == 0 then return end
 
     table.sort(sorted_list, function(r1, r2) return r1.localised < r2.localised end)
+
+    local img_arrow = commons.prefix .. "_arrow"
+
     for _, recipe_element in pairs(sorted_list) do
-        local recipe_line = recipe_table.add { type = "flow", direction = "vertical" }
+        local recipe_line = recipe_table.add { type = "flow", direction = "horizontal" }
         local recipe_name = recipe_element.grecipe.name
         recipe_line.tags = { recipe_name = recipe_name }
         local state = g.selection[recipe_name] ~= nil
 
         local recipe = recipe_element.recipe
+
+        local b = recipe_line.add {
+            type = "sprite-button",
+            name = np("goto"),
+            tooltip = { np("goto-tooltip") },
+            mouse_button_filter = { "left" },
+            sprite = commons.prefix .. "_arrow",
+        }
+        b.style.size = 18
+        b.style.right_margin = 3
+
         if recipe then
             local tooltip_builder = {}
             local start = true
-                for _, i in pairs(recipe.ingredients) do
+            local i_table = {}
+            local p_table = {}
+            for _, i in pairs(recipe.ingredients) do
                 if start then
                     start = false
                 else
                     table.insert(tooltip_builder, "\n")
                 end
+                local name, label
                 if i.type == "item" then
-                    table.insert(tooltip_builder,
-                        "[img=item/" .. i.name .. "] "
-                        .. tostring(i.amount) .. " x "
-                        .. translations.get_item_name(player_index, i.name)
-                    )
+                    name = "item/" .. i.name
+                    label = translations.get_item_name(player_index, i.name)
+                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(i.amount) .. " x " .. label)
                 else
-                    table.insert(tooltip_builder,
-                        "[img=fluid/" .. i.name .. "] "
-                        .. tostring(i.amount) .. " x "
-                        .. translations.get_fluid_name(player_index, i.name))
+                    name = "fluid/" .. i.name
+                    label = translations.get_fluid_name(player_index, i.name)
+                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(i.amount) .. " x " .. label)
                 end
+                table.insert(i_table, { name = name, tooltip = label })
             end
             table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
 
@@ -152,19 +168,20 @@ function recipe_selection.open(player, g, product, src)
                     amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
                 end
                 if p.probability and p.probability < 1 then
-                    amount = amount .. "(" .. tostring(p.probability * 100) .. ")"
+                    amount = amount .. "(" .. tostring(p.probability * 100) .. "%)"
                 end
+                local name
+                local label
                 if p.type == "item" then
-                    table.insert(tooltip_builder,
-                        "[img=item/" .. p.name .. "] "
-                        .. amount .. " x "
-                        .. translations.get_item_name(player_index, p.name))
+                    name = "item/" .. p.name
+                    label = translations.get_item_name(player_index, p.name)
+                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
                 else
-                    table.insert(tooltip_builder,
-                        "[img=fluid/" .. p.name .. "] "
-                        .. amount .. " x "
-                        .. translations.get_fluid_name(player_index, p.name))
+                    name = "fluid/" .. p.name
+                    label = translations.get_fluid_name(player_index, p.name)
+                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
                 end
+                table.insert(p_table, { name = name, tooltip = label })
             end
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
@@ -173,26 +190,56 @@ function recipe_selection.open(player, g, product, src)
                 type = "checkbox",
                 state = state,
                 caption = "[img=recipe/" .. recipe_name .. "] " .. recipe_element.localised,
-                name = "cb",
+                name = cb_name,
                 tooltip = tooltip
             }
+            recipe_line.tooltip = tooltip
+            local recipe_table = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }
+            recipe_table.style.left_margin = 10
+            for _, def in pairs(i_table) do
+                local b = recipe_table.add { type = "sprite-button", sprite = def.name, tooltip = def.tooltip  }
+                b.style.size = sprite_button_size
+                b.style.margin = 0
+                tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name})
+            end
+            recipe_table.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
+            for _, def in pairs(p_table) do
+                local b = recipe_table.add { type = "sprite-button", sprite = def.name, tooltip = def.tooltip }
+                b.style.size = sprite_button_size
+                b.style.margin = 0
+                tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
+            end
         else
             recipe_line.add {
                 type = "checkbox",
                 state = state,
                 caption = "[img=" .. recipe_name .. "] " .. recipe_element.localised,
-                name = "cb"
+                name = cb_name
             }
+            recipe_table.add { type = "label", caption = "" }
         end
     end
 
-    local button_flow = frame.add { type = "flow", direction = "horizontal" }
-
-    button_flow.add { type = "button", name = np("ok"), caption = { np("ok") } }
-    button_flow.add { type = "button", name = np("cancel"), caption = { np("cancel") } }
-
-    frame.force_auto_center()
+    if g.rs_location then
+        frame.location = g.rs_location
+    else
+        frame.force_auto_center()
+    end
 end
+
+tools.on_named_event(np("product_button"), defines.events.on_gui_click,
+    function(e)
+        local player = game.players[e.player_index]
+        local e = e.element
+        if e.valid then
+            local product_name = e.tags.product_name
+            local recipe_name = e.tags.recipe_name
+            local g = gutils.get_graph(player)
+            if g then
+                recipe_selection.open(player, g, g.products[product_name], g.recipes[recipe_name])
+            end
+        end
+    end)
 
 ---@param player LuaPlayer
 local function set_recipes_to_selection(player)
@@ -204,14 +251,27 @@ local function set_recipes_to_selection(player)
     ---@cast recipe_table -nil
     for _, line in pairs(recipe_table.children) do
         local name = line.tags.recipe_name
-        if line.cb.state then
-            g.selection[name] = g.recipes[name]
-        else
-            g.selection[name] = nil
+        local cb = line[cb_name]
+        if name and cb then
+            if cb.state then
+                g.selection[name] = g.recipes[name]
+            else
+                g.selection[name] = nil
+            end
         end
     end
     return recipes
 end
+
+tools.on_named_event(np("cb"), defines.events.on_gui_checked_state_changed,
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        set_recipes_to_selection(player)
+        gutils.select_current_recipe(g, g.rs_recipe)
+        recipe_selection.update_drawing(player)
+    end)
 
 ---@param player_index integer
 function recipe_selection.close(player_index)
@@ -219,20 +279,11 @@ function recipe_selection.close(player_index)
 
     local frame = player.gui.screen[recipe_selection_frame_name]
     if frame then
+        local g = gutils.get_graph(player)
+        g.rs_location = frame.location
         frame.destroy()
     end
 end
-
-tools.on_gui_click(np("ok"),
-    ---@param e EventData.on_gui_click
-    function(e)
-        local player = game.players[e.player_index]
-
-        set_recipes_to_selection(player)
-        recipe_selection.close(e.player_index)
-        recipe_selection.update_drawing(player)
-    end)
-
 
 tools.on_gui_click(np("close"),
     ---@param e EventData.on_gui_click
@@ -240,10 +291,24 @@ tools.on_gui_click(np("close"),
         recipe_selection.close(e.player_index)
     end)
 
-tools.on_gui_click(np("cancel"),
+
+tools.on_gui_click(np("goto"),
     ---@param e EventData.on_gui_click
     function(e)
-        recipe_selection.close(e.player_index)
+        local player = game.players[e.player_index]
+        local line = e.element.parent
+        ---@cast line -nil
+        local recipe_name = line.tags.recipe_name
+
+        local g = gutils.get_graph(player)
+        local recipe = g.recipes[recipe_name]
+        local position = gutils.get_position(g, recipe)
+
+        if e.control then
+            player.teleport(position, g.surface, false)
+        else
+            gutils.move_view(player, position)
+        end
     end)
 
 tools.on_event(defines.events.on_gui_closed,
