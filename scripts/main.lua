@@ -100,6 +100,7 @@ local function test_click(e)
 end
 script.on_event(prefix .. "-click", test_click)
 
+local tile_name = commons.tile_name
 
 ---@param player LuaPlayer
 ---@return LuaSurface
@@ -137,7 +138,7 @@ function main.enter(player)
             cliffiness = 0,
             ["tile:water:probability"] = -1000,
             ["tile:deep-water:probability"] = -1000,
-            ["tile:" .. tile_name .. ":probability"] = 1 / 0
+            ["tile:" .. tile_name .. ":probability"] = "inf"
         }
     }
 
@@ -146,7 +147,6 @@ function main.enter(player)
     surface.daytime = 0
     surface.freeze_daytime = true
     surface.show_clouds = false
-    surface.request_to_generate_chunks({ x = 0, y = 0 }, 128)
 
     local character = player.character
     vars.character = character
