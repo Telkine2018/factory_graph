@@ -331,7 +331,7 @@ function graph.do_layout(g)
             for _, ing in pairs(recipe.ingredients) do
                 product_to_process[ing.name] = ing
                 for _, irecipe in pairs(ing.product_of) do
-                    if irecipe.visible then 
+                    if irecipe.visible then
                         is_root = false
                         goto skip
                     end
@@ -388,6 +388,7 @@ function graph.do_layout(g)
             end
             local found_count
             local found_product
+            --[[
             for name, gproduct in pairs(product_to_process) do
                 if not processed_products[name] then
                     local count = table_size(gproduct.ingredient_of) + table_size(gproduct.product_of)
@@ -397,10 +398,30 @@ function graph.do_layout(g)
                     end
                 end
             end
-
+            ]]
+            for _, gproduct in pairs(product_to_process) do
+                for _, grecipe in pairs(gproduct.ingredient_of) do
+                    if not grecipe.col then
+                        local count = 0
+                        for _, ingredient in pairs(grecipe.ingredients) do
+                            if ingredient ~= gproduct and not processed_products[ingredient.name] then
+                                count = count + 1
+                            end
+                        end
+                        if count == 0 then
+                            found_product = gproduct
+                            goto product_found
+                        elseif not found_count or found_count > count then
+                            found_count = count
+                            found_product = gproduct
+                        end
+                    end
+                end
+            end
             if not found_product then
                 break
             end
+            ::product_found::
 
             add_processed_product(found_product)
 
@@ -601,19 +622,5 @@ function graph.draw(g)
         draw_recipe(g, grecipe)
     end
 end
-
-tools.on_configuration_changed(function(data)
-    for _, player in pairs(game.players) do
-        local g = tools.get_vars(player).graph
-        if g then
-            if not g.grid_size then
-                g.grid_size = commons.grid_size
-            end
-            if not g.color_index then
-                g.color_index = 0
-            end
-        end
-    end
-end)
 
 return graph

@@ -176,5 +176,25 @@ function main.exit(player)
     vars.graph = nil
 end
 
+
+tools.on_configuration_changed(function(data)
+    for _, player in pairs(game.players) do
+        local g = tools.get_vars(player).graph
+        if g then
+            if not g.grid_size then
+                g.grid_size = commons.grid_size
+            end
+            if not g.color_index then
+                g.color_index = 0
+            end
+            local has_command = player.gui.left[command.frame_name] ~= nil
+            tools.close_panels(player)
+            if has_command then
+                command.open(player)
+            end
+        end
+    end
+end)
+
 return main
 

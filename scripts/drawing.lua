@@ -2,6 +2,7 @@ local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
+local colors = require("scripts.colors")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -285,7 +286,7 @@ local function draw_horizontal_anchor(g, recipe, ids, product)
     current_ids = ids
     current_product = product
     current_surface = g.surface
-    current_color = gutils.get_product_color(g, product)
+    current_color = colors.get_product_color(g, product)
     local x = recipe.col * g.grid_size + entity_size / 2
     local y = recipe.line * g.grid_size + entity_size
 
@@ -617,7 +618,7 @@ end
 ---@param base_recipe GRecipe
 local function draw_select_ingredients(g, ids, base_recipe)
     for _, ingredient in pairs(base_recipe.ingredients) do
-        local color = gutils.get_product_color(g, ingredient)
+        local color = colors.get_product_color(g, ingredient)
         local connected_recipes = { base_recipe }
         local is_in_selection = g.selection[base_recipe.name]
 
@@ -642,7 +643,7 @@ end
 ---@param base_recipe GRecipe
 local function draw_select_products(g, ids, base_recipe)
     for _, product in pairs(base_recipe.products) do
-        local color = gutils.get_product_color(g, product)
+        local color = colors.get_product_color(g, product)
         local connected_recipes = { base_recipe }
         local is_in_selection = g.selection[base_recipe.name]
 
@@ -727,7 +728,7 @@ local function draw_graph(g)
     for product_name, recipes in pairs(product_to_recipes) do
         if table_size(recipes) > 1 and product_set[product_name] and ingredient_set[product_name] then
             local product = g.products[product_name]
-            local color = gutils.get_product_color(g, product)
+            local color = colors.get_product_color(g, product)
             draw_recipe_connections(g, ids, product, recipes, color)
         end
     end

@@ -2,6 +2,8 @@ local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
+local colors = require("scripts.colors")
+local recipe_selection = require("scripts.recipe_selection")
 
 local graph = require("scripts.graph")
 local drawing = require("scripts.drawing")
@@ -15,10 +17,12 @@ local function np(name)
     return prefix .. "-command." .. name
 end
 
-local settings_frame_name = np("command")
-tools.add_panel_name(settings_frame_name)
+local command_frame_name = np("command")
+tools.add_panel_name(command_frame_name)
 
-local select_modes = {
+command.frame_name      = command_frame_name
+
+local select_modes      = {
 
     commons.none_selection,
     commons.ingredient_selection,
@@ -31,8 +35,8 @@ for _, name in pairs(select_modes) do
 end
 
 local visibility_items = {
-    {np("visibility_all")},
-    {np("visibility_selection")}
+    { np("visibility_all") },
+    { np("visibility_selection") }
 }
 
 ---@param player LuaPlayer
@@ -45,7 +49,7 @@ function command.open(player)
     local frame = player.gui.left.add {
         type = "frame",
         direction = 'vertical',
-        name = settings_frame_name
+        name = command_frame_name
     }
 
     --frame.style.width = 600
@@ -64,7 +68,7 @@ function command.open(player)
         style = "flib_titlebar_drag_handle"
     }
 
-    local flow = frame.add {
+    local inner_frame = frame.add {
         type = "frame",
         direction = "vertical",
         style = "inside_shallow_frame_with_padding"
@@ -77,14 +81,14 @@ function command.open(player)
             break
         end
     end
-    local hflow = flow.add { type = "flow", direction = "horizontal" }
+    local hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "label", caption = { np("selection_label") } }
     hflow.add { type = "drop-down", caption = { "selection_mode" }, items = select_mode_items, selected_index = select_index, name = np("selection") }
     hflow.style.bottom_margin = 5
 
     local visibility = g.visibility
     if not visibility then visibility = commons.visibility_all end
-    hflow = flow.add { type = "flow", direction = "horizontal" }
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "label", caption = { np("visibility_label") } }
     hflow.add { type = "drop-down", caption = { "visibility_mode" }, items = visibility_items, selected_index = visibility, name = np("visibility") }
     hflow.add {
@@ -95,8 +99,28 @@ function command.open(player)
         sprite = prefix .. "_refresh_white",
         hovered_sprite = prefix .. "_refresh_black"
     }
+    hflow.style.bottom_margin = 5
 
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "button", caption = { np("search-text") }, name = np("search-text") }
+    hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
 end
+
+tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        colors.recompute_colors(g)
+        drawing.update_drawing(player)
+    end)
+
+tools.on_named_event(np("search-text"), defines.events.on_gui_click,
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        recipe_selection.open(player, g)
+    end)
 
 tools.on_named_event(np("selection"), defines.events.on_gui_selection_state_changed,
     function(e)
@@ -128,7 +152,7 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         local g = gutils.get_graph(player)
         g.visibility = e.element.selected_index
         refresh(player)
-        player.teleport({0,0})
+        player.teleport({ 0, 0 })
     end)
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
@@ -140,7 +164,7 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
 
 ---@param player LuaPlayer
 function command.close(player)
-    local frame = player.gui.left[settings_frame_name]
+    local frame = player.gui.left[command_frame_name]
     if frame then
         frame.destroy()
     end

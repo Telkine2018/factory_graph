@@ -118,6 +118,13 @@ function translations.get_item_description(player_index, name)
     return translations.get_translation(player_index, "item_description", name)
 end
 
+---@param player_index integer
+---@param dic_name string
+---@return table<string, string>
+function translations.get_all(player_index, dic_name)
+    return dictionary.get_all(player_index)[dic_name]
+end
+
 script.on_event(dictionary.on_player_dictionaries_ready, function(e)
     local player = game.players[e.player_index]
     local vars = tools.get_vars(player)
