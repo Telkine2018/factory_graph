@@ -131,5 +131,24 @@ sprite = {
 }
 add(sprite)
 
+sprite = {
+  type = "sprite",
+  name = prefix .. "_refresh_black",
+  filename = png("refresh_black"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
+sprite = {
+  type = "sprite",
+  name = prefix .. "_refresh_white",
+  filename = png("refresh_white"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
+
 data:extend(declarations)
 

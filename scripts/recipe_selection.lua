@@ -3,6 +3,9 @@ local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 
+local drawing = require("scripts.drawing")
+local graph = require("scripts.graph")
+
 local debug = tools.debug
 local prefix = commons.prefix
 
@@ -242,25 +245,33 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
     end)
 
 ---@param player LuaPlayer
+---@return {[string]:GRecipe}   @ all selected
+---@return {[string]:GRecipe}   @ all invisible
 local function set_recipes_to_selection(player)
     local frame = player.gui.screen[recipe_selection_frame_name]
     local recipe_table = tools.get_child(frame, "recipe_table")
     local g = gutils.get_graph(player)
 
     local recipes = {}
+    local not_visible = {}
     ---@cast recipe_table -nil
     for _, line in pairs(recipe_table.children) do
         local name = line.tags.recipe_name
         local cb = line[cb_name]
         if name and cb then
             if cb.state then
-                g.selection[name] = g.recipes[name]
+                local grecipe = g.recipes[name]
+                g.selection[name] = grecipe
+                recipes[name] = grecipe
+                if not grecipe.visible then
+                    not_visible[name] = grecipe
+                end
             else
                 g.selection[name] = nil
             end
         end
     end
-    return recipes
+    return recipes, not_visible
 end
 
 tools.on_named_event(np("cb"), defines.events.on_gui_checked_state_changed,
@@ -268,9 +279,15 @@ tools.on_named_event(np("cb"), defines.events.on_gui_checked_state_changed,
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
 
-        set_recipes_to_selection(player)
+        local _, not_visible = set_recipes_to_selection(player)
+        
+        for _, grecipe in pairs(not_visible) do
+            grecipe.visible = true
+            graph.layout_recipe(g, grecipe)
+        end
+        graph.draw(g)
         gutils.select_current_recipe(g, g.rs_recipe)
-        recipe_selection.update_drawing(player)
+        drawing.update_drawing(player)
     end)
 
 ---@param player_index integer
@@ -302,6 +319,9 @@ tools.on_gui_click(np("goto"),
 
         local g = gutils.get_graph(player)
         local recipe = g.recipes[recipe_name]
+        if not recipe.visible  then
+            return 
+        end
         local position = gutils.get_position(g, recipe)
 
         if e.control then
@@ -320,8 +340,7 @@ tools.on_event(defines.events.on_gui_closed,
         end
     end)
 
----@param player LuaPlayer
-function recipe_selection.update_drawing(player)
-end
+
+drawing.open_recipe_selection=recipe_selection.open
 
 return recipe_selection

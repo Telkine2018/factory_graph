@@ -23,10 +23,14 @@ local commons = {
     ingredient_and_product_selection = "ingredient_and_product",
     ingredient_selection = "ingredient",
     product_selection = "product",
-    non_selection = "none"
+    none_selection = "none",
+
+    visibility_all = 1,
+    visibility_selection = 2
 }
 
 commons.default_selection = commons.ingredient_and_product_selection
+commons.surface_prefix_filter = "^" .. commons.surface_prefix
 
 ---@param name string
 ---@return string

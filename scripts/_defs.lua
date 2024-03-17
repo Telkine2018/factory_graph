@@ -7,19 +7,22 @@ local tools = require("scripts.tools")
 ---@field surface LuaSurface
 ---@field recipes {[string]:GRecipe}
 ---@field products {[string]:GProduct}
+---@field root_products {[string]:GProduct}
 ---@field entity_map {[integer]:(GRecipe|GProduct)}
 ---@field player LuaPlayer
 ---@field gcols GCol[]
----@field root_products {[string]:GProduct}
----@field excluded_categories {[string]:boolean}?
+---@field current_col integer
+---@field product_line integer
 ---@field selection {[string]:GElement}?
 ---@field graph_ids integer[]?
 ---@field x_routing RoutingSet
 ---@field y_routing RoutingSet
+---@field excluded_categories {[string]:boolean}?
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
 ---@field grid_size integer
 ---@field show_hidden boolean?
 ---@field color_index integer
+---@field visibility integer?
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
 ---@field graph_select_ids integer[]?
 ---@field selected_recipe GRecipe?
@@ -53,6 +56,7 @@ local tools = require("scripts.tools")
 ---@field products  GProduct[]
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
+---@field visible boolean?
 
 ---@class GCol
 ---@field col integer

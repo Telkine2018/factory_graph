@@ -210,4 +210,32 @@ function gutils.select_current_recipe(g, recipe)
     return true
 end
 
+---@param g Graph
+function gutils.set_visibility_to_selection(g)
+    local selection = g.selection
+    if not selection then
+        selection = {}
+    end
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.line = nil
+        grecipe.col = nil
+        grecipe.selector_positions = nil
+        if selection[grecipe.name] then
+            grecipe.visible = true
+        else
+            grecipe.visible = false
+        end
+    end
+end
+
+---@param g Graph
+function gutils.set_full_visibility(g)
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.line = nil
+        grecipe.col = nil
+        grecipe.selector_positions = nil
+        grecipe.visible = true
+    end
+end
+
 return gutils

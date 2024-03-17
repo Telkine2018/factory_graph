@@ -7,6 +7,9 @@ local debug = tools.debug
 local prefix = commons.prefix
 
 local graph = require("scripts.graph")
+local command = require("scripts.command")
+
+local main = {}
 
 local surface_prefix = commons.surface_prefix
 local recipe_symbol_name = prefix .. "-recipe-symbol"
@@ -60,12 +63,13 @@ local function switch_surface(e)
     local player = game.players[e.player_index]
     local character = player.character
 
-    if character then
+    if not string.match(player.surface.name, commons.surface_prefix_filter) then
 
         if not player.gui.left[switch_button_name] then
             player.gui.left.add {type="button", name=switch_button_name, caption="Grapher"}
         end
-        local surface = graph.enter(player)
+
+        local surface = main.enter(player)
 
         local g = graph.new(surface)
         g.player = player
@@ -74,8 +78,9 @@ local function switch_surface(e)
         graph.add_recipes(g, recipes, excluded_categories)
         graph.do_layout(g)
         graph.draw(g)
+        command.open(player)
     else
-        graph.exit(player)
+        main.exit(player)
     end
 end
 script.on_event(prefix .. "-alt_k", switch_surface)
@@ -95,4 +100,81 @@ local function test_click(e)
 end
 script.on_event(prefix .. "-click", test_click)
 
+
+---@param player LuaPlayer
+---@return LuaSurface
+function main.enter(player)
+    local vars = tools.get_vars(player)
+
+    if not game.tile_prototypes[tile_name] then
+        tile_name = "lab-dark-2"
+    end
+
+    local settings = {
+        height = 1000,
+        width = 1000,
+        autoplace_controls = {},
+        default_enable_all_autoplace_controls = false,
+        cliff_settings = { cliff_elevation_0 = 1024 },
+        starting_area = "none",
+        starting_points = {},
+        terrain_segmentation = "none",
+        autoplace_settings = {
+            entity = { treat_missing_as_default = false, frequency = "none" },
+            tile = {
+                treat_missing_as_default = false,
+                settings = {
+                    [tile_name] = {
+                        frequency = 6,
+                        size = 6,
+                        richness = 6
+                    }
+                }
+            },
+            decorative = { treat_missing_as_default = false, frequency = "none" }
+        },
+        property_expression_names = {
+            cliffiness = 0,
+            ["tile:water:probability"] = -1000,
+            ["tile:deep-water:probability"] = -1000,
+            ["tile:" .. tile_name .. ":probability"] = 1 / 0
+        }
+    }
+
+    local surface = game.create_surface(surface_prefix .. player.index, settings)
+    surface.map_gen_settings = settings
+    surface.daytime = 0
+    surface.freeze_daytime = true
+    surface.show_clouds = false
+    surface.request_to_generate_chunks({ x = 0, y = 0 }, 128)
+
+    local character = player.character
+    vars.character = character
+    vars.surface = surface
+    ---@cast character -nil
+    player.disassociate_character(character)
+    local controller_type
+    controller_type = defines.controllers.ghost
+    controller_type = defines.controllers.spectator
+    controller_type = defines.controllers.god
+    player.set_controller { type = controller_type }
+    player.teleport({ 0, 0 }, surface)
+    return surface
+end
+
+---@param player LuaPlayer
+function main.exit(player)
+    local vars = tools.get_vars(player)
+
+    tools.close_panels(player)
+    local character = vars.character
+    player.teleport(character.position, character.surface)
+    player.associate_character(vars.character)
+    player.set_controller { type = defines.controllers.character, character = vars.character }
+    game.delete_surface(vars.surface)
+    command.close(player)
+    vars.graph = nil
+end
+
+return main
 

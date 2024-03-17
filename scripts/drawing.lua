@@ -2,13 +2,12 @@ local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
-local recipe_selection = require("scripts.recipe_selection")
 
 local debug = tools.debug
 local prefix = commons.prefix
 
 local function np(name)
-    return prefix .. "-recipe_selection." .. name
+    return prefix .. "-drawing." .. name
 end
 
 local add_debug_info = false
@@ -39,9 +38,6 @@ local select_modes = {
     "product",
     "ingredient_and_product"
 }
-
----@type GRecipe
-local current_recipe
 
 local null_value
 
@@ -102,11 +98,11 @@ end
 
 
 ---@param g Graph
-local function clear_selection(g)
+function drawing.clear_selection(g)
     g.graph_select_ids = gutils.destroy_drawing(g.graph_select_ids)
     if g.select_product_positions then
         for _, p in pairs(g.select_product_positions) do
-            p.recipe[p.product_name] = nil
+            p.recipe.selector_positions[p.product_name] = nil
         end
         g.select_product_positions = nil
     end
@@ -171,6 +167,136 @@ local function get_routing(routings, range_position, limit1, limit2, disp_delta)
     return disp * disp_delta
 end
 
+---@type LuaSurface
+local current_surface
+---@type integer[]
+local current_ids
+---@type GProduct
+local current_product
+---@type Color
+local current_color
+---@type GRecipe
+local current_recipe
+---@type Graph
+local current_g
+
+local function clear_globals()
+    current_recipe = null_value
+    current_color = null_value
+    current_ids = null_value
+    current_product = null_value
+    current_surface = null_value
+    current_g = null_value
+end
+
+
+---@param x number
+---@param y number
+---@param positive boolean
+local function draw_product_h(x, y, positive)
+    local x1
+    if positive then
+        x1 = x - marker_offset
+        x = x + product_sprite_offset
+    else
+        x1 = x + marker_offset
+        x = x - product_sprite_offset
+    end
+    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+        x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
+    table.insert(current_ids, id)
+
+    local orientation = 0
+
+    if (positive) then
+        orientation = 0
+    else
+        orientation = 0.5
+    end
+    if current_product.product_of[current_recipe.name] then
+        orientation = 0.5 - orientation
+    end
+    id = rendering.draw_sprite {
+        surface = current_surface, sprite = sprite_arrow1, target = { x1, y },
+        tint = current_color,
+        x_scale = marker_scale, y_scale = marker_scale,
+        orientation = orientation }
+    table.insert(current_ids, id)
+
+    if not current_recipe.selector_positions then current_recipe.selector_positions = {} end
+    if not current_recipe.selector_positions[current_product.name] then
+        if current_g.select_product_positions then
+            table.insert(current_g.select_product_positions, { product_name = current_product.name, recipe = current_recipe })
+        end
+        current_recipe.selector_positions[current_product.name] = { x, y }
+    end
+end
+
+---@param x number
+---@param y number
+---@param positive boolean
+local function draw_product_v(x, y, positive)
+    local y1
+    if positive then
+        y1 = y - marker_offset
+        y = y + product_sprite_offset
+    else
+        y1 = y + marker_offset
+        y = y - product_sprite_offset
+    end
+    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+        x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
+    table.insert(current_ids, id)
+
+    local orientation = 0
+
+    if (positive) then
+        orientation = 0
+    else
+        orientation = 0.5
+    end
+    if current_product.product_of[current_recipe.name] then
+        orientation = 0.5 - orientation
+    end
+    orientation = orientation + 0.25
+    id = rendering.draw_sprite {
+        surface = current_surface, sprite = sprite_arrow1, target = { x, y1 },
+        tint = current_color,
+        x_scale = marker_scale, y_scale = marker_scale,
+        orientation = orientation }
+    table.insert(current_ids, id)
+
+    if not current_recipe.selector_positions then current_recipe.selector_positions = {} end
+    if not current_recipe.selector_positions[current_product.name] then
+        if current_g.select_product_positions then
+            table.insert(current_g.select_product_positions, { product_name = current_product.name, recipe = current_recipe })
+        end
+        current_recipe.selector_positions[current_product.name] = { x, y }
+    end
+end
+
+---@param g Graph
+---@param recipe GRecipe
+---@param ids integer[]
+---@param product GProduct
+local function draw_horizontal_anchor(g, recipe, ids, product)
+    current_g = g
+    current_recipe = recipe
+    current_ids = ids
+    current_product = product
+    current_surface = g.surface
+    current_color = gutils.get_product_color(g, product)
+    local x = recipe.col * g.grid_size + entity_size / 2
+    local y = recipe.line * g.grid_size + entity_size
+
+    local disp = get_routing(g.y_routing, x, y, y + entity_size, product_disp_delta)
+    x = x + disp
+    draw_product_v(x, y, false)
+
+    clear_globals()
+end
+
+
 ---@param g Graph
 ---@param ids integer[]
 ---@param product GProduct
@@ -183,29 +309,36 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
     local lineavg = 0
     local product_count = 0
 
-    local surface = g.surface
     local grid_size = g.grid_size
     local grid_middle = (grid_size - entity_size) / 2
+
+    current_surface = g.surface
+    current_ids = ids
+    current_product = product
+    current_color = color
+    current_g = g
 
     routing_tag = routing_tag + 1
 
     ---@param recipes {[string]:GRecipe}
     local function analyze_recipes(recipes)
         for _, recipe in pairs(recipes) do
-            if not colmax then
-                colmax = recipe.col
-                colmin = recipe.col
-                linemax = recipe.line
-                linemin = recipe.line
-            else
-                if recipe.col < colmin then colmin = recipe.col end
-                if recipe.col > colmax then colmax = recipe.col end
-                if recipe.line < linemin then linemin = recipe.line end
-                if recipe.line > linemax then linemax = recipe.line end
+            if recipe.visible then
+                if not colmax then
+                    colmax = recipe.col
+                    colmin = recipe.col
+                    linemax = recipe.line
+                    linemin = recipe.line
+                else
+                    if recipe.col < colmin then colmin = recipe.col end
+                    if recipe.col > colmax then colmax = recipe.col end
+                    if recipe.line < linemin then linemin = recipe.line end
+                    if recipe.line > linemax then linemax = recipe.line end
+                end
+                colavg = colavg + recipe.col
+                lineavg = lineavg + recipe.line
+                product_count = product_count + 1
             end
-            colavg = colavg + recipe.col
-            lineavg = lineavg + recipe.line
-            product_count = product_count + 1
         end
     end
 
@@ -224,98 +357,13 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
     ---@param p1 MapPosition
     ---@param p2 MapPosition
     local function draw_line(p1, p2)
-        local line_info = { surface = surface, color = color, from = p1, to = p2, width = 1 }
+        local line_info = { surface = current_surface, color = current_color, from = p1, to = p2, width = 1 }
         if (dash) then
             line_info.dash_length = 0.05
             line_info.gap_length = 0.1
         end
         local id = rendering.draw_line(line_info)
-        table.insert(ids, id)
-    end
-
-    ---@param x number
-    ---@param y number
-    ---@param positive boolean
-    local function draw_product_h(x, y, positive)
-        local x1
-        if positive then
-            x1 = x - marker_offset
-            x = x + product_sprite_offset
-        else
-            x1 = x + marker_offset
-            x = x - product_sprite_offset
-        end
-        local id = rendering.draw_sprite { surface = surface, sprite = product.name, target = { x, y },
-            x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
-        table.insert(ids, id)
-
-        local orientation = 0
-
-        if (positive) then
-            orientation = 0
-        else
-            orientation = 0.5
-        end
-        if product.product_of[current_recipe.name] then
-            orientation = 0.5 - orientation
-        end
-        id = rendering.draw_sprite {
-            surface = surface, sprite = sprite_arrow1, target = { x1, y },
-            tint = color,
-            x_scale = marker_scale, y_scale = marker_scale,
-            orientation = orientation }
-        table.insert(ids, id)
-
-        if not current_recipe.selector_positions then current_recipe.selector_positions = {} end
-        if not current_recipe.selector_positions[product.name] then
-            if g.select_product_positions then
-                table.insert(g.select_product_positions, { product_name = product.name, recipe = current_recipe })
-            end
-            current_recipe.selector_positions[product.name] = { x, y }
-        end
-    end
-
-    ---@param x number
-    ---@param y number
-    ---@param positive boolean
-    local function draw_product_v(x, y, positive)
-        local y1
-        if positive then
-            y1 = y - marker_offset
-            y = y + product_sprite_offset
-        else
-            y1 = y + marker_offset
-            y = y - product_sprite_offset
-        end
-        local id = rendering.draw_sprite { surface = surface, sprite = product.name, target = { x, y },
-            x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
-        table.insert(ids, id)
-
-        local orientation = 0
-
-        if (positive) then
-            orientation = 0
-        else
-            orientation = 0.5
-        end
-        if product.product_of[current_recipe.name] then
-            orientation = 0.5 - orientation
-        end
-        orientation = orientation + 0.25
-        id = rendering.draw_sprite {
-            surface = surface, sprite = sprite_arrow1, target = { x, y1 },
-            tint = color,
-            x_scale = marker_scale, y_scale = marker_scale,
-            orientation = orientation }
-        table.insert(ids, id)
-
-        if not current_recipe.selector_positions then current_recipe.selector_positions = {} end
-        if not current_recipe.selector_positions[product.name] then
-            if g.select_product_positions then
-                table.insert(g.select_product_positions, { product_name = product.name, recipe = current_recipe })
-            end
-            current_recipe.selector_positions[product.name] = { x, y }
-        end
+        table.insert(current_ids, id)
     end
 
     ---@param col integer
@@ -561,7 +609,7 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             end
         end
     end
-    current_recipe = null_value
+    clear_globals()
 end
 
 ---@param g Graph
@@ -574,10 +622,12 @@ local function draw_select_ingredients(g, ids, base_recipe)
         local is_in_selection = g.selection[base_recipe.name]
 
         for _, recipe in pairs(ingredient.product_of) do
-            if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
-                goto cont
-            else
-                table.insert(connected_recipes, recipe)
+            if recipe.visible then
+                if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
+                    goto cont
+                else
+                    table.insert(connected_recipes, recipe)
+                end
             end
         end
         if #connected_recipes > 1 then
@@ -598,10 +648,12 @@ local function draw_select_products(g, ids, base_recipe)
 
         if not g.selection[product.name] then
             for _, recipe in pairs(product.ingredient_of) do
-                if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
-                    goto cont
-                else
-                    table.insert(connected_recipes, recipe)
+                if recipe.visible then
+                    if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
+                        goto cont
+                    else
+                        table.insert(connected_recipes, recipe)
+                    end
                 end
             end
             if #connected_recipes > 1 then
@@ -615,7 +667,7 @@ end
 
 ---@param g Graph
 local function draw_graph(g)
-    clear_selection(g)
+    drawing.clear_selection(g)
 
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
     if not g.selection then return end
@@ -633,35 +685,35 @@ local function draw_graph(g)
         recipe.selector_positions = nil
     end
 
-    for name, o in pairs(g.selection) do
-        if g.recipes[name] then
-            ---@cast o GRecipe
+    for name, crecipe in pairs(g.selection) do
+        ---@cast crecipe GRecipe
 
-            for _, ingredient in pairs(o.ingredients) do
+        if crecipe.visible then
+            for _, ingredient in pairs(crecipe.ingredients) do
                 local recipes = product_to_recipes[ingredient.name]
                 if not recipes then
-                    recipes = { [o.name] = o }
+                    recipes = { [crecipe.name] = crecipe }
                     product_to_recipes[ingredient.name] = recipes
                 else
-                    recipes[o.name] = o
+                    recipes[crecipe.name] = crecipe
                 end
                 ingredient_set[ingredient.name] = ingredient
             end
 
-            for _, prod in pairs(o.products) do
+            for _, prod in pairs(crecipe.products) do
                 local recipes = product_to_recipes[prod.name]
                 if not recipes then
-                    recipes = { [o.name] = o }
+                    recipes = { [crecipe.name] = crecipe }
                     product_to_recipes[prod.name] = recipes
                 else
-                    recipes[o.name] = o
+                    recipes[crecipe.name] = crecipe
                 end
                 product_set[prod.name] = prod
             end
 
             local margin = 0.6
             local grid_size = g.grid_size
-            local p = { x = grid_size * o.col + 0.5, y = grid_size * o.line + 0.5 }
+            local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
                 left_top = { p.x - margin, p.y - margin },
                 right_bottom = { p.x + margin, p.y + margin },
@@ -743,7 +795,7 @@ local function draw_selected_entity(player, entity, grecipe)
     ---@type Graph
     local g = vars.graph;
 
-    clear_selection(g)
+    drawing.clear_selection(g)
 
     local ids = {}
     g.graph_select_ids = ids
@@ -758,24 +810,31 @@ local function draw_selected_entity(player, entity, grecipe)
         vertical_alignment = "top", alignment = "center", scale = recipe_font_size }
     table.insert(ids, id)
 
-    if grecipe.selector_positions then
-        ---@type {[string]:LuaEntity}
-        local selectors = {}
-        local products = gutils.product_set(grecipe)
-        for product_name, _ in pairs(products) do
-            local position = grecipe.selector_positions[product_name]
-            if position then
-                local entity = g.surface.create_entity {
-                    name = commons.product_selector_name,
-                    position = position,
-                    force = g.player.force_index,
-                    create_build_effect_smoke = false
-                }
-                selectors[product_name] = entity
-            end
-        end
-        g.product_selectors = selectors
+    local products = gutils.product_set(grecipe)
+
+    if not grecipe.selector_positions then
+        grecipe.selector_positions = {}
     end
+
+    ---@type {[string]:LuaEntity}
+    local selectors = {}
+    routing_tag = 1000
+    for product_name, _ in pairs(products) do
+        local position = grecipe.selector_positions[product_name]
+        if not position then
+            draw_horizontal_anchor(g, grecipe, ids, g.products[product_name])
+            position = grecipe.selector_positions[product_name]
+            routing_tag = routing_tag + 1
+        end
+        local entity = g.surface.create_entity {
+            name = commons.product_selector_name,
+            position = position,
+            force = g.player.force_index,
+            create_build_effect_smoke = false
+        }
+        selectors[product_name] = entity
+    end
+    g.product_selectors = selectors
 end
 
 ---@param player_index integer
@@ -878,7 +937,7 @@ local function on_selected_entity_changed(e)
             }
             local grecipe = g.selected_recipe
             if grecipe then
-                local product = drawing.get_product_from_selected(player, g, entity)
+                local product = drawing.get_product_from_selected(player, entity)
                 if product then
                     if entity.valid then
                         g.selector_product_name = product.name
@@ -914,7 +973,7 @@ local function on_selected_entity_changed(e)
         select_panel.destroy()
     end
 
-    clear_selection(g)
+    drawing.clear_selection(g)
 
     if g.select_graph_panel then
         g.select_graph_panel.destroy()
@@ -971,9 +1030,9 @@ local function on_gui_opened(e)
 
             player.opened = nil
         elseif entity_name == commons.product_selector_name then
-            local product = drawing.get_product_from_selected(player, g, entity)
+            local product = drawing.get_product_from_selected(player, entity)
             if product then
-                recipe_selection.open(player, g, product, grecipe)
+                drawing.open_recipe_selection(player, g, product, grecipe)
             end
             player.opened = nil
         end
@@ -981,12 +1040,9 @@ local function on_gui_opened(e)
 end
 tools.on_event(defines.events.on_gui_opened, on_gui_opened)
 
-
 ---@param player LuaPlayer
----@param g Graph
 ---@param entity LuaEntity
----@return GProduct?
-function drawing.get_product_from_selected(player, g, entity)
+function drawing.get_product_from_selected(player, entity)
     local g = gutils.get_graph(player)
     for product_name, selector in pairs(g.product_selectors) do
         if selector == entity then
@@ -999,16 +1055,39 @@ end
 
 ---@param player LuaPlayer
 function drawing.update_drawing(player)
-    ---@type Graph
     local g = gutils.get_graph(player)
 
-    clear_selection(g)
+    drawing.clear_selection(g)
     draw_graph(g)
     if g.selected_recipe and g.selected_recipe_entity then
         draw_selected_entity(player, g.selected_recipe_entity, g.selected_recipe)
     end
 end
 
-recipe_selection.update_drawing = drawing.update_drawing
+---@param g Graph
+function drawing.delete_content(g)
+    drawing.clear_selection(g)
+    g.graph_ids = gutils.destroy_drawing(g.graph_ids)
+
+    local entities = g.surface.find_entities_filtered {}
+    for _, entity in pairs(entities) do
+        entity.destroy { raise_destroy = false }
+    end
+    -- g.surface.clear(true)
+    for _, recipe in pairs(g.recipes) do
+        recipe.entity = nil
+        recipe.line = nil
+        recipe.col = nil
+    end
+    g.entity_map = {}
+    g.gcols = {}
+end
+
+---@param player LuaPlayer
+---@param g Graph
+---@param product GProduct
+---@param src GRecipe
+function drawing.open_recipe_selection(player, g, product, src)
+end
 
 return drawing
