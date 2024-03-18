@@ -74,7 +74,7 @@ local function switch_surface(e)
         local g = graph.new(surface)
         g.player = player
         tools.get_vars(player).graph = g
-        local recipes = game.recipe_prototypes
+        local recipes = player.force.recipes
         graph.add_recipes(g, recipes, excluded_categories)
         graph.do_layout(g)
         graph.draw(g)
@@ -191,6 +191,15 @@ tools.on_configuration_changed(function(data)
             tools.close_panels(player)
             if has_command then
                 command.open(player)
+            end
+            local recipes = player.force.recipes
+            for _, grecipe in pairs(g.recipes) do
+                local r = recipes[grecipe.name]
+                if r then
+                    grecipe.enabled = r.enabled
+                else
+                    grecipe.enabled = true
+                end
             end
         end
     end

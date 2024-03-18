@@ -22,7 +22,7 @@ end
 
 ---@param type string
 ---@param prototypes {[string]:any}
-local function load_translations(type, prototypes)
+local function load_names_and_descriptions(type, prototypes)
 
     local dic_name = type .. "_name"
     local dic_description = type .. "_description"
@@ -35,23 +35,38 @@ local function load_translations(type, prototypes)
     end
 end
 
-local function load_prototypes()
-    load_translations("fluid", game.fluid_prototypes)
-    load_translations("item", game.item_prototypes)
+---@param type string
+---@param prototypes {[string]:any}
+local function load_names(type, prototypes)
 
-    load_translations("recipe_category", game.recipe_category_prototypes)
-    load_translations("recipe", game.recipe_prototypes)
+    local dic_name = type .. "_name"
+    dictionary.new(dic_name)
+
+    for name, proto in pairs(prototypes) do
+        add(dic_name, name, proto.localised_name)
+    end
+end
+
+
+local function load_translations()
+    load_names_and_descriptions("fluid", game.fluid_prototypes)
+    load_names_and_descriptions("item", game.item_prototypes)
+
+    load_names_and_descriptions("recipe_category", game.recipe_category_prototypes)
+    load_names_and_descriptions("recipe", game.recipe_prototypes)
+
+    load_names("technology", game.technology_prototypes)
 end
 
 tools.on_init(function()
     dictionary.on_init()
-    load_prototypes()
+    load_translations()
 end
 )
 
 tools.on_configuration_changed(function(data)
     dictionary.on_configuration_changed()
-    load_prototypes()
+    load_translations()
 end)
 
 for event, handler in pairs(dictionary.events) do

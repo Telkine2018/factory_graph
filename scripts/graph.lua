@@ -6,14 +6,12 @@ local drawing = require("scripts.drawing")
 
 local prefix = commons.prefix
 
-local surface_prefix = commons.surface_prefix
-local tile_name = commons.tile_name
-
 local graph = {}
 local recipe_sprite_scale = 0.5
 
 local e_recipe_name = commons.recipe_symbol_name
 local e_product_name = commons.product_symbol_name
+local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
@@ -56,7 +54,7 @@ local function get_product(g, name)
 end
 
 ---@param g Graph
----@param recipes table<string, LuaRecipePrototype>
+---@param recipes table<string, LuaRecipe>
 ---@param excluded_categories {[string]:boolean}?
 function graph.add_recipes(g, recipes, excluded_categories)
     if not excluded_categories then
@@ -71,9 +69,14 @@ function graph.add_recipes(g, recipes, excluded_categories)
                     name = name,
                     ingredients = {},
                     products = {},
-                    visible = true
+                    visible = true,
                 }
                 g.recipes[name] = grecipe
+                if recipe.enabled then
+                    grecipe.enabled = true
+                else
+                    grecipe.enabled = false
+                end
                 if recipe.ingredients then
                     for _, ingredient in pairs(recipe.ingredients) do
                         local iname = ingredient.type .. "/" .. ingredient.name
@@ -153,6 +156,7 @@ function find_free_line(gcol, initial)
         end
         dist = dist + 1
     until not found
+    dist = dist - 1
     return line
 end
 
@@ -191,18 +195,24 @@ function graph.layout_recipe(g, grecipe)
     local count = 0
     local max_col
     local gcols = g.gcols
+
+    if grecipe.name == "slag-processing-1" then
+        log("test")
+    end
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
-                local col = irecipe.col
-                if col then
-                    if not max_col or col > max_col then
-                        max_col = col
-                        count = 1
-                        line = irecipe.line
-                    elseif max_col == col then
-                        count = count + 1
-                        line = line + irecipe.line
+                if irecipe.visible then
+                    local col = irecipe.col
+                    if col then
+                        if not max_col or col > max_col then
+                            max_col = col
+                            count = 1
+                            line = irecipe.line
+                        elseif max_col == col then
+                            count = count + 1
+                            line = line + irecipe.line
+                        end
                     end
                 end
             end
@@ -228,9 +238,19 @@ function graph.layout_recipe(g, grecipe)
             end
         end
     end
+
+    local gcol = gcols[g.current_col]
+    if not gcol then
+        gcol = { col = g.current_col, line_set = {} }
+        gcols[g.current_col] = gcol
+    end
+
     if count == 0 then
-        line = g.product_line
-        g.product_line = g.product_line + 1
+        if not gcol.max_line then
+            line = find_free_line(gcol, 0)
+        else
+            line = find_free_line(gcol, gcol.max_line + 1)
+        end
     else
         line = math.ceil(line / count)
     end
@@ -239,10 +259,12 @@ function graph.layout_recipe(g, grecipe)
     local found_line
     local found_col
     if not max_col then
-        local gcol = gcols[g.current_col]
-        if not gcol then
-            gcol = { col = g.current_col, line_set = {} }
-            gcols[g.current_col] = gcol
+        line = g.product_line
+        if not gcol.max_line then
+            local prevcol = gcols[g.current_col - 1]
+            if prevcol then
+                line = math.floor((prevcol.min_line + prevcol.max_line) / 2)
+            end
         end
         line = alloc_free_line(gcol, line, grecipe)
         found_col = g.current_col
@@ -348,7 +370,7 @@ function graph.do_layout(g)
     end
 
     g.current_col = initial_col
-    while next(remaining_recipes) do
+    while true do
         ---@type {[string]:GRecipe}
         local processed_recipes = {}
 
@@ -452,6 +474,7 @@ function graph.do_layout(g)
 
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
+    graph.reverse_equalize_recipes(g)
 end
 
 ---@param g Graph
@@ -485,47 +508,12 @@ function graph.reverse_equalize_recipes(g)
                     end
                 end
             end
+            
             if count == 0 then
                 alloc_free_line(new_cols, line_recipe.line, line_recipe)
             else
                 line = math.ceil(line / count)
                 alloc_free_line(new_cols, line, line_recipe)
-            end
-        end
-    end
-end
-
----@param g Graph
-function graph.equalize_roots(g)
-    local root_col = {
-        col = 1,
-        line_set = {}
-    }
-    for _, product in pairs(g.root_products) do
-        if product.root_recipe.visible then
-            local count = 0
-            local line = 0
-            local min_dcol
-
-            for _, recipe in pairs(product.ingredient_of) do
-                if recipe.visible then
-                    local dcol = math.abs(recipe.col - product.col)
-                    if not min_dcol or dcol < min_dcol then
-                        line = recipe.line
-                        min_dcol = dcol
-                        count = 1
-                    elseif min_dcol == dcol then
-                        line = line + recipe.line
-                        count = count + 1
-                    end
-                end
-            end
-
-            if count == 0 then
-                alloc_free_line(root_col, product.line, product.root_recipe)
-            else
-                line = math.ceil(line / count)
-                alloc_free_line(root_col, line, product.root_recipe)
             end
         end
     end
@@ -563,8 +551,8 @@ function graph.equalize_recipes(g)
                         end
                     end
                 else
-                    for _, product in pairs(line_recipe.ingredients) do
-                        for _, recipe in pairs(product.product_of) do
+                    for _, product in pairs(line_recipe.products) do
+                        for _, recipe in pairs(product.ingredient_of) do
                             if recipe.visible and recipe.col then
                                 local dcol = math.abs(recipe.col - line_recipe.col)
                                 if not min_dcol or dcol < min_dcol then
@@ -601,9 +589,12 @@ local function draw_recipe(g, grecipe)
     if grecipe.is_product then
         sprite_name = grecipe.name
         entity_name = e_product_name
-    else
+    elseif grecipe.enabled then
         sprite_name = "recipe/" .. grecipe.name
         entity_name = e_recipe_name
+    else
+        sprite_name = "recipe/" .. grecipe.name
+        entity_name = e_unresearched_name
     end
     local surface = g.surface
     local x = grecipe.col * g.grid_size + 0.5
@@ -621,6 +612,16 @@ function graph.draw(g)
     for _, grecipe in pairs(g.recipes) do
         draw_recipe(g, grecipe)
     end
+end
+
+---@param player LuaPlayer
+function graph.refresh(player)
+    local g = gutils.get_graph(player)
+    gutils.compute_visibility(g)
+    drawing.delete_content(g)
+    graph.do_layout(g)
+    graph.draw(g)
+    drawing.update_drawing(player)
 end
 
 return graph

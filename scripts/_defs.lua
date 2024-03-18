@@ -21,6 +21,7 @@ local tools = require("scripts.tools")
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
 ---@field grid_size integer
 ---@field show_hidden boolean?
+---@field show_only_researched boolean?
 ---@field color_index integer
 ---@field visibility integer?
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
@@ -35,6 +36,7 @@ local tools = require("scripts.tools")
 ---@field rs_location GuiLocation?
 ---@field product_selectors {[string]:LuaEntity}    @ product name => entity
 ---@field select_graph_panel LuaGuiElement?         @ panel for current recipe
+---@field highlighted_recipes table<string, GRecipe>
 
 ---@class GElement
 ---@field name string     @ name of product or recipe
@@ -57,6 +59,7 @@ local tools = require("scripts.tools")
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
 ---@field visible boolean?
+---@field enabled boolean?
 
 ---@class GCol
 ---@field col integer

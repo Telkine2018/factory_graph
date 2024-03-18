@@ -145,30 +145,36 @@ function gutils.select_current_recipe(g, recipe)
 end
 
 ---@param g Graph
-function gutils.set_visibility_to_selection(g)
-    local selection = g.selection
-    if not selection then
-        selection = {}
-    end
-    for _, grecipe in pairs(g.recipes) do
-        grecipe.line = nil
-        grecipe.col = nil
-        grecipe.selector_positions = nil
-        if selection[grecipe.name] then
-            grecipe.visible = true
-        else
-            grecipe.visible = false
+function gutils.compute_visibility(g)
+    local show_only_researched = g.show_only_researched
+    if g.visibility == commons.visibility_selection then
+        local selection = g.selection
+        if not selection then
+            selection = {}
         end
-    end
-end
-
----@param g Graph
-function gutils.set_full_visibility(g)
-    for _, grecipe in pairs(g.recipes) do
-        grecipe.line = nil
-        grecipe.col = nil
-        grecipe.selector_positions = nil
-        grecipe.visible = true
+        for _, grecipe in pairs(g.recipes) do
+            grecipe.line = nil
+            grecipe.col = nil
+            grecipe.selector_positions = nil
+            if selection[grecipe.name] then
+                grecipe.visible = true
+                if show_only_researched and not grecipe.enabled then
+                    grecipe.visible = false
+                end
+            else
+                grecipe.visible = false
+            end
+        end
+    else -- if g.visibility == commons.visibility_all then
+        for _, grecipe in pairs(g.recipes) do
+            grecipe.line = nil
+            grecipe.col = nil
+            grecipe.selector_positions = nil
+            grecipe.visible = true
+            if show_only_researched and not grecipe.enabled then
+                grecipe.visible = false
+            end
+        end
     end
 end
 
@@ -192,6 +198,42 @@ function gutils.get_visible_products(g)
         ::skip::
     end
     return products
+end
+
+---@generic KEY
+---@param recipes table<KEY, GRecipe>
+---@return table<KEY, GRecipe>
+function gutils.filter_enabled_recipe(recipes)
+    local new_recipes = {}
+    for key, recipe in pairs(recipes) do
+        if recipe.enabled then
+            new_recipes[key] = recipe
+        end
+    end
+    return new_recipes
+end
+
+---@param grecipe GRecipe
+function gutils.get_connected_recipe(grecipe)
+    local result = {}
+
+    for _, ingredient in pairs(grecipe.ingredients) do
+        for _, irecipe in pairs(ingredient.product_of) do
+            if irecipe.visible then
+                result[irecipe.name] = irecipe
+            end
+        end
+    end
+
+    for _, product in pairs(grecipe.products) do
+        for _, precipe in pairs(product.ingredient_of) do
+            if precipe.visible then
+                result[precipe.name] = precipe
+            end
+        end
+    end
+    result[grecipe.name] = nil
+    return result
 end
 
 return gutils

@@ -104,7 +104,21 @@ function command.open(player)
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("search-text") }, name = np("search-text") }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
+
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "checkbox", caption = { np("only-researched") }, name = np("only-researched"), state = not not g.show_only_researched }
 end
+
+tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        local state = e.element.state
+
+        g.show_only_researched = state
+        graph.refresh(player)
+    end)
 
 tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
     function(e)
@@ -129,21 +143,6 @@ tools.on_named_event(np("selection"), defines.events.on_gui_selection_state_chan
         g.select_mode = select_modes[e.element.selected_index]
     end)
 
----@param player any
-local function refresh(player)
-    local g = gutils.get_graph(player)
-    if g.visibility == commons.visibility_all then
-        gutils.set_full_visibility(g)
-    elseif g.visibility == commons.visibility_selection then
-        gutils.set_visibility_to_selection(g)
-    else
-        gutils.set_full_visibility(g)
-    end
-    drawing.delete_content(g)
-    graph.do_layout(g)
-    graph.draw(g)
-    drawing.update_drawing(player)
-end
 
 tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_changed,
     function(e)
@@ -151,16 +150,15 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         ---@type Graph
         local g = gutils.get_graph(player)
         g.visibility = e.element.selected_index
-        refresh(player)
+        graph.refresh(player)
         player.teleport({ 0, 0 })
     end)
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
-        refresh(player)
+        graph.refresh(player)
     end)
-
 
 ---@param player LuaPlayer
 function command.close(player)

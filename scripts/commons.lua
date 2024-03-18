@@ -15,6 +15,7 @@ local commons = {
 
     recipe_symbol_name = prefix .. "-recipe-symbol",
     product_symbol_name = prefix .. "-product-symbol",
+    unresearched_symbol_name = prefix .. "-unresearched-symbol",
     product_selector_name = prefix .. "-product-selector",
 
     selector_size = 0.1,

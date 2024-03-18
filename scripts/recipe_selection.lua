@@ -47,6 +47,9 @@ function recipe_selection.open(player, g, product, recipe)
             end
         end
         recipes[recipe.name] = nil
+        if g.show_only_researched then
+            recipes = gutils.filter_enabled_recipe(recipes)
+        end
 
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
@@ -150,6 +153,9 @@ local function do_search(player)
                 recipes[name] = recipe
             end
         end
+    end
+    if g.show_only_researched then
+        recipes = gutils.filter_enabled_recipe(recipes)
     end
 
     local recipe_table = tools.get_child(frame, "recipe_table")
@@ -339,11 +345,17 @@ function recipe_selection.display(player, recipes, recipe_table)
             end
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
+            local start_color = ""
+            local end_color = ""
+            if not recipe_element.grecipe.enabled then
+                start_color = "[color=1,0.42,0]"
+                end_color = "[/color]"
+            end
             local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
             recipe_line.add {
                 type = "checkbox",
                 state = state,
-                caption = "[img=recipe/" .. recipe_name .. "] " .. recipe_element.localised,
+                caption = "[img=recipe/" .. recipe_name .. "] " .. start_color .. recipe_element.localised .. end_color,
                 name = cb_name,
                 tooltip = tooltip
             }

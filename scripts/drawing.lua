@@ -40,6 +40,12 @@ local select_modes = {
     "ingredient_and_product"
 }
 
+local recipe_entity_names = {
+    [commons.recipe_symbol_name] = true,
+    [commons.product_symbol_name] = true,
+    [commons.unresearched_symbol_name] = true,
+}
+
 local null_value
 
 ---@param player_index integer
@@ -686,7 +692,8 @@ local function draw_graph(g)
         recipe.selector_positions = nil
     end
 
-    for name, crecipe in pairs(g.selection) do
+    local grid_size = g.grid_size
+    for _, crecipe in pairs(g.selection) do
         ---@cast crecipe GRecipe
 
         if crecipe.visible then
@@ -713,7 +720,6 @@ local function draw_graph(g)
             end
 
             local margin = 0.6
-            local grid_size = g.grid_size
             local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
                 left_top = { p.x - margin, p.y - margin },
@@ -787,6 +793,24 @@ function drawing.next_select_mode(g)
     g.select_mode = select_modes[1]
 end
 
+---@param g Graph
+---@param recipe GRecipe
+---@param ids integer[]
+local function draw_connected_recipes(g, recipe, ids)
+    local connected_recipe = gutils.get_connected_recipe(recipe)
+    local grid_size = g.grid_size
+
+    for _, grecipe in pairs(connected_recipe) do
+        local margin = 0.6
+        local p = { x = grid_size * grecipe.col + 0.5, y = grid_size * grecipe.line + 0.5 }
+        id = rendering.draw_rectangle { surface = g.surface, color = { 1, 0, 0 },
+            left_top = { p.x - margin, p.y - margin },
+            right_bottom = { p.x + margin, p.y + margin }
+        }
+        table.insert(ids, id)
+    end
+end
+
 ---@param player LuaPlayer
 ---@param entity LuaEntity
 ---@param grecipe GRecipe
@@ -803,6 +827,8 @@ local function draw_selected_entity(player, entity, grecipe)
 
     g.select_product_positions = {}
     draw_select_set(g, ids, grecipe)
+
+    draw_connected_recipes(g, grecipe, ids)
 
     ---@type LocalisedString
     local localised_name = gutils.get_recipe_name(player, grecipe)
@@ -986,7 +1012,7 @@ local function on_selected_entity_changed(e)
     end
 
     ---@cast entity LuaEntity
-    if entity.name == commons.recipe_symbol_name or entity.name == commons.product_symbol_name then
+    if recipe_entity_names[entity.name] then
         ---@type GRecipe
         local grecipe = g.entity_map[entity.unit_number]
         if grecipe then
@@ -1004,18 +1030,21 @@ tools.on_event(defines.events.on_selected_entity_changed, on_selected_entity_cha
 ---@param e EventData.on_gui_opened
 local function on_gui_opened(e)
     local player = game.players[e.player_index]
-
     local entity = e.entity
+
+    if not string.find(player.surface.name, commons.surface_prefix_filter) then return end
 
     ---@type Graph
     local g = gutils.get_graph(player)
+    if not g then return end
+
     ---@type GRecipe
     local grecipe = g.selected_recipe
 
     if not g then return end
     if entity then
         local entity_name = entity.name
-        if entity_name == commons.recipe_symbol_name or entity_name == commons.product_symbol_name then
+        if recipe_entity_names[entity_name] then
             local grecipe = g.entity_map[entity.unit_number]
             if not grecipe then return end
 

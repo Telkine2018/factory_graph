@@ -68,7 +68,8 @@ local function create_symbol(name, filename)
 end
 
 create_symbol(commons.product_symbol_name, png("entity/product-symbol/product-symbol"))
-local entity = create_symbol(commons.recipe_symbol_name, png("entity/recipe-symbol/recipe-symbol"))
+create_symbol(commons.recipe_symbol_name, png("entity/recipe-symbol/recipe-symbol"))
+create_symbol(commons.unresearched_symbol_name, png("entity/unresearched-symbol/unresearched-symbol"))
 
 add({
   type = "sprite",
