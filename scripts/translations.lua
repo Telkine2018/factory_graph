@@ -55,14 +55,14 @@ local function load_translations()
     load_names_and_descriptions("recipe_category", game.recipe_category_prototypes)
     load_names_and_descriptions("recipe", game.recipe_prototypes)
 
+    load_names("entity", game.entity_prototypes)
     load_names("technology", game.technology_prototypes)
 end
 
 tools.on_init(function()
     dictionary.on_init()
     load_translations()
-end
-)
+end)
 
 tools.on_configuration_changed(function(data)
     dictionary.on_configuration_changed()
@@ -131,6 +131,20 @@ end
 ---@return string?
 function translations.get_item_description(player_index, name)
     return translations.get_translation(player_index, "item_description", name)
+end
+
+---@param player_index integer
+---@param name string
+---@return string?
+function translations.get_entity_name(player_index, name)
+    return translations.get_translation(player_index, "entity_name", name)
+end
+
+---@param player_index integer
+---@param name string
+---@return string?
+function translations.get_technology_name(player_index, name)
+    return translations.get_translation(player_index, "technology_name", name)
 end
 
 ---@param player_index integer

@@ -131,6 +131,7 @@ end
 
 local function do_search(player)
     local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
     local textfield = tools.get_child(frame, np("search_field"))
     if not textfield then return end
 
@@ -196,6 +197,7 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
 ---@return {[string]:GRecipe}   @ all invisible
 local function set_recipes_to_selection(player)
     local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return {},{} end
     local recipe_table = tools.get_child(frame, "recipe_table")
     local g = gutils.get_graph(player)
 

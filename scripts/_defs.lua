@@ -26,6 +26,7 @@ local tools = require("scripts.tools")
 ---@field visibility integer?
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
 ---@field graph_select_ids integer[]?
+---@field highlighted_recipes_ids integer[]?
 ---@field selected_recipe GRecipe?
 ---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
 ---@field selector_product_name string?             @ selected product

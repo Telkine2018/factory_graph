@@ -215,7 +215,18 @@ end
 
 ---@param grecipe GRecipe
 function gutils.get_connected_recipe(grecipe)
-    local result = {}
+    local result = gutils.get_connected_ingredients(grecipe)
+    gutils.get_connected_productions(grecipe)
+    result[grecipe.name] = nil
+    return result
+end
+
+---@param grecipe GRecipe
+---@param result table<string, GRecipe>?
+---@return table<string, GRecipe>
+function gutils.get_connected_ingredients(grecipe, result)
+
+    if not result then result = {} end
 
     for _, ingredient in pairs(grecipe.ingredients) do
         for _, irecipe in pairs(ingredient.product_of) do
@@ -224,6 +235,15 @@ function gutils.get_connected_recipe(grecipe)
             end
         end
     end
+    return result
+end
+
+---@param grecipe GRecipe
+---@param result table<string, GRecipe>?
+---@return table<string, GRecipe>
+function gutils.get_connected_productions(grecipe, result)
+
+    if not result then result = {} end
 
     for _, product in pairs(grecipe.products) do
         for _, precipe in pairs(product.ingredient_of) do
@@ -232,8 +252,8 @@ function gutils.get_connected_recipe(grecipe)
             end
         end
     end
-    result[grecipe.name] = nil
     return result
 end
+
 
 return gutils

@@ -3,6 +3,8 @@ local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local colors = require("scripts.colors")
+local recipe_panel = require("scripts.recipe_panel")
+
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -14,8 +16,6 @@ end
 local add_debug_info = false
 
 local surface_prefix = commons.surface_prefix
-local select_panel_name = np("select")
-tools.add_panel_name(select_panel_name)
 
 local drawing = {}
 local routing_tag = 1
@@ -48,54 +48,6 @@ local recipe_entity_names = {
 
 local null_value
 
----@param player_index integer
----@param product Product|Ingredient
----@return LocalisedString
----@return integer
-local function get_product_label(player_index, product)
-    local size = 0
-    local caption = { "" }
-    table.insert(caption, "[" .. product.type .. "=" .. product.name .. "] ")
-    size = 0
-
-    local s
-    if product.amount then
-        s = tostring(product.amount)
-        size = size + #s
-        table.insert(caption, s)
-    elseif product.amount_min then
-        s = tostring(product.amount_min)
-        table.insert(caption, s)
-        size = size + #s + 1
-        table.insert(caption, "-")
-        s = tostring(product.amount_max)
-        table.insert(caption, s)
-        size = size + #s
-    end
-    if product.probability and product.probability ~= 1 then
-        s = " " .. tostring(product.probability * 100) .. "%"
-        table.insert(caption, s)
-        size = size + #s
-    end
-
-    table.insert(caption, " x ")
-    size = size + 3
-
-    local lname
-    if product.type == "item" then
-        lname = translations.get_item_name(player_index, product.name)
-    else
-        lname = translations.get_fluid_name(player_index, product.name)
-    end
-    if not lname then
-        lname = product.name
-    end
-    table.insert(caption, " " .. lname)
-    size = size + #lname + 1
-
-    return caption, size
-end
-
 ---@param g Graph
 local function clear_routing(g)
     g.x_routing = {}
@@ -107,6 +59,7 @@ end
 ---@param g Graph
 function drawing.clear_selection(g)
     g.graph_select_ids = gutils.destroy_drawing(g.graph_select_ids)
+    g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
     if g.select_product_positions then
         for _, p in pairs(g.select_product_positions) do
             p.recipe.selector_positions[p.product_name] = nil
@@ -794,22 +747,75 @@ function drawing.next_select_mode(g)
 end
 
 ---@param g Graph
----@param recipe GRecipe
----@param ids integer[]
-local function draw_connected_recipes(g, recipe, ids)
-    local connected_recipe = gutils.get_connected_recipe(recipe)
+---@param recipes table<string, GRecipe>
+---@param color Color
+local function highlight_recipes(g, recipes, color)
     local grid_size = g.grid_size
 
-    for _, grecipe in pairs(connected_recipe) do
+    local ids = g.highlighted_recipes_ids
+    ---@cast ids -nil
+    for _, grecipe in pairs(recipes) do
         local margin = 0.6
         local p = { x = grid_size * grecipe.col + 0.5, y = grid_size * grecipe.line + 0.5 }
-        id = rendering.draw_rectangle { surface = g.surface, color = { 1, 0, 0 },
+        id = rendering.draw_rectangle { surface = g.surface, color = color,
             left_top = { p.x - margin, p.y - margin },
-            right_bottom = { p.x + margin, p.y + margin }
+            right_bottom = { p.x + margin, p.y + margin },
+            width = 3
         }
         table.insert(ids, id)
     end
 end
+
+local ingredient_color = {255,106,0}
+local production_color = {1,0,0}
+
+---@param g Graph
+---@param recipe GRecipe
+local function draw_connected_recipes(g, recipe)
+    g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
+    g.highlighted_recipes_ids = {}
+
+    local recipes = gutils.get_connected_ingredients(recipe)
+    highlight_recipes(g, recipes, ingredient_color)
+    local recipes = gutils.get_connected_productions(recipe)
+    highlight_recipes(g, recipes, production_color)
+end
+
+---@param g Graph
+---@param recipe GRecipe
+---@param product GProduct
+local function draw_connected_by_product(g, recipe, product)
+    g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
+    g.highlighted_recipes_ids = {}
+
+    local drawed_recipes = {}
+    if product.ingredient_of[recipe.name] then
+        for _, ingredient in pairs(recipe.ingredients) do
+            if ingredient.name == product.name then
+                for _, irecipe in pairs(ingredient.product_of) do
+                    if irecipe.visible then
+                        drawed_recipes[irecipe.name] = irecipe
+                    end
+                end
+                highlight_recipes(g, drawed_recipes, ingredient_color)
+                break
+            end
+        end
+    else
+        for _, product in pairs(recipe.products) do
+            if product.name == product.name then
+                for _, precipe in pairs(product.ingredient_of) do
+                    if precipe.visible then
+                        drawed_recipes[precipe.name] = precipe
+                    end
+                end
+                highlight_recipes(g, drawed_recipes, production_color)
+                break
+            end
+        end
+    end
+end
+
 
 ---@param player LuaPlayer
 ---@param entity LuaEntity
@@ -828,7 +834,7 @@ local function draw_selected_entity(player, entity, grecipe)
     g.select_product_positions = {}
     draw_select_set(g, ids, grecipe)
 
-    draw_connected_recipes(g, grecipe, ids)
+    draw_connected_recipes(g, grecipe)
 
     ---@type LocalisedString
     local localised_name = gutils.get_recipe_name(player, grecipe)
@@ -862,69 +868,6 @@ local function draw_selected_entity(player, entity, grecipe)
         selectors[product_name] = entity
     end
     g.product_selectors = selectors
-end
-
----@param player_index integer
----@param grecipe GRecipe
-local function create_recipe_panel(player_index, grecipe)
-    local player = game.players[player_index]
-    local g = gutils.get_graph(player)
-
-    ---@type LuaRecipePrototype
-    local recipe = game.recipe_prototypes[grecipe.name]
-
-    ---@type LocalisedString
-    local name = translations.get_recipe_name(player_index, grecipe.name)
-
-    if add_debug_info then
-        name = { "", name, "[", grecipe.name, "]" }
-    end
-
-    local frame = player.gui.left.add { type = "frame", caption = name, name = select_panel_name }
-    frame.style.minimal_width = 300
-    g.select_graph_panel = frame
-
-    local flow = frame.add {
-        type = "frame",
-        direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
-    }
-    local max = 0
-    if recipe.ingredients then
-        for _, p in pairs(recipe.ingredients) do
-            local caption, size = get_product_label(player_index, p)
-            if size > max then
-                max = size
-            end
-            if add_debug_info then
-                caption = { "", caption, " [", p.name, "]" }
-            end
-            flow.add { type = "label", caption = caption }
-        end
-    end
-
-    local line_margin = 5
-    local line = flow.add { type = "line" }
-    line.style.top_margin = line_margin
-    line.style.bottom_margin = line_margin
-    if recipe.products then
-        for _, p in pairs(recipe.products) do
-            local caption, size = get_product_label(player_index, p)
-            if size > max then
-                max = size
-            end
-            if add_debug_info then
-                caption = { "", caption, " [", p.name, "]" }
-            end
-            flow.add { type = "label", caption = caption }
-        end
-    end
-
-    line = flow.add { type = "line" }
-    line.style.top_margin = line_margin
-    line.style.bottom_margin = line_margin
-
-    flow.add { type = "label", caption = { np("speed"), tostring(recipe.energy) } }
 end
 
 ---@param e EventData.on_selected_entity_changed
@@ -978,15 +921,17 @@ local function on_selected_entity_changed(e)
                             text = text,
                             scale = 0.4
                         }
+                        draw_connected_by_product(g, grecipe, product)
                     end
                 end
             end
             return
         end
 
-        if entity.name == commons.recipe_symbol_name then
+        if recipe_entity_names[entity] then
             local grecipe = g.entity_map[entity.unit_number]
             if grecipe and grecipe.name and grecipe == g.selected_recipe then
+                draw_connected_recipes(g, grecipe)
                 return
             end
         end
@@ -995,11 +940,8 @@ local function on_selected_entity_changed(e)
     g.selected_recipe = nil
     g.selected_recipe_entity = nil
 
-    local select_panel = player.gui.left[select_panel_name]
-    if select_panel then
-        select_panel.destroy()
-    end
-
+    recipe_panel.close(player)
+    
     drawing.clear_selection(g)
 
     if g.select_graph_panel then
@@ -1017,7 +959,7 @@ local function on_selected_entity_changed(e)
         local grecipe = g.entity_map[entity.unit_number]
         if grecipe then
             if not grecipe.is_product then
-                create_recipe_panel(player_index, grecipe)
+                recipe_panel.create(player_index, grecipe)
             end
             g.selected_recipe = grecipe
             g.selected_recipe_entity = entity

@@ -27,7 +27,8 @@ local commons = {
     none_selection = "none",
 
     visibility_all = 1,
-    visibility_selection = 2
+    visibility_selection = 2,
+    add_debug_info = false
 }
 
 commons.default_selection = commons.ingredient_and_product_selection
