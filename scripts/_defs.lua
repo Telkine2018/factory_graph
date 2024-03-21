@@ -51,6 +51,7 @@ local tools = require("scripts.tools")
 ---@field is_root boolean?
 ---@field root_recipe GRecipe?
 ---@field color Color
+---@field ids integer[]?
 
 ---@class GRecipe : GElement
 ---@field line integer?

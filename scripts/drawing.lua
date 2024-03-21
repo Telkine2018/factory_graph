@@ -8,12 +8,11 @@ local recipe_panel = require("scripts.recipe_panel")
 
 local debug = tools.debug
 local prefix = commons.prefix
+local destroy_drawing = gutils.destroy_drawing
 
 local function np(name)
     return prefix .. "-drawing." .. name
 end
-
-local add_debug_info = false
 
 local surface_prefix = commons.surface_prefix
 
@@ -56,8 +55,57 @@ local function clear_routing(g)
 end
 
 
+---@param product GProduct
+---@param dash boolean
+function dash_line_for_product(product, dash)
+    if product.ids then
+        for _, id in pairs(product.ids) do
+            if dash then
+                rendering.set_dashes(id, 0.05, 0.1)
+            else
+                rendering.set_dashes(id, 0, 0)
+            end
+        end
+    end
+end
+
+---@param g Graph
+---@param crecipe GRecipe
+---@param dash boolean
+function dash_lines(g, crecipe, dash)
+    local product_to_recipes = {}
+    if crecipe.visible then
+        for _, ingredient in pairs(crecipe.ingredients) do
+            local recipes = product_to_recipes[ingredient.name]
+            if not recipes then
+                recipes = { [crecipe.name] = crecipe }
+                product_to_recipes[ingredient.name] = recipes
+            else
+                recipes[crecipe.name] = crecipe
+            end
+        end
+        for _, prod in pairs(crecipe.products) do
+            local recipes = product_to_recipes[prod.name]
+            if not recipes then
+                recipes = { [crecipe.name] = crecipe }
+                product_to_recipes[prod.name] = recipes
+            else
+                recipes[crecipe.name] = crecipe
+            end
+        end
+    end
+
+    for product_name, _ in pairs(product_to_recipes) do
+        local product = g.products[product_name]
+        dash_line_for_product(product, dash)
+    end
+end
+
 ---@param g Graph
 function drawing.clear_selection(g)
+    if g.selected_recipe then
+        dash_lines(g, g.selected_recipe, false)
+    end
     g.graph_select_ids = gutils.destroy_drawing(g.graph_select_ids)
     g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
     if g.select_product_positions then
@@ -324,6 +372,14 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
         end
         local id = rendering.draw_line(line_info)
         table.insert(current_ids, id)
+
+        if current_ids ~= g.graph_select_ids then
+            if product.ids then
+                table.insert(product.ids, id)
+            else
+                product.ids = { id }
+            end
+        end
     end
 
     ---@param col integer
@@ -606,7 +662,7 @@ local function draw_select_products(g, ids, base_recipe)
         local connected_recipes = { base_recipe }
         local is_in_selection = g.selection[base_recipe.name]
 
-        if not g.selection[product.name] then
+        if not g.selection[product.name] and not product.ingredient_of[base_recipe.name] then
             for _, recipe in pairs(product.ingredient_of) do
                 if recipe.visible then
                     if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
@@ -630,6 +686,10 @@ local function draw_graph(g)
     drawing.clear_selection(g)
 
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
+    for _, gproduct in pairs(g.products) do
+        gproduct.ids = nil
+    end
+
     if not g.selection then return end
 
     ---@type {[string]:{[string]:GRecipe}}
@@ -692,6 +752,28 @@ local function draw_graph(g)
         end
     end
     g.graph_ids = ids
+end
+
+---@param g Graph
+---@param crecipe GRecipe
+function drawing.draw_target(g, crecipe)
+    local margin = 0.7
+    local grid_size = g.grid_size
+    local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
+    local top = { p.x - margin, p.y - margin }
+    local bottom = { p.x + margin, p.y + margin }
+
+    ---@param color Color
+    ---@param time_to_live integer
+    function draw_color(color, time_to_live)
+        rendering.draw_rectangle { surface = g.surface, color = color, left_top = top, right_bottom = bottom, width = 2, time_to_live = time_to_live }
+    end
+    for i = 2, 0, -1 do
+        local j = 2 * i + 2
+        draw_color({1, 0, 0}, (j + 1) * 30)
+        draw_color({0, 0, 0}, j * 30)
+    end
+    draw_color({1, 0, 0}, 1 * 30)
 end
 
 ---@param g Graph
@@ -766,8 +848,8 @@ local function highlight_recipes(g, recipes, color)
     end
 end
 
-local ingredient_color = {255,106,0}
-local production_color = {1,0,0}
+local ingredient_color = { 255, 106, 0 }
+local production_color = { 1, 0, 0 }
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -885,7 +967,6 @@ local function on_selected_entity_changed(e)
     if not g then return end
 
     local entity = player.selected
-    -- game.print("[" .. game.tick .. "] => " .. serpent.block(entity and (entity.name .. ":" .. tools.strip(entity.position)) or "null"))
 
     if (g.selector_id) then
         rendering.destroy(g.selector_id)
@@ -922,6 +1003,8 @@ local function on_selected_entity_changed(e)
                             scale = 0.4
                         }
                         draw_connected_by_product(g, grecipe, product)
+                        dash_lines(g, grecipe, false)
+                        dash_line_for_product(product, true)
                     end
                 end
             end
@@ -937,18 +1020,16 @@ local function on_selected_entity_changed(e)
         end
     end
 
-    g.selected_recipe = nil
-    g.selected_recipe_entity = nil
-
-    recipe_panel.close(player)
-    
     drawing.clear_selection(g)
+    recipe_panel.close(player)
 
     if g.select_graph_panel then
         g.select_graph_panel.destroy()
         g.select_graph_panel = nil
     end
 
+    g.selected_recipe = nil
+    g.selected_recipe_entity = nil
     if not entity then
         return
     end
@@ -964,6 +1045,7 @@ local function on_selected_entity_changed(e)
             g.selected_recipe = grecipe
             g.selected_recipe_entity = entity
             draw_selected_entity(player, entity, grecipe)
+            dash_lines(g, grecipe, true)
         end
     end
 end

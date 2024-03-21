@@ -196,9 +196,6 @@ function graph.layout_recipe(g, grecipe)
     local max_col
     local gcols = g.gcols
 
-    if grecipe.name == "slag-processing-1" then
-        log("test")
-    end
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
@@ -306,6 +303,7 @@ function graph.do_layout(g)
     ---@type {[string]:GProduct}
     local processed_products = {}
 
+    ---@type GCol[]
     local gcols = {}
     g.gcols = gcols
 
@@ -317,7 +315,6 @@ function graph.do_layout(g)
 
     ---@type {[string]:GProduct}
     local product_to_process = {}
-
 
     ---@param product GProduct
     function add_processed_product(product)
@@ -347,27 +344,33 @@ function graph.do_layout(g)
         end
     end
 
+    local recipe_count = 0
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible and not recipe.line then
-            local is_root = true
-            for _, ing in pairs(recipe.ingredients) do
-                product_to_process[ing.name] = ing
-                for _, irecipe in pairs(ing.product_of) do
-                    if irecipe.visible then
-                        is_root = false
-                        goto skip
+        if recipe.visible then
+            if not recipe.line then
+                local is_root = true
+                for _, ing in pairs(recipe.ingredients) do
+                    product_to_process[ing.name] = ing
+                    for _, irecipe in pairs(ing.product_of) do
+                        if irecipe.visible then
+                            is_root = false
+                            goto skip
+                        end
                     end
+                    ::skip::
                 end
-                ::skip::
+                for _, prod in pairs(recipe.products) do
+                    product_to_process[prod.name] = prod
+                end
+                if is_root then
+                    remaining_recipes[recipe.name] = recipe
+                end
             end
-            for _, prod in pairs(recipe.products) do
-                product_to_process[prod.name] = prod
-            end
-            if is_root then
-                remaining_recipes[recipe.name] = recipe
-            end
+            recipe_count = recipe_count + 1
         end
     end
+
+    local edge_size = math.max(math.ceil(0.5 * math.sqrt(recipe_count)),3)
 
     g.current_col = initial_col
     while true do
@@ -410,34 +413,47 @@ function graph.do_layout(g)
             end
             local found_count
             local found_product
-            --[[
-            for name, gproduct in pairs(product_to_process) do
-                if not processed_products[name] then
-                    local count = table_size(gproduct.ingredient_of) + table_size(gproduct.product_of)
-                    if not found_count or count > found_count then
-                        found_product = gproduct
-                        found_count = count
-                    end
-                end
-            end
-            ]]
+            local found_avg_col
+            local found_avg_col_count
             for _, gproduct in pairs(product_to_process) do
+                local count = 0
+                local avg_col = 0
+                local avg_col_count = 0
                 for _, grecipe in pairs(gproduct.ingredient_of) do
                     if not grecipe.col then
-                        local count = 0
                         for _, ingredient in pairs(grecipe.ingredients) do
                             if ingredient ~= gproduct and not processed_products[ingredient.name] then
                                 count = count + 1
                             end
                         end
-                        if count == 0 then
-                            found_product = gproduct
-                            goto product_found
-                        elseif not found_count or found_count > count then
-                            found_count = count
-                            found_product = gproduct
-                        end
+                    else
+                        avg_col = avg_col + grecipe.col
+                        avg_col_count = avg_col_count + 1
                     end
+                end
+                for _, grecipe in pairs(gproduct.product_of) do
+                    if not grecipe.col then
+                        local count = 0
+                        for _, prod in pairs(grecipe.products) do
+                            if prod ~= gproduct and not processed_products[prod.name] then
+                                count = count + 1
+                            end
+                        end
+                    else
+                        avg_col = avg_col + grecipe.col
+                        avg_col_count = avg_col_count + 1
+                    end
+                end
+                if count == 0 then
+                    found_product = gproduct
+                    found_avg_col = avg_col
+                    found_avg_col_count = avg_col_count
+                    goto product_found
+                elseif not found_count or found_count > count then
+                    found_count = count
+                    found_product = gproduct
+                    found_avg_col = avg_col
+                    found_avg_col_count = avg_col_count
                 end
             end
             if not found_product then
@@ -445,7 +461,19 @@ function graph.do_layout(g)
             end
             ::product_found::
 
+            if found_avg_col then
+                found_avg_col = math.ceil(found_avg_col / found_avg_col_count)
+                if found_avg_col < g.current_col - 1 then
+                    local col = found_avg_col + 1
+                    local gcol = gcols[col]
+
+                    if not gcol or (gcol.max_line - gcol.min_line + 1) < edge_size then
+                        g.current_col = col
+                    end
+                end
+            end
             add_processed_product(found_product)
+
 
             ::line_found::
             goto restart
@@ -474,7 +502,6 @@ function graph.do_layout(g)
 
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
-    graph.reverse_equalize_recipes(g)
 end
 
 ---@param g Graph
@@ -508,7 +535,7 @@ function graph.reverse_equalize_recipes(g)
                     end
                 end
             end
-            
+
             if count == 0 then
                 alloc_free_line(new_cols, line_recipe.line, line_recipe)
             else
@@ -551,8 +578,8 @@ function graph.equalize_recipes(g)
                         end
                     end
                 else
-                    for _, product in pairs(line_recipe.products) do
-                        for _, recipe in pairs(product.ingredient_of) do
+                    for _, ingredient in pairs(line_recipe.ingredients) do
+                        for _, recipe in pairs(ingredient.product_of) do
                             if recipe.visible and recipe.col then
                                 local dcol = math.abs(recipe.col - line_recipe.col)
                                 if not min_dcol or dcol < min_dcol then

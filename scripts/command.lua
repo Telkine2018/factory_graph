@@ -7,6 +7,7 @@ local recipe_selection = require("scripts.recipe_selection")
 
 local graph = require("scripts.graph")
 local drawing = require("scripts.drawing")
+local flow_panel = require("scripts.flow_panel")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -81,10 +82,7 @@ function command.open(player)
             break
         end
     end
-    local hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "label", caption = { np("selection_label") } }
-    hflow.add { type = "drop-down", caption = { "selection_mode" }, items = select_mode_items, selected_index = select_index, name = np("selection") }
-    hflow.style.bottom_margin = 5
+    local hflow
 
     local visibility = g.visibility
     if not visibility then visibility = commons.visibility_all end
@@ -104,10 +102,16 @@ function command.open(player)
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("search-text") }, name = np("search-text") }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
+    hflow.style.bottom_margin = 5
 
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "checkbox", caption = { np("only-researched") }, name = np("only-researched"), state = not not g.show_only_researched }
+    hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "button", caption = { np("flow") }, name = np("flow") }
+    hflow.style.bottom_margin = 5
 end
 
 tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
@@ -158,6 +162,12 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
         graph.refresh(player)
+    end)
+
+tools.on_named_event(np("flow"), defines.events.on_gui_click,
+    function(e)
+        local player = game.players[e.player_index]
+        flow_panel.create(player.index)
     end)
 
 ---@param player LuaPlayer

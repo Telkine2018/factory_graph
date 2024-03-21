@@ -13,8 +13,8 @@ local function np(name)
     return prefix .. "-recipe-panel." .. name
 end
 
-local select_panel_name = np("select")
-tools.add_panel_name(select_panel_name)
+local recipe_panel_name = np("frame ")
+tools.add_panel_name(recipe_panel_name)
 
 ---@param player_index integer
 ---@param product Product|Ingredient
@@ -80,7 +80,7 @@ function recipe_panel.create(player_index, grecipe)
         name = { "", name, "[", grecipe.name, "]" }
     end
 
-    local frame = player.gui.left.add { type = "frame", caption = name, name = select_panel_name }
+    local frame = player.gui.left.add { type = "frame", caption = name, name = recipe_panel_name }
     frame.style.minimal_width = 300
     g.select_graph_panel = frame
 
@@ -90,21 +90,9 @@ function recipe_panel.create(player_index, grecipe)
         style = "inside_shallow_frame_with_padding"
     }
 
-    local line_margin = 5
     ---@param title LocalisedString?
     local function add_line(title)
-        if not title then
-            line = flow.add { type = "line" }
-            line.style.top_margin = line_margin
-            line.style.bottom_margin = line_margin
-        else
-            local hflow = flow.add { type = "flow", direction = "horizontal" }
-            hflow.add { type = "label", caption = title }
-            local line = hflow.add { type = "line" }
-            line.style.top_margin = 10
-            hflow.style.top_margin = 3
-            hflow.style.bottom_margin = 5
-        end
+        gutils.add_line(flow, title)
     end
 
     local max = 0
@@ -118,7 +106,8 @@ function recipe_panel.create(player_index, grecipe)
             if add_debug_info then
                 caption = { "", caption, " [", p.name, "]" }
             end
-            flow.add { type = "label", caption = caption }
+            local label = flow.add { type = "label", caption = caption }
+            label.style.bottom_margin = 3
         end
     end
 
@@ -132,7 +121,8 @@ function recipe_panel.create(player_index, grecipe)
             if add_debug_info then
                 caption = { "", caption, " [", p.name, "]" }
             end
-            flow.add { type = "label", caption = caption }
+            local label = flow.add { type = "label", caption = caption }
+            label.style.bottom_margin = 3
         end
     end
 
@@ -159,7 +149,8 @@ function recipe_panel.create(player_index, grecipe)
                 end
                 ::searched::
             end
-            flow.add { type = "label", caption = localised }
+            local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] ", localised } }
+            label.style.bottom_margin = 3
             ::next_recipe::
         end
     end
@@ -171,14 +162,15 @@ function recipe_panel.create(player_index, grecipe)
 
         for _, tech in pairs(technologies) do
             local name = translations.get_technology_name(player_index, tech.name)
-            flow.add { type = "label", caption = name }
+            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
+            label.style.bottom_margin = 3
         end
     end
 end
 
 ---@param player LuaPlayer
 function recipe_panel.close(player)
-    local select_panel = player.gui.left[select_panel_name]
+    local select_panel = player.gui.left[recipe_panel_name]
     if select_panel then
         select_panel.destroy()
     end

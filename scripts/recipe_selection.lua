@@ -53,6 +53,18 @@ function recipe_selection.open(player, g, product, recipe)
 
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
+    elseif product and not recipe then
+        for name, i_recipe in pairs(product.ingredient_of) do
+            recipes[name] = i_recipe
+        end
+        for name, p_recipe in pairs(product.product_of) do
+            recipes[name] = p_recipe
+        end
+        if g.show_only_researched then
+            recipes = gutils.filter_enabled_recipe(recipes)
+        end
+        local recipe_count = table_size(recipes)
+        if recipe_count == 0 then return end
     end
 
     local frame = player.gui.screen.add {
@@ -108,7 +120,6 @@ function recipe_selection.open(player, g, product, recipe)
         local search_flow = inner_frame.add { type = "flow", direction = "horizontal" }
 
         search_flow.add { type = "textfield", name = np("search_field"), clear_and_focus_on_right_click = true }
-
         search_flow.add { type = "button", caption = { np("search_button") }, name = np("search_button") }
         search_flow.style.bottom_margin = 10
     end
@@ -197,7 +208,7 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
 ---@return {[string]:GRecipe}   @ all invisible
 local function set_recipes_to_selection(player)
     local frame = player.gui.screen[recipe_selection_frame_name]
-    if not frame then return {},{} end
+    if not frame then return {}, {} end
     local recipe_table = tools.get_child(frame, "recipe_table")
     local g = gutils.get_graph(player)
 
@@ -223,7 +234,7 @@ local function set_recipes_to_selection(player)
     return recipes, not_visible
 end
 
-tools.on_named_event(np("cb"), defines.events.on_gui_checked_state_changed,
+tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
     function(e)
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
@@ -237,6 +248,15 @@ tools.on_named_event(np("cb"), defines.events.on_gui_checked_state_changed,
         graph.draw(g)
         gutils.select_current_recipe(g, g.rs_recipe)
         drawing.update_drawing(player)
+        if e.element and e.element.state then
+            local recipe_name = e.element.tags.recipe_name
+            if recipe_name then
+                local recipe = g.recipes[recipe_name]
+                local position = gutils.get_position(g, recipe)
+                drawing.draw_target(g, recipe)
+                gutils.move_view(player, position)
+            end
+        end
     end)
 
 ---@param player_index integer
@@ -359,7 +379,8 @@ function recipe_selection.display(player, recipes, recipe_table)
                 state = state,
                 caption = "[img=recipe/" .. recipe_name .. "] " .. start_color .. recipe_element.localised .. end_color,
                 name = cb_name,
-                tooltip = tooltip
+                tooltip = tooltip,
+                tags = { recipe_name = recipe_name }
             }
             recipe_line.tooltip = tooltip
             local recipe_table = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }
@@ -411,6 +432,7 @@ tools.on_gui_click(np("goto"),
         end
         local position = gutils.get_position(g, recipe)
 
+        drawing.draw_target(g, recipe)
         if e.control then
             player.teleport(position, g.surface, false)
         else

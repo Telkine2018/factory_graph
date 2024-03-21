@@ -255,5 +255,66 @@ function gutils.get_connected_productions(grecipe, result)
     return result
 end
 
+---@param g Graph
+---@return table<string, GProduct>
+---@return table<string, GProduct>
+---@return table<string, GProduct>
+function gutils.get_product_flow(g)
+
+    ---@type table<string, GProduct>
+    local inputs
+    ---@type table<string, GProduct>
+    local outputs
+    ---@type table<string, GProduct>
+    local intermediates
+
+    inputs = {}
+    outputs = {}
+    intermediates = {}
+    for _, recipe in pairs(g.recipes) do
+        if recipe.visible then
+            for _, ingredient in pairs(recipe.ingredients) do
+                local name = ingredient.name
+                inputs[name] = ingredient
+            end
+        end
+    end
+    for _, recipe in pairs(g.recipes) do
+        if recipe.visible then
+            for _, product in pairs(recipe.products) do
+                local name = product.name
+                if inputs[name] then
+                    intermediates[name] = product
+                    inputs[name] = nil
+                else
+                    outputs[name] = product
+                end
+            end
+        end
+    end
+    return inputs, outputs, intermediates
+end
+
+
+local line_margin = 5
+
+---@param flow LuaGuiElement
+---@param title LocalisedString?
+function gutils.add_line(flow, title)
+    if not title then
+        line = flow.add { type = "line" }
+        line.style.top_margin = line_margin
+        line.style.bottom_margin = line_margin
+    else
+        local hflow = flow.add { type = "flow", direction = "horizontal" }
+        hflow.add { type = "label", caption = title }
+        local line = hflow.add { type = "line" }
+        line.style.top_margin = 10
+        hflow.style.top_margin = 3
+        hflow.style.bottom_margin = 5
+    end
+end
+
+
 
 return gutils
