@@ -259,8 +259,10 @@ function graph.layout_recipe(g, grecipe)
         line = g.product_line
         if not gcol.max_line then
             local prevcol = gcols[g.current_col - 1]
-            if prevcol then
+            if prevcol and prevcol.line then
                 line = math.floor((prevcol.min_line + prevcol.max_line) / 2)
+            else
+                line = 1
             end
         end
         line = alloc_free_line(gcol, line, grecipe)

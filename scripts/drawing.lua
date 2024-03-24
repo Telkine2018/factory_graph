@@ -1023,9 +1023,9 @@ local function on_selected_entity_changed(e)
     drawing.clear_selection(g)
     recipe_panel.close(player)
 
-    if g.select_graph_panel then
-        g.select_graph_panel.destroy()
-        g.select_graph_panel = nil
+    local frame = g.player.gui.children[commons.recipe_panel_name]
+    if frame then
+        frame.destroy()
     end
 
     g.selected_recipe = nil

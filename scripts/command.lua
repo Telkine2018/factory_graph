@@ -8,6 +8,7 @@ local recipe_selection = require("scripts.recipe_selection")
 local graph = require("scripts.graph")
 local drawing = require("scripts.drawing")
 local flow_panel = require("scripts.flow_panel")
+local production = require("scripts.production")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -112,6 +113,10 @@ function command.open(player)
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("flow") }, name = np("flow") }
     hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "button", caption = { np("production") }, name = np("production") }
+    hflow.style.bottom_margin = 5
 end
 
 tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
@@ -168,6 +173,14 @@ tools.on_named_event(np("flow"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
         flow_panel.create(player.index)
+    end)
+
+tools.on_named_event(np("production"), defines.events.on_gui_click,
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        production.compute(g)
     end)
 
 ---@param player LuaPlayer

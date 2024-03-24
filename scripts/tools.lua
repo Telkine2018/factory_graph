@@ -919,11 +919,7 @@ end
 function tools.close_panels(player)
 
     for name, _ in pairs(panel_names) do
-        local frame = player.gui.screen[name]
-        if frame then frame.destroy() end
-        frame = player.gui.top[name]
-        if frame then frame.destroy() end
-        frame = player.gui.left[name]
+        local frame = player.gui.children[name]
         if frame then frame.destroy() end
     end
 

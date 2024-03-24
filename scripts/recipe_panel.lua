@@ -14,6 +14,8 @@ local function np(name)
 end
 
 local recipe_panel_name = np("frame ")
+commons.recipe_panel_name = recipe_panel_name
+
 tools.add_panel_name(recipe_panel_name)
 
 ---@param player_index integer
@@ -82,7 +84,6 @@ function recipe_panel.create(player_index, grecipe)
 
     local frame = player.gui.left.add { type = "frame", caption = name, name = recipe_panel_name }
     frame.style.minimal_width = 300
-    g.select_graph_panel = frame
 
     local flow = frame.add {
         type = "frame",

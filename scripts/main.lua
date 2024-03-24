@@ -8,6 +8,7 @@ local prefix = commons.prefix
 
 local graph = require("scripts.graph")
 local command = require("scripts.command")
+local machinedb = require("scripts.machinedb")
 
 local main = {}
 
@@ -70,7 +71,6 @@ local function switch_surface(e)
         end
 
         local surface = main.enter(player)
-
         local g = graph.new(surface)
         g.player = player
         tools.get_vars(player).graph = g

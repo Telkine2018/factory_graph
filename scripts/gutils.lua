@@ -271,8 +271,10 @@ function gutils.get_product_flow(g)
     inputs = {}
     outputs = {}
     intermediates = {}
+    local selection = g.selection
+    if not selection then selection = {} end
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible then
+        if recipe.visible and selection[recipe.name] then
             for _, ingredient in pairs(recipe.ingredients) do
                 local name = ingredient.name
                 inputs[name] = ingredient
@@ -280,7 +282,7 @@ function gutils.get_product_flow(g)
         end
     end
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible then
+        if recipe.visible and selection[recipe.name] then
             for _, product in pairs(recipe.products) do
                 local name = product.name
                 if inputs[name] then
