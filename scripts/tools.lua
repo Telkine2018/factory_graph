@@ -916,13 +916,32 @@ function tools.add_panel_name(name)
 end
 
 ---@param player LuaPlayer
+---@param name string
+---@return LuaGuiElement?
+function tools.get_panel(player, name)
+    for _, child in pairs(player.gui.children) do
+        local panel = child[name]
+        if panel then return panel end
+    end
+    return nil
+end
+
+---@param player LuaPlayer
+---@param name string
+function tools.close_panel(player, name)
+
+    local panel = tools.get_panel(player, name)
+    if panel then panel.destroy() end
+end
+
+local close_panel = tools.close_panel
+
+---@param player LuaPlayer
 function tools.close_panels(player)
 
     for name, _ in pairs(panel_names) do
-        local frame = player.gui.children[name]
-        if frame then frame.destroy() end
+        close_panel(player, name)
     end
-
 end
 
 return tools

@@ -1023,7 +1023,7 @@ local function on_selected_entity_changed(e)
     drawing.clear_selection(g)
     recipe_panel.close(player)
 
-    local frame = g.player.gui.children[commons.recipe_panel_name]
+    local frame = g.player.gui.left[commons.recipe_panel_name]
     if frame then
         frame.destroy()
     end
@@ -1077,9 +1077,9 @@ local function on_gui_opened(e)
             else
                 g.selection[grecipe.name] = grecipe
             end
+            gutils.fire_selection_change(g)
 
             draw_graph(g)
-
             draw_selected_entity(player, entity, grecipe)
 
             player.opened = nil

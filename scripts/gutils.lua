@@ -141,6 +141,7 @@ function gutils.select_current_recipe(g, recipe)
     if not recipe then return false end
     if g.selection[recipe.name] then return false end
     g.selection[recipe.name] = recipe
+    gutils.fire_selection_change(g)
     return true
 end
 
@@ -274,7 +275,7 @@ function gutils.get_product_flow(g)
     local selection = g.selection
     if not selection then selection = {} end
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible and selection[recipe.name] then
+        if recipe.visible and selection[recipe.name] and not recipe.is_product then
             for _, ingredient in pairs(recipe.ingredients) do
                 local name = ingredient.name
                 inputs[name] = ingredient
@@ -282,7 +283,7 @@ function gutils.get_product_flow(g)
         end
     end
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible and selection[recipe.name] then
+        if recipe.visible and selection[recipe.name] and not recipe.is_product then
             for _, product in pairs(recipe.products) do
                 local name = product.name
                 if inputs[name] then
@@ -317,6 +318,9 @@ function gutils.add_line(flow, title)
     end
 end
 
-
+---@param g Graph
+function gutils.fire_selection_change(g)
+    tools.fire_user_event(commons.selection_change_event, {g=g})
+end
 
 return gutils

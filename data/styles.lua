@@ -9,7 +9,7 @@ styles[prefix .. "_count_label_bottom"] = {
     height = 36,
     width = 36,
     vertical_align = "bottom",
-    horizontal_align = "right",
+    horizontal_align = "center",
     right_padding = 2
 }
 styles[prefix .. "_count_label_top"] = {

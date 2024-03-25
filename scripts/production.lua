@@ -15,18 +15,13 @@ local free_value = 1e8
 function production.compute(g)
     machinedb.initialize()
 
-    --[[
-    g.preferred_machines= {"assembling-machine-2"}
-    g.preferred_modules={"productivity-module-2", "speed-module-2"}
-    g.preferred_beacon = "beacon"
-    g.preferred_beacon_count = 4
-    ]]
     g.preferred_machines = { "assembling-machine-2" }
     g.preferred_modules = nil
     g.preferred_beacon = nil
     g.preferred_beacon_count = 0
-    g.iovalues = { ["item/electronic-circuit"] = 10 }
+    -- g.iovalues = { ["item/electronic-circuit"] = 10 }
 
+    local failed = false
 
     ---@type {[string]:ProductionRecipe}
     local precipes = {}
@@ -34,6 +29,7 @@ function production.compute(g)
     local enabled_cache = {}
     for recipe_name, grecipe in pairs(g.recipes) do
         if not g.selection[recipe_name] then goto skip end
+        if grecipe.is_product then goto skip end
 
         local config = grecipe.production_config
         if not config then
@@ -166,7 +162,6 @@ function production.compute(g)
     end
 
     local to_solve = {}
-    local derived = {}
     local eq_values = {}
     for name, value in pairs(iovalues) do
         eq_values[name] = value
@@ -181,8 +176,6 @@ function production.compute(g)
         end
         if eq_values[product_name] then
             to_solve[product_name] = eq
-        else
-            derived[product_name] = eq
         end
     end
 
@@ -243,34 +236,64 @@ function production.compute(g)
     local machine_counts = {}
     local count = #equation_list
     local last_eq = equation_list[count]
-    local last_count = table_size(last_eq)
-    local last_const = constant_list[count] / last_count
+    local last_const = constant_list[count]
+    local is_neg = last_const < 0
+    local last_count = 0
 
     --- Compute machine counts
-    for recipe_name, value in pairs(equation_list[count]) do
-        machine_counts[recipe_name] = last_const
+    local end_const = {}
+    for recipe_name, value in pairs(last_eq) do
+        if is_neg == (value < 0) then
+            end_const[recipe_name] = value
+            last_count = last_count + 1
+        else
+            end_const[recipe_name] = 0
+        end
     end
+
+    if last_count > 0 then
+        for recipe_name, value in pairs(end_const) do
+            if value == 0 then
+                machine_counts[recipe_name] = 0
+            else
+                machine_counts[recipe_name] = last_const / value / last_count
+            end
+        end
+    else
+        failed = true
+    end
+
     for i = count - 1, 1, -1 do
         local eq = equation_list[i]
         local recipe_name = var_list[i]
 
-        local machine_count = constant_list[i]
-        for name, value in pairs(eq) do
-            if name ~= recipe_name then
-                local mc = machine_counts[name]
-                machine_count = machine_count - mc * value
+        if recipe_name then
+            local machine_count = constant_list[i]
+            for name, value in pairs(eq) do
+                if name ~= recipe_name then
+                    local mc = machine_counts[name]
+                    if mc then
+                        machine_count = machine_count - mc * value
+                    end
+                end
+            end
+            if math.abs(machine_count) < 0.01 then
+                machine_count = 0
+            end
+            machine_counts[recipe_name] = machine_count
+            if machine_count < 0 then
+                failed = true
             end
         end
-        machine_counts[recipe_name] = machine_count
     end
 
     --- compute products
     local product_counts = {}
     for _, precipe in pairs(precipes) do
-        local craft_per_s = precipe.craft_per_s
         local recipe_name = precipe.recipe_name
         local machine_count = machine_counts[recipe_name]
         if machine_count then
+            local craft_per_s = precipe.craft_per_s
             for _, ingredient in pairs(precipe.recipe.ingredients) do
                 local iname = ingredient.type .. "/" .. ingredient.name
                 local coef = product_counts[iname]
@@ -298,7 +321,45 @@ function production.compute(g)
     end
     g.machine_counts = machine_counts
     g.product_counts = product_counts
+    g.production_failed = failed
     return precipes
 end
+
+---@param g Graph
+---@param structure_change boolean?
+function production.push(g, structure_change)
+    if not global.production_queue then
+        global.production_queue = {}
+    end
+    local player_index = g.player.index
+    local data = global.production_queue[player_index]
+    if data then
+        if structure_change then
+            data.structure_change = true
+        end
+    else
+        global.production_queue[player_index] = { g = g, structure_change = structure_change }
+    end
+end
+
+tools.on_nth_tick(30, function()
+    local production_queue = global.production_queue
+    if not production_queue then
+        return
+    end
+    global.production_queue = nil
+    for _, data in pairs(production_queue) do
+        production.compute(data.g)
+        tools.fire_user_event(commons.production_compute_event, { g = data.g, structure_change = data.structure_change })
+    end
+end)
+
+tools.register_user_event(commons.selection_change_event, function(data)
+    production.push(data.g, true)
+end)
+
+tools.register_user_event(commons.production_data_change_event, function(data)
+    production.push(data.g)
+end)
 
 return production

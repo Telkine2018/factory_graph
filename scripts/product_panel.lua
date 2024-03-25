@@ -1,31 +1,35 @@
+local luautil = require("__core__/lualib/util")
+
+
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local recipe_selection = require("scripts.recipe_selection")
+local production = require("scripts.production")
 
-local flow_panel = {}
+local product_panel = {}
 local prefix = commons.prefix
 
 local label_style_name = commons.prefix .. "_count_label_bottom"
 
 local function np(name)
-    return prefix .. "-flow-panel." .. name
+    return prefix .. "-product-panel." .. name
 end
 
-local flow_panel_name = np("frame")
+local product_panel_name = np("frame")
 local input_qty_name = np("frame")
 local location_name = np("location")
 
-tools.add_panel_name(flow_panel_name)
+tools.add_panel_name(product_panel_name)
 
 ---@param player_index integer
-function flow_panel.create(player_index)
+function product_panel.create(player_index)
     local player = game.players[player_index]
     local g = gutils.get_graph(player)
 
-    if (player.gui.screen[flow_panel_name]) then
-        flow_panel.close(player)
+    if (player.gui.screen[product_panel_name]) then
+        product_panel.close(player)
         return
     end
 
@@ -33,16 +37,18 @@ function flow_panel.create(player_index)
     local frame = player.gui.screen.add {
         type = "frame",
         direction = 'vertical',
-        name = flow_panel_name
+        name = product_panel_name
     }
     frame.style.maximal_height = 800
 
+    local title = g.production_failed and np("failed-title") or np("title")
     local titleflow = frame.add { type = "flow" }
     titleflow.add {
         type = "label",
-        caption = { np("title") },
+        caption = { title },
         style = "frame_title",
-        ignored_by_interaction = true
+        ignored_by_interaction = true,
+        name = "title"
     }
 
     local drag = titleflow.add {
@@ -72,7 +78,7 @@ function flow_panel.create(player_index)
 
     inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name = "sroll-table" }
 
-    flow_panel.update(player)
+    product_panel.create_product_tables(player)
 
     local vars = tools.get_vars(player)
     local location = vars[location_name]
@@ -83,10 +89,46 @@ function flow_panel.create(player_index)
     end
 end
 
+---@param g Graph
+---@param product_name string
+---@param qtlabel LuaGuiElement
+function product_panel.set_product_value(g, product_name, qtlabel)
+    local value = g.iovalues[product_name]
+    local caption
+    if value == true then
+        caption = "-"
+    elseif value == 0 then
+        caption = "0"
+    else
+        local is_computed
+        if not value and g.product_counts then
+            value = g.product_counts[product_name]
+            is_computed = true
+        end
+        ---@cast value number
+        if value and math.abs(value) > 0.001 then
+            local precision = math.pow(10, math.floor(math.log(math.abs(value), 10))-2)
+            value = math.floor(value/precision) * precision
+            if value < 0 then
+                caption = "[color=red]" .. luautil.format_number(-value, true) .. "[/color]"
+            elseif is_computed then
+                caption = "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"
+            else
+                caption = luautil.format_number(value, true)
+            end
+        end
+    end
+    if caption then
+        qtlabel.caption = caption
+    else
+        qtlabel.caption = ""
+    end
+end
 
+local set_product_value = product_panel.set_product_value
 
-function flow_panel.update(player)
-    local frame = player.gui.screen[flow_panel_name]
+function product_panel.create_product_tables(player)
+    local frame = player.gui.screen[product_panel_name]
     if not frame then return end
 
     local scroll = tools.get_child(frame, "sroll-table")
@@ -106,7 +148,8 @@ function flow_panel.update(player)
     local column_width = 200
 
     ---@param products table<string, GProduct>
-    function show_products(products)
+    ---@param table_name string
+    function create_product_table(products, table_name)
         ---@type {product:GProduct, label:string}[]
         local list = {}
         for _, prod in pairs(products) do
@@ -114,28 +157,18 @@ function flow_panel.update(player)
         end
         table.sort(list, function(e1, e2) return e1.label < e2.label end)
 
-        local product_table = scroll.add { type = "table", column_count = column_count }
+        local product_table = scroll.add { type = "table", column_count = column_count, name = table_name }
         product_table.style.cell_padding = 0
         for _, product in pairs(list) do
+            local product_name = product.product.name
             local pline = product_table.add { type = "flow", direction = "horizontal" }
-            local b = pline.add { type = "sprite-button", sprite = product.product.name }
-            tools.set_name_handler(b, np("product"), { product_name = product.product.name })
+            local b = pline.add { type = "sprite-button", sprite = product_name, name = "product_button" }
+            tools.set_name_handler(b, np("product"), { product_name = product_name })
             b.style.size = 36
             b.style.vertical_align = "top"
 
-            qtlabel = b.add{type="label", style=label_style_name, name="label", ignored_by_interaction = true}
-            local value = g.iovalues[product.product.name]
-            if value == true then
-                qtlabel.caption = "-"
-            elseif value then
-                qtlabel.caption = string.format("%.1f", value)
-            elseif g.product_counts then
-                value = g.product_counts[product.product.name]
-                if value and math.abs(value) > 0.001 then
-                    qtlabel.caption = string.format("%.1f", value)
-                end
-            end
-
+            qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+            set_product_value(g, product_name, qtlabel)
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
             label.style.width = column_width
@@ -143,18 +176,46 @@ function flow_panel.update(player)
     end
 
     add_line({ np("inputs") })
-    show_products(inputs)
+    create_product_table(inputs, "inputs")
 
     add_line({ np("outputs") })
-    show_products(outputs)
+    create_product_table(outputs, "outputs")
 
     add_line({ np("intermediates") })
-    show_products(intermediates)
+    create_product_table(intermediates, "intermediates")
+end
+
+---@param g Graph
+local function update_products(g)
+    local player = g.player
+
+    local frame = tools.get_panel(player, product_panel_name)
+    if not frame then return end
+
+    ---@param table_name string
+    local function update_table(table_name)
+        local product_table = tools.get_child(frame, table_name)
+        if product_table then
+            for _, line in pairs(product_table.children) do
+                local b = line.product_button
+                local product_name = b.tags.product_name --[[@as string]]
+                set_product_value(g, product_name, b.label)
+            end
+        end
+    end
+    local title = g.production_failed and np("failed-title") or np("title")
+    local ftitle = tools.get_child(frame, "title")
+    if ftitle then
+        ftitle.caption =  {title}
+    end
+
+    update_table("inputs")
+    update_table("outputs")
+    update_table("intermediates")
 end
 
 ---@param parent LuaGuiElement
 local function get_vinput(parent)
-
     local vinput = tools.get_child(parent, "vinput")
     ---@cast vinput -nil
 
@@ -178,7 +239,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
 
         if e.shift then
             recipe_selection.open(player, g, g.products[product_name], nil)
-            flow_panel.close(player)
+            product_panel.close(player)
         elseif e.control then
             get_vinput(e.element.parent)
             if g.iovalues[product_name] == true then
@@ -191,16 +252,18 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
             if not vinput then return end
             local hinput = vinput.add { type = "flow", direction = "horizontal" }
             hinput.add { type = "label", caption = { np("product_qty") } }
-            local input = hinput.add { type = "textfield", 
-                numeric = true, allow_negative = true, allow_decimal = true, 
-                name=np("qty") }
+            local input = hinput.add { type = "textfield",
+                numeric = true, allow_negative = true, allow_decimal = true,
+                name = np("qty") }
             tools.set_name_handler(input, np("qty"), { product_name = product_name })
             input.style.maximal_width = 80
+            input.focus()
             local qty = g.iovalues[product_name]
             if type(qty) == "number" then
                 input.text = tostring(qty)
             end
         end
+        product_panel.fire_production_data_change(g)
     end)
 
 tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
@@ -214,13 +277,17 @@ tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
         local value = nil
         if #text > 0 then
             value = tonumber(text)
+            g.iovalues[product_name] = value
+            g.product_counts[product_name] = value
+        else
+            g.iovalues[product_name] = nil
+            g.product_counts[product_name] = nil
         end
-        g.iovalues[product_name] = value
-
+        product_panel.fire_production_data_change(g)
     end)
 
-function flow_panel.close(player)
-    local frame = player.gui.screen[flow_panel_name]
+function product_panel.close(player)
+    local frame = player.gui.screen[product_panel_name]
     if not frame then return end
 
     local location = frame.location
@@ -229,16 +296,30 @@ function flow_panel.close(player)
 end
 
 tools.on_gui_click(np("close"), function(e)
-    flow_panel.close(game.players[e.player_index])
+    product_panel.close(game.players[e.player_index])
 end)
 
-tools.on_event(defines.events.on_gui_confirmed, 
----@param e EventData.on_gui_confirmed
-function(e)
-    if e.element.name == np("qty") then
-        e.element.parent.destroy()
+tools.on_event(defines.events.on_gui_confirmed,
+    ---@param e EventData.on_gui_confirmed
+    function(e)
+        if e.element.name == np("qty") then
+            e.element.parent.destroy()
+        end
+    end)
+
+-- Fire production change
+function product_panel.fire_production_data_change(g)
+    tools.fire_user_event(commons.production_data_change_event, { g = g })
+end
+
+-- React to production computation
+tools.register_user_event(commons.production_compute_event, function(data)
+    if not data.structure_change then
+        update_products(data.g)
+    else
+        product_panel.close(data.g.player)
+        product_panel.create(data.g.player.index)
     end
 end)
 
-
-return flow_panel
+return product_panel

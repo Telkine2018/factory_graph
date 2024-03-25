@@ -31,6 +31,7 @@ local tools = require("scripts.tools")
 ---@field selector_product_name_id integer?         @ selector text id
 ---@field machine_counts {[string]:number}       
 ---@field product_counts {[string]:number}       
+---@field production_failed boolean
 
 ---@class GraphConfig
 ---@field selection {[string]:GElement}?
@@ -122,4 +123,5 @@ local tools = require("scripts.tools")
 ---@field consumption number
 ---@field craft_per_s number
 
-
+---@class GraphSelectionChangeEvent
+---@field g Graph

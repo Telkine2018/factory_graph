@@ -229,6 +229,7 @@ local function set_recipes_to_selection(player)
             else
                 g.selection[name] = nil
             end
+            gutils.fire_selection_change(g)
         end
     end
     return recipes, not_visible

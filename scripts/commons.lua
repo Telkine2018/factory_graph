@@ -28,7 +28,12 @@ local commons = {
 
     visibility_all = 1,
     visibility_selection = 2,
-    add_debug_info = false
+    add_debug_info = false,
+
+    selection_change_event = "selection_change_event",        
+    production_compute_event = "production_compute_event",
+    production_data_change_event = "production_data_change_event"
+
 }
 
 commons.default_selection = commons.ingredient_and_product_selection
