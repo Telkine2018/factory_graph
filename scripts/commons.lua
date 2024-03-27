@@ -40,7 +40,8 @@ local commons = {
         linear_dependecy = "linear_dependecy",
         no_soluce = "no_soluce",
         invalid_soluce="invalid_soluce",
-        too_many_free_variables = "too_many_free_variables"
+        too_many_free_variables = "too_many_free_variables",
+        too_many_constraints = "too_many_constraints"
     }
 
 }

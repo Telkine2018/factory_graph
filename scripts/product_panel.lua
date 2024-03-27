@@ -130,7 +130,7 @@ function product_panel.set_output_value(g, product_name, qtlabel)
         if value and math.abs(value) > math_precision then
             local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - 2)
             value = math.floor(value / precision) * precision
-            if value < 0 then
+            if value < 0 and is_computed then
                 caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
             elseif is_computed then
                 caption = mark .. "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"

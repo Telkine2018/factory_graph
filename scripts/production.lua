@@ -204,165 +204,176 @@ function production.compute(g)
     local retry_count = 0
     local end_index = #equation_list
 
-    while true do
-        local name_map = {}
-        local var_list = {}
+    local name_map = {}
+    local var_list = {}
 
-        free_recipes = tools.table_dup(all_recipes)
+    free_recipes = tools.table_dup(all_recipes)
 
-        for i = 1, #equation_list do
-            ---@type table<string, number>
-            local pivot_eq = equation_list[i]
+    for i = 1, #equation_list do
+        ---@type table<string, number>
+        local pivot_eq = equation_list[i]
 
-            -- find pivot
-            local pivot_var, pivot_value
-            for var_name, value in pairs(pivot_eq) do
-                if value ~= 0 and not name_map[var_name] then
-                    if not pivot_value then
-                        pivot_var = var_name
-                        pivot_value = value
-                    elseif math.abs(value) > math.abs(pivot_value) then
-                        pivot_var = var_name
-                        pivot_value = value
-                    end
+        -- find pivot
+        local pivot_var, pivot_value
+        for var_name, value in pairs(pivot_eq) do
+            if value ~= 0 and not name_map[var_name] then
+                if not pivot_value then
+                    pivot_var = var_name
+                    pivot_value = value
+                elseif math.abs(value) > math.abs(pivot_value) then
+                    pivot_var = var_name
+                    pivot_value = value
                 end
             end
-            if not pivot_value then goto next_eq end
-
-            name_map[pivot_var] = true
-            for n, v in pairs(pivot_eq) do
-                pivot_eq[n] = v / pivot_value
-            end
-            constant_list[i] = constant_list[i] / pivot_value
-            var_list[i] = pivot_var
-            free_recipes[pivot_var] = nil
-
-            for j = i + 1, #equation_list do
-                local eq_line = equation_list[j]
-                local pivot_coef = eq_line[pivot_var]
-                if pivot_coef then
-                    for n, v in pairs(pivot_eq) do
-                        eq_line[n] = trim((eq_line[n] or 0) - pivot_coef * v)
-                    end
-                    constant_list[j] = constant_list[j] - pivot_coef * constant_list[i]
-                end
-
-                -- check linear depencies
-                if not next(eq_line) and math.abs(constant_list[j]) > math_precision then
-                    failed = commons.production_failures.linear_dependecy
-                end
-            end
-
-            ::next_eq::
         end
+        if not pivot_value then goto next_eq end
 
-        -- Reverse
-        for i = #equation_list, 1, -1 do
-
-            ---@type table<string, number>
-            local pivot_eq = equation_list[i]
-
-            -- find pivot
-            local pivot_var = var_list[i]
-            for j = i - 1, 1, -1 do
-                local eq_line = equation_list[j]
-                local pivot_coef = eq_line[pivot_var]
-                if pivot_coef then
-                    for n, v in pairs(pivot_eq) do
-                        eq_line[n] = trim((eq_line[n] or 0) - pivot_coef * v)
-                    end
-                    constant_list[j] = constant_list[j] - pivot_coef * constant_list[i]
-                end
-            end
-            ::next_eq::
+        name_map[pivot_var] = true
+        for n, v in pairs(pivot_eq) do
+            pivot_eq[n] = v / pivot_value
         end
+        constant_list[i] = constant_list[i] / pivot_value
+        var_list[i] = pivot_var
+        free_recipes[pivot_var] = nil
 
+        for j = i + 1, #equation_list do
+            local eq_line = equation_list[j]
+            local pivot_coef = eq_line[pivot_var]
+            if pivot_coef then
+                for n, v in pairs(pivot_eq) do
+                    eq_line[n] = trim((eq_line[n] or 0) - pivot_coef * v)
+                end
+                constant_list[j] = constant_list[j] - pivot_coef * constant_list[i]
+            end
 
-        -- Initialize
-        machine_counts = {}
-        local count = #equation_list
-        local last_eq = equation_list[count]
-        local last_const = constant_list[count]
-
-        local is_neg = last_const <= 0
-        local is_zero = math.abs(last_const) <= math_precision
-        local test_set = {}
-
-        for recipe_name, value in pairs(last_eq) do
-            machine_counts[recipe_name] = 0
-            if is_zero then
-                test_set[recipe_name] = true
-            elseif is_neg == (value <= 0) then
-                test_set[recipe_name] = true
+            -- check linear depencies
+            if not next(eq_line) and math.abs(constant_list[j]) > math_precision then
+                failed = commons.production_failures.linear_dependecy
             end
         end
 
-        local test_recipe
-        local fail_index
-        while true do
-            ::next_var::
-            test_recipe = next(test_set)
-            if not test_recipe then
-                failed = commons.production_failures.no_soluce
-                if not fail_index then
-                    fail_index = 1
+        ::next_eq::
+    end
+
+    -- Reverse
+    for i = #equation_list, 1, -1 do
+        ---@type table<string, number>
+        local pivot_eq = equation_list[i]
+
+        -- find pivot
+        local pivot_var = var_list[i]
+        for j = i - 1, 1, -1 do
+            local eq_line = equation_list[j]
+            local pivot_coef = eq_line[pivot_var]
+            if pivot_coef then
+                for n, v in pairs(pivot_eq) do
+                    eq_line[n] = trim((eq_line[n] or 0) - pivot_coef * v)
                 end
-                break
+                constant_list[j] = constant_list[j] - pivot_coef * constant_list[i]
             end
+        end
+        ::next_eq::
+    end
 
-            test_set[test_recipe] = nil
-            if is_zero then
-                machine_counts[test_recipe] = 0
-            else
-                machine_counts[test_recipe] = last_const / last_eq[test_recipe]
+
+    -- Compute end values
+    machine_counts = {}
+    local count = #equation_list
+
+    if table_size(free_recipes) > 1 then
+        failed = commons.production_failures.too_many_free_variables
+        goto end_compute
+    else
+        local main_var = next(free_recipes)
+        if not main_var then
+            for i = 1, count do
+                local cst = constant_list[i]
+                local var_name = var_list[i]
+                if not var_name then
+                    if abs(cst) > math_precision then
+                        failed = commons.production_failures.too_many_constraints
+                    end
+                else
+                    machine_counts[var_name] = cst
+                end
             end
-
-            for i = count - 1, 1, -1 do
+            goto end_compute
+        else
+            local minv, maxv
+            for i = 1, count do
                 local eq = equation_list[i]
-                local recipe_name = var_list[i]
+                local coef = eq[main_var]
+                local cst = constant_list[i]
 
-                if recipe_name then
-                    local machine_count = constant_list[i]
-                    for name, value in pairs(eq) do
-                        if name ~= recipe_name then
-                            local mc = machine_counts[name]
-                            if mc then
-                                machine_count = machine_count - mc * value
+                if coef then
+                    if abs(coef) < math_precision then
+                        if abs(cst) < math_precision then
+                            failed = commons.production_failures.linear_dependecy
+                        end
+                    else
+                        local limit = cst / coef
+                        if coef >= 0 then
+                            if not maxv or limit < maxv then
+                                maxv = limit
+                            end
+                        else
+                            if not minv or limit > minv then
+                                minv = limit
                             end
                         end
                     end
-                    if math.abs(machine_count) < math_precision then
-                        machine_count = 0
-                    end
-                    machine_counts[recipe_name] = machine_count
-                    if machine_count < 0 then
-                        if not fail_index then
-                            fail_index = i 
-                        end
-                        goto next_var
-                    end
                 end
             end
-            break
-        end
-        retry_count = retry_count + 1
-        if not failed or retry_count > 10 or not fail_index then
-            break
-        end
-        last_eq = equation_list[fail_index]
-        table.remove(equation_list, fail_index)
-        table.insert(equation_list, end_index, last_eq)
 
-        last_const = constant_list[fail_index]
-        table.remove(constant_list, fail_index)
-        table.insert(constant_list, end_index, last_const)
+            --- compute end value
+            local main_value
+            if minv then
+                if maxv then
+                    main_value = (minv + maxv) / 2
+                else
+                    main_value = minv
+                end
+            elseif maxv then
+                main_value = maxv
+            end
+            if not main_value then
+                failed = commons.production_failures.linear_dependecy
+                goto end_compute
+                else
+                machine_counts[main_var] = main_value
+            end
+        end
 
-        local last_var = var_list[fail_index]
-        table.remove(var_list, fail_index)
-        table.insert(var_list, end_index, last_var)
-        failed = nil
-        end_index = end_index - 1
+        for i = count, 1, -1 do
+            local eq = equation_list[i]
+            local recipe_name = var_list[i]
+
+            if recipe_name then
+                local machine_count = constant_list[i]
+                for name, value in pairs(eq) do
+                    if name ~= recipe_name then
+                        local mc = machine_counts[name]
+                        if mc then
+                            machine_count = machine_count - mc * value
+                        end
+                    end
+                end
+                if math.abs(machine_count) < math_precision then
+                    machine_count = 0
+                end
+                machine_counts[recipe_name] = machine_count
+                if machine_count < 0 then
+                    if not fail_index then
+                        fail_index = i
+                    end
+                    failed = commons.production_failures.invalid_soluce
+                    goto end_compute
+                end
+            end
+        end
     end
+    ::end_compute::
+
 
     --- compute products
     local product_outputs = {}
