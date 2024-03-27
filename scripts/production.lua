@@ -24,14 +24,14 @@ function production.compute(g)
 
     local failed = nil
 
-    ---@type {[string]:ProductionRecipe}
-    local precipes = {}
+    ---@type {[string]:ProductionMachine}
+    local machines = {}
 
     local enabled_cache = {}
     for recipe_name, grecipe in pairs(g.selection) do
 
         ---@cast grecipe GRecipe
-        grecipe.craft_per_s = nil
+        grecipe.machine = nil
         if grecipe.is_product then goto skip end
 
         ---@cast grecipe GRecipe
@@ -43,8 +43,8 @@ function production.compute(g)
 
         local recipe = game.recipe_prototypes[recipe_name]
 
-        ---@type ProductionRecipe
-        local production = {
+        ---@type ProductionMachine
+        local machine = {
             recipe_name = recipe_name,
             grecipe = grecipe,
             recipe = recipe,
@@ -52,21 +52,21 @@ function production.compute(g)
         }
 
         if config.machine_modules then
-            production.modules = {}
+            machine.modules = {}
             for _, module_name in pairs(config.machine_modules) do
-                table.insert(production.modules, game.item_prototypes[module_name])
+                table.insert(machine.modules, game.item_prototypes[module_name])
             end
         end
 
-        precipes[recipe_name] = production
+        machines[recipe_name] = machine
 
         local speed = 0
         ---@cast speed -nil
         local productivity = 0
         local consumption = 0
 
-        if production.modules then
-            for _, module in pairs(production.modules) do
+        if machine.modules then
+            for _, module in pairs(machine.modules) do
                 local effects = module.module_effects
                 if effects then
                     if effects.speed then speed = speed + effects.speed.bonus end
@@ -91,11 +91,12 @@ function production.compute(g)
                 end
             end
         end
-        production.speed = speed
-        production.productivity = productivity
-        production.consumption = consumption
-        production.craft_per_s = (1 + speed) * (1 + productivity) * production.machine.crafting_speed / recipe.energy
-        grecipe.craft_per_s = production.craft_per_s
+        machine.name = recipe_name
+        machine.speed = speed
+        machine.productivity = productivity
+        machine.consumption = consumption
+        machine.craft_per_s = (1 + speed) * (1 + productivity) * machine.machine.crafting_speed / recipe.energy
+        grecipe.machine = machine
 
         ::skip::
     end
@@ -125,11 +126,11 @@ function production.compute(g)
 
     local all_recipes = {}
 
-    for _, precipe in pairs(precipes) do
-        local craft_per_s = precipe.craft_per_s
+    for _, machine in pairs(machines) do
+        local craft_per_s = machine.craft_per_s
 
-        local recipe_name = precipe.recipe_name
-        for _, ingredient in pairs(precipe.recipe.ingredients) do
+        local recipe_name = machine.name
+        for _, ingredient in pairs(machine.recipe.ingredients) do
             local iname = ingredient.type .. "/" .. ingredient.name
             local eq = equations[iname]
             if not eq then
@@ -146,7 +147,7 @@ function production.compute(g)
             all_recipes[recipe_name] = true
         end
 
-        for _, product in pairs(precipe.recipe.products) do
+        for _, product in pairs(machine.recipe.products) do
             local pname = product.type .. "/" .. product.name
             local eq = equations[pname]
             if not eq then
@@ -205,9 +206,6 @@ function production.compute(g)
     local saved_const = tools.table_deep_copy(constant_list)
     ]]
     local machine_counts
-    local retry_count = 0
-    local end_index = #equation_list
-
     local name_map = {}
     local var_list = {}
 
@@ -283,31 +281,43 @@ function production.compute(g)
     -- Compute end values
     machine_counts = {}
     local count = #equation_list
+    local main_var
 
-    if table_size(free_recipes) > 1 then
-        failed = commons.production_failures.too_many_free_variables
-        goto end_compute
-    else
-        local main_var = next(free_recipes)
-        if not main_var then
-            for i = 1, count do
-                local cst = constant_list[i]
-                local var_name = var_list[i]
-                if not var_name then
-                    if abs(cst) > math_precision then
-                        failed = commons.production_failures.too_many_constraints
-                    end
-                else 
-                    if abs(cst) < math_precision then
-                        cst = 0
-                        machine_counts[var_name] = cst
-                    elseif cst < 0 then
-                        failed = commons.production_failures.too_many_constraints
-                    else
-                        machine_counts[var_name] = cst
-                    end
+    local function solve_linear(current_error)
+        for i = 1, count do
+            local cst = constant_list[i]
+            local var_name = var_list[i]
+            if not var_name then
+                if abs(cst) > math_precision then
+                    failed = current_error
+                end
+            else 
+                if abs(cst) < math_precision then
+                    cst = 0
+                    machine_counts[var_name] = cst
+                elseif cst < 0 then
+                    failed = current_error
+                else
+                    machine_counts[var_name] = cst
                 end
             end
+        end
+    end
+
+    if table_size(free_recipes) > 1 then
+        if abs(constant_list[count]) < math_precision then
+            for name, _ in pairs(free_recipes) do
+                machine_counts[name] = 0
+            end
+            solve_linear(commons.production_failures.too_many_free_variables)
+        else
+            failed = commons.production_failures.too_many_free_variables
+        end
+        goto end_compute
+    else
+        main_var = next(free_recipes)
+        if not main_var then
+            solve_linear(commons.production_failures.too_many_constraints)
             goto end_compute
         else
             local minv, maxv
@@ -385,16 +395,17 @@ function production.compute(g)
     end
     ::end_compute::
 
-
     --- compute products
     local product_outputs = {}
     local product_effective = {}
-    for _, precipe in pairs(precipes) do
-        local recipe_name = precipe.recipe_name
+    for _, machine in pairs(machines) do
+        local recipe_name = machine.name
         local machine_count = machine_counts[recipe_name]
         if machine_count then
-            local craft_per_s = precipe.craft_per_s
-            for _, ingredient in pairs(precipe.recipe.ingredients) do
+
+            machine.count = machine_count
+            local craft_per_s = machine.craft_per_s
+            for _, ingredient in pairs(machine.recipe.ingredients) do
                 local iname = ingredient.type .. "/" .. ingredient.name
                 local coef = product_outputs[iname]
                 if not coef then
@@ -406,7 +417,7 @@ function production.compute(g)
                 end
             end
 
-            for _, product in pairs(precipe.recipe.products) do
+            for _, product in pairs(machine.recipe.products) do
                 local pname = product.type .. "/" .. product.name
                 local coef = product_outputs[pname]
                 if not coef then
@@ -431,11 +442,10 @@ function production.compute(g)
             end
         end
     end
-    g.machine_counts = machine_counts
     g.product_outputs = product_outputs
     g.product_effective = product_effective
     g.production_failed = failed
-    return precipes
+    return machines
 end
 
 ---@param g Graph

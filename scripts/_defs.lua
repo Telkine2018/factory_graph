@@ -29,7 +29,6 @@ local tools = require("scripts.tools")
 ---@field rs_location GuiLocation?
 ---@field selector_id integer?                      @ selector rectangle id 
 ---@field selector_product_name_id integer?         @ selector text id
----@field machine_counts {[string]:number}       
 ---@field product_outputs {[string]:number}       
 ---@field product_effective {[string]:number}       
 ---@field production_failed string?
@@ -69,6 +68,8 @@ local tools = require("scripts.tools")
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
 ---@field craft_per_s number?
+---@field machine ProductionMachine?
+---@field count number?
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?
@@ -114,8 +115,8 @@ local tools = require("scripts.tools")
 ---@field beacon_modules string[]?
 ---@field beacon_count integer?
 
----@class ProductionRecipe
----@field recipe_name string
+---@class ProductionMachine
+---@field name string
 ---@field grecipe GRecipe
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype
@@ -124,6 +125,7 @@ local tools = require("scripts.tools")
 ---@field productivity number
 ---@field consumption number
 ---@field craft_per_s number
+---@field count number
 
 ---@class GraphSelectionChangeEvent
 ---@field g Graph

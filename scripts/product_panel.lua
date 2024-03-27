@@ -11,9 +11,16 @@ local production = require("scripts.production")
 local product_panel = {}
 local prefix = commons.prefix
 
-local label_style_name = commons.prefix .. "_count_label_bottom"
-local label_style_top = commons.prefix .. "_count_label_top"
+local label_style_name = prefix .. "_count_label_bottom"
+local label_style_top = prefix .. "_count_label_top"
+
+local default_button_style = prefix .. "_button_default"
+local default_button_label_style = prefix .. "_count_label_bottom"
+
+local arrow_sprite = prefix .. "_arrow"
+
 local math_precision = commons.math_precision
+local abs = math.abs
 
 local function np(name)
     return prefix .. "-product-panel." .. name
@@ -22,8 +29,20 @@ end
 local product_panel_name = np("frame")
 local input_qty_name = np("frame")
 local location_name = np("location")
-
 tools.add_panel_name(product_panel_name)
+
+local round_digit = 2
+
+---@param value number
+local function fround(value)
+    if abs(value) <= math_precision then
+        return 0
+    end
+    local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - round_digit)
+    value = math.floor(value / precision) * precision
+    return value
+end
+
 
 ---@param g Graph
 local function get_production_title(g)
@@ -80,16 +99,28 @@ function product_panel.create(player_index)
         hovered_sprite = "utility/close_black"
     }
 
-    local inner_frame = frame.add {
+    local inner_flow = frame.add { type = "flow", direction = "horizontal" }
+
+    local product_frame = inner_flow.add {
         type = "frame",
         direction = "vertical",
         style = "inside_shallow_frame_with_padding"
     }
-    inner_frame.style.horizontally_stretchable = true
-
-    inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name = "sroll-table" }
-
+    product_frame.style.vertically_stretchable = true
+    product_frame.style.horizontally_stretchable = true
+    product_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name = "sroll-table" }
     product_panel.create_product_tables(player)
+
+    local machine_frame = inner_flow.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding"
+    }
+    machine_frame.style.minimal_width = 200
+    machine_frame.style.vertically_stretchable = true
+    local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
+    local machine_flow = machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
+    product_panel.update_machine_panel(g, machine_flow)
 
     local vars = tools.get_vars(player)
     local location = vars[location_name]
@@ -99,8 +130,6 @@ function product_panel.create(player_index)
         frame.force_auto_center()
     end
 end
-
-local log_precision = 2
 
 ---@param g Graph
 ---@param product_name string
@@ -128,8 +157,7 @@ function product_panel.set_output_value(g, product_name, qtlabel)
 
         ---@cast value number
         if value and math.abs(value) > math_precision then
-            local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - 2)
-            value = math.floor(value / precision) * precision
+            value = fround(value)
             if value < 0 and is_computed then
                 caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
             elseif is_computed then
@@ -158,7 +186,6 @@ local set_output_value = product_panel.set_output_value
 ---@param product_name string
 ---@param qtlabel LuaGuiElement
 function product_panel.set_effective_value(g, product_name, qtlabel)
-    
     local product_effective = g.product_effective
     if not qtlabel or not product_effective then
         return
@@ -169,8 +196,7 @@ function product_panel.set_effective_value(g, product_name, qtlabel)
 
     ---@cast value number
     if value and math.abs(value) > math_precision then
-        local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - 2)
-        value = math.floor(value / precision) * precision
+        value = fround(value)
         caption = "x [color=yellow]" .. luautil.format_number(value, true) .. "[/color]"
     end
     if caption then
@@ -179,6 +205,7 @@ function product_panel.set_effective_value(g, product_name, qtlabel)
         qtlabel.caption = ""
     end
 end
+
 local set_effective_value = product_panel.set_effective_value
 
 function product_panel.create_product_tables(player)
@@ -211,7 +238,8 @@ function product_panel.create_product_tables(player)
         end
         table.sort(list, function(e1, e2) return e1.label < e2.label end)
 
-        local product_table = scroll.add { type = "table", column_count = column_count, name = table_name }
+        local product_table = scroll.add { type = "table", column_count = column_count, name = table_name,
+            style = prefix .. "_default_table", draw_vertical_lines = true }
         product_table.style.cell_padding = 0
         for _, product in pairs(list) do
             local product_name = product.product.name
@@ -227,7 +255,7 @@ function product_panel.create_product_tables(player)
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
 
-            local elabel = pline.add { type ="label" , name="elabel"}
+            local elabel = pline.add { type = "label", name = "elabel" }
             elabel.style.width = 50
             elabel.style.horizontal_align = "right"
             elabel.style.right_margin = 10
@@ -385,6 +413,86 @@ tools.register_user_event(commons.production_compute_event, function(data)
     else
         product_panel.close(data.g.player)
         product_panel.create(data.g.player.index)
+    end
+end)
+
+---@param g Graph
+---@param container LuaGuiElement
+function product_panel.update_machine_panel(g, container)
+    container.clear()
+    if not g.selection then return end
+
+    ---@type ProductionMachine[]
+    local machines = {}
+    for _, grecipe in pairs(g.selection) do
+        local machine = grecipe.machine
+        if machine and machine.count and abs(machine.count) > math_precision then
+            table.insert(machines, machine)
+        end
+    end
+    if #machines == 0 then return end
+
+    for _, machine in pairs(machines) do
+        local line = container.add { type = "flow", direction = "horizontal" }
+
+        local b = line.add { type = "sprite-button", sprite = "entity/" .. machine.machine.name, style = default_button_style }
+        local label = b.add { type = "label", style = default_button_label_style,
+            caption = tostring(math.ceil(machine.count)), ignored_by_interaction = true }
+
+        local frecipe = line.add { type = "sprite-button", sprite = "recipe/" .. machine.name, style = default_button_style }
+        frecipe.style.right_margin = 5
+
+        for _, ingredient in pairs(machine.recipe.ingredients) do
+            b = line.add { type = "sprite-button",
+                sprite = ingredient.type .. "/" .. ingredient.name,
+                style = default_button_style }
+
+            local amount = ingredient.amount * machine.craft_per_s * machine.count
+            amount = fround(amount)
+            label = b.add { type = "label", style = default_button_label_style,
+                caption = "[color=cyan]" .. tostring(amount) .. "[/color]", ignored_by_interaction = true }
+        end
+
+        local sep = line.add {type="sprite", sprite=arrow_sprite}
+        sep.style.left_margin = 5
+        sep.style.top_margin = 5
+        sep.style.right_margin = 5
+
+        for _, product in pairs(machine.recipe.products) do
+            b = line.add { type = "sprite-button",
+                sprite = product.type .. "/" .. product.name,
+                style = default_button_style }
+
+            local amount
+            if product.amount_min then
+                amount = (product.amount_min + product.amount_max) / 2
+            else
+                amount = product.amount
+            end
+            amount = amount * machine.craft_per_s * machine.count
+            amount = fround(amount)
+            label = b.add { type = "label", style = default_button_label_style,
+                caption = "[color=orange]" .. tostring(amount) .. "[/color]", ignored_by_interaction = true }
+        end
+    end
+end
+
+---@param g Graph
+local function update_machines(g)
+    local player = g.player
+    local frame = player.gui.screen[product_panel_name]
+    if not frame then return end
+
+    local container = tools.get_child(frame, "machine_container")
+    if container then
+        product_panel.update_machine_panel(g, container)
+    end
+end
+
+-- React to production computation
+tools.register_user_event(commons.production_compute_event, function(data)
+    if not data.structure_change then
+        update_machines(data.g)
     end
 end)
 
