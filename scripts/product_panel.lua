@@ -12,6 +12,8 @@ local product_panel = {}
 local prefix = commons.prefix
 
 local label_style_name = commons.prefix .. "_count_label_bottom"
+local label_style_top = commons.prefix .. "_count_label_top"
+local math_precision = commons.math_precision
 
 local function np(name)
     return prefix .. "-product-panel." .. name
@@ -22,6 +24,15 @@ local input_qty_name = np("frame")
 local location_name = np("location")
 
 tools.add_panel_name(product_panel_name)
+
+---@param g Graph
+local function get_production_title(g)
+    if not g.production_failed or type(g.production_failed) ~= "string" then
+        return { np("title") }
+    else
+        return { "", { np("failed-title") }, { np("failure_" .. g.production_failed) } }
+    end
+end
 
 ---@param player_index integer
 function product_panel.create(player_index)
@@ -41,11 +52,11 @@ function product_panel.create(player_index)
     }
     frame.style.maximal_height = 800
 
-    local title = g.production_failed and np("failed-title") or np("title")
+    local title = get_production_title(g)
     local titleflow = frame.add { type = "flow" }
     titleflow.add {
         type = "label",
-        caption = { title },
+        caption = title,
         style = "frame_title",
         ignored_by_interaction = true,
         name = "title"
@@ -89,34 +100,78 @@ function product_panel.create(player_index)
     end
 end
 
+local log_precision = 2
+
 ---@param g Graph
 ---@param product_name string
 ---@param qtlabel LuaGuiElement
-function product_panel.set_product_value(g, product_name, qtlabel)
+function product_panel.set_output_value(g, product_name, qtlabel)
+    ---@type any
     local value = g.iovalues[product_name]
     local caption
-    if value == true then
-        caption = "-"
-    elseif value == 0 then
+    local is_unlinked
+    local mark = ""
+    if value == 0 then
         caption = "0"
     else
+        is_unlinked = value == true
+        if is_unlinked then
+            value = nil
+            mark = "*"
+        end
+
         local is_computed
-        if not value and g.product_counts then
-            value = g.product_counts[product_name]
+        if not value and g.product_outputs then
+            value = g.product_outputs[product_name]
             is_computed = true
         end
+
         ---@cast value number
-        if value and math.abs(value) > 0.001 then
-            local precision = math.pow(10, math.floor(math.log(math.abs(value), 10))-2)
-            value = math.floor(value/precision) * precision
+        if value and math.abs(value) > math_precision then
+            local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - 2)
+            value = math.floor(value / precision) * precision
             if value < 0 then
-                caption = "[color=red]" .. luautil.format_number(-value, true) .. "[/color]"
+                caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
             elseif is_computed then
-                caption = "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"
+                caption = mark .. "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"
             else
                 caption = luautil.format_number(value, true)
             end
+        elseif is_unlinked then
+            caption = "*"
         end
+    end
+    if caption then
+        qtlabel.caption = caption
+        if value then
+            qtlabel.parent.tooltip = tools.comma_value(value)
+        end
+    else
+        qtlabel.caption = ""
+        qtlabel.parent.tooltip = ""
+    end
+end
+
+local set_output_value = product_panel.set_output_value
+
+---@param g Graph
+---@param product_name string
+---@param qtlabel LuaGuiElement
+function product_panel.set_effective_value(g, product_name, qtlabel)
+    
+    local product_effective = g.product_effective
+    if not qtlabel or not product_effective then
+        return
+    end
+
+    local value = product_effective[product_name]
+    local caption
+
+    ---@cast value number
+    if value and math.abs(value) > math_precision then
+        local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - 2)
+        value = math.floor(value / precision) * precision
+        caption = "x [color=yellow]" .. luautil.format_number(value, true) .. "[/color]"
     end
     if caption then
         qtlabel.caption = caption
@@ -124,8 +179,7 @@ function product_panel.set_product_value(g, product_name, qtlabel)
         qtlabel.caption = ""
     end
 end
-
-local set_product_value = product_panel.set_product_value
+local set_effective_value = product_panel.set_effective_value
 
 function product_panel.create_product_tables(player)
     local frame = player.gui.screen[product_panel_name]
@@ -145,7 +199,7 @@ function product_panel.create_product_tables(player)
     local inputs, outputs, intermediates = gutils.get_product_flow(g)
 
     local column_count = 3
-    local column_width = 200
+    local column_width = 120
 
     ---@param products table<string, GProduct>
     ---@param table_name string
@@ -167,10 +221,18 @@ function product_panel.create_product_tables(player)
             b.style.size = 36
             b.style.vertical_align = "top"
 
-            qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-            set_product_value(g, product_name, qtlabel)
+            local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+            set_output_value(g, product_name, qtlabel)
+
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
+
+            local elabel = pline.add { type ="label" , name="elabel"}
+            elabel.style.width = 50
+            elabel.style.horizontal_align = "right"
+            elabel.style.right_margin = 10
+            set_effective_value(g, product_name, elabel)
+
             label.style.width = column_width
         end
     end
@@ -199,14 +261,16 @@ local function update_products(g)
             for _, line in pairs(product_table.children) do
                 local b = line.product_button
                 local product_name = b.tags.product_name --[[@as string]]
-                set_product_value(g, product_name, b.label)
+                set_output_value(g, product_name, b.label)
+
+                set_effective_value(g, product_name, line.elabel)
             end
         end
     end
-    local title = g.production_failed and np("failed-title") or np("title")
+    local title = get_production_title(g)
     local ftitle = tools.get_child(frame, "title")
     if ftitle then
-        ftitle.caption =  {title}
+        ftitle.caption = title
     end
 
     update_table("inputs")
@@ -278,10 +342,10 @@ tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
         if #text > 0 then
             value = tonumber(text)
             g.iovalues[product_name] = value
-            g.product_counts[product_name] = value
+            g.product_outputs[product_name] = value
         else
             g.iovalues[product_name] = nil
-            g.product_counts[product_name] = nil
+            g.product_outputs[product_name] = nil
         end
         product_panel.fire_production_data_change(g)
     end)
@@ -314,6 +378,8 @@ end
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
+    local player = data.g.player
+    if not player.gui.screen[product_panel_name] then return end
     if not data.structure_change then
         update_products(data.g)
     else

@@ -32,7 +32,16 @@ local commons = {
 
     selection_change_event = "selection_change_event",        
     production_compute_event = "production_compute_event",
-    production_data_change_event = "production_data_change_event"
+    production_data_change_event = "production_data_change_event",
+
+    math_precision = 0.000001,
+    production_failures = {
+
+        linear_dependecy = "linear_dependecy",
+        no_soluce = "no_soluce",
+        invalid_soluce="invalid_soluce",
+        too_many_free_variables = "too_many_free_variables"
+    }
 
 }
 

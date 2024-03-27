@@ -30,8 +30,9 @@ local tools = require("scripts.tools")
 ---@field selector_id integer?                      @ selector rectangle id 
 ---@field selector_product_name_id integer?         @ selector text id
 ---@field machine_counts {[string]:number}       
----@field product_counts {[string]:number}       
----@field production_failed boolean
+---@field product_outputs {[string]:number}       
+---@field product_effective {[string]:number}       
+---@field production_failed string?
 
 ---@class GraphConfig
 ---@field selection {[string]:GElement}?
