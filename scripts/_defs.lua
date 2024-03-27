@@ -52,8 +52,6 @@ local tools = require("scripts.tools")
 
 ---@class GElement
 ---@field name string     @ name of product or recipe
----@field unit_number integer
----@field graph_symbol_id integer
 ---@field entity LuaEntity?
 
 ---@class GProduct : GElement
@@ -64,16 +62,19 @@ local tools = require("scripts.tools")
 ---@field color Color
 ---@field ids integer[]?
 
----@class GRecipe : GElement
----@field line integer?
----@field col integer?
+---@class GRecipe : GElement, GRecipeConfig
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
+---@field enabled boolean?
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
----@field visible boolean?
----@field enabled boolean?
+---@field craft_per_s number?
+
+---@class GRecipeConfig
 ---@field production_config ProductionConfig?
+---@field line integer?
+---@field col integer?
+---@field visible boolean?
 
 ---@class GCol
 ---@field col integer

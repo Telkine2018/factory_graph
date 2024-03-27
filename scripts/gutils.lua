@@ -289,7 +289,7 @@ function gutils.get_product_flow(g)
                 if inputs[name] then
                     intermediates[name] = product
                     inputs[name] = nil
-                else
+                elseif not intermediates[name] then
                     outputs[name] = product
                 end
             end

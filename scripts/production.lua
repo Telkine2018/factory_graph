@@ -29,6 +29,9 @@ function production.compute(g)
 
     local enabled_cache = {}
     for recipe_name, grecipe in pairs(g.selection) do
+
+        ---@cast grecipe GRecipe
+        grecipe.craft_per_s = nil
         if grecipe.is_product then goto skip end
 
         ---@cast grecipe GRecipe
@@ -92,6 +95,7 @@ function production.compute(g)
         production.productivity = productivity
         production.consumption = consumption
         production.craft_per_s = (1 + speed) * (1 + productivity) * production.machine.crafting_speed / recipe.energy
+        grecipe.craft_per_s = production.craft_per_s
 
         ::skip::
     end
@@ -293,8 +297,15 @@ function production.compute(g)
                     if abs(cst) > math_precision then
                         failed = commons.production_failures.too_many_constraints
                     end
-                else
-                    machine_counts[var_name] = cst
+                else 
+                    if abs(cst) < math_precision then
+                        cst = 0
+                        machine_counts[var_name] = cst
+                    elseif cst < 0 then
+                        failed = commons.production_failures.too_many_constraints
+                    else
+                        machine_counts[var_name] = cst
+                    end
                 end
             end
             goto end_compute
@@ -339,7 +350,7 @@ function production.compute(g)
             if not main_value then
                 failed = commons.production_failures.linear_dependecy
                 goto end_compute
-                else
+            else
                 machine_counts[main_var] = main_value
             end
         end
@@ -389,7 +400,10 @@ function production.compute(g)
                 if not coef then
                     coef = 0
                 end
-                product_outputs[iname] = coef - ingredient.amount * craft_per_s * machine_count
+                local total = ingredient.amount * craft_per_s * machine_count
+                if abs(total) >= math_precision then
+                    product_outputs[iname] = coef - total
+                end
             end
 
             for _, product in pairs(precipe.recipe.products) do
@@ -409,8 +423,10 @@ function production.compute(g)
                     amount = 0
                 else
                     local total = amount * craft_per_s * machine_count
-                    product_outputs[pname] = coef + total
-                    product_effective[pname] = (product_effective[pname] or 0) + total
+                    if abs(total) >= math_precision then
+                        product_outputs[pname] = coef + total
+                        product_effective[pname] = (product_effective[pname] or 0) + total
+                    end
                 end
             end
         end
