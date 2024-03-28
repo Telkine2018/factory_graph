@@ -32,6 +32,7 @@ local tools = require("scripts.tools")
 ---@field product_outputs {[string]:number}       
 ---@field product_effective {[string]:number}       
 ---@field production_failed string?
+---@field recipe_order integer
 
 ---@class GraphConfig
 ---@field selection {[string]:GElement}?
@@ -69,7 +70,7 @@ local tools = require("scripts.tools")
 ---@field is_product boolean?
 ---@field craft_per_s number?
 ---@field machine ProductionMachine?
----@field count number?
+---@field order integer?
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?

@@ -1,4 +1,3 @@
-
 local commons = require("scripts.commons")
 local styles = data.raw["gui-style"].default
 local prefix = commons.prefix
@@ -47,6 +46,16 @@ styles[prefix .. "_button_default"] = {
     size = 36
 }
 
+for _, suffix in ipairs({ "default", "grey", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink" }) do
+    styles[prefix .. "_small_slot_button_" .. suffix] = {
+        type = "button_style",
+        parent = "flib_slot_button_" .. suffix,
+        size = 36,
+        top_margin = 0
+    }
+end
+
+
 styles[prefix .. "_button_missing"] = {
     parent = "flib_selected_slot_button_default",
     type = "button_style",
@@ -58,6 +67,3 @@ styles[prefix .. "_button_free"] = {
     type = "button_style",
     size = 36
 }
-
-
-

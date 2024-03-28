@@ -179,6 +179,7 @@ end
 
 tools.on_configuration_changed(function(data)
     for _, player in pairs(game.players) do
+        ---@type Graph
         local g = tools.get_vars(player).graph
         if g then
             if not g.grid_size then
@@ -199,6 +200,9 @@ tools.on_configuration_changed(function(data)
                     grecipe.enabled = r.enabled
                 else
                     grecipe.enabled = true
+                end
+                if not grecipe.order then
+                    grecipe.order = 1
                 end
             end
         end

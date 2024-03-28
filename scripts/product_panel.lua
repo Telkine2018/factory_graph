@@ -22,6 +22,13 @@ local arrow_sprite = prefix .. "_arrow"
 local math_precision = commons.math_precision
 local abs = math.abs
 
+local orange_button = prefix .. "_small_slot_button_orange"
+local green_button = prefix .. "_small_slot_button_green"
+local cyan_button = prefix .. "_small_slot_button_cyan"
+local red_button = prefix .. "_small_slot_button_red"
+local default_button = prefix .. "_small_slot_button_default"
+
+
 local function np(name)
     return prefix .. "-product-panel." .. name
 end
@@ -119,7 +126,7 @@ function product_panel.create(player_index)
     machine_frame.style.minimal_width = 200
     machine_frame.style.vertically_stretchable = true
     local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
-    local machine_flow = machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
+    local machine_flow = machine_scroll.add { type = "table", column_count = 2, name = "machine_container" }
     product_panel.update_machine_panel(g, machine_flow)
 
     local vars = tools.get_vars(player)
@@ -134,7 +141,8 @@ end
 ---@param g Graph
 ---@param product_name string
 ---@param qtlabel LuaGuiElement
-function product_panel.set_output_value(g, product_name, qtlabel)
+---@return number?
+local function set_output_value(g, product_name, qtlabel)
     ---@type any
     local value = g.iovalues[product_name]
     local caption
@@ -174,21 +182,22 @@ function product_panel.set_output_value(g, product_name, qtlabel)
         if value then
             qtlabel.parent.tooltip = tools.comma_value(value)
         end
+        return value
     else
         qtlabel.caption = ""
         qtlabel.parent.tooltip = ""
+        return nil
     end
 end
-
-local set_output_value = product_panel.set_output_value
 
 ---@param g Graph
 ---@param product_name string
 ---@param qtlabel LuaGuiElement
-function product_panel.set_effective_value(g, product_name, qtlabel)
+---@return number?
+function set_effective_value(g, product_name, qtlabel)
     local product_effective = g.product_effective
     if not qtlabel or not product_effective then
-        return
+        return nil
     end
 
     local value = product_effective[product_name]
@@ -201,12 +210,12 @@ function product_panel.set_effective_value(g, product_name, qtlabel)
     end
     if caption then
         qtlabel.caption = caption
+        return value
     else
         qtlabel.caption = ""
+        return nil
     end
 end
-
-local set_effective_value = product_panel.set_effective_value
 
 function product_panel.create_product_tables(player)
     local frame = player.gui.screen[product_panel_name]
@@ -244,13 +253,22 @@ function product_panel.create_product_tables(player)
         for _, product in pairs(list) do
             local product_name = product.product.name
             local pline = product_table.add { type = "flow", direction = "horizontal" }
-            local b = pline.add { type = "sprite-button", sprite = product_name, name = "product_button" }
+
+            local b
+            if string.find(product_name, "^item/") then
+                b = pline.add { type = "choose-elem-button", elem_type = "item", item = string.sub(product_name, 6), name = "product_button" }
+            else
+                b = pline.add { type = "choose-elem-button", elem_type = "fluid", fluid = string.sub(product_name, 7), name = "product_button" }
+            end
+            b.locked = true
+
             tools.set_name_handler(b, np("product"), { product_name = product_name })
-            b.style.size = 36
-            b.style.vertical_align = "top"
 
             local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-            set_output_value(g, product_name, qtlabel)
+            local value = set_output_value(g, product_name, qtlabel)
+
+            b.style.size = 36
+            b.style.vertical_align = "top"
 
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
@@ -259,7 +277,22 @@ function product_panel.create_product_tables(player)
             elabel.style.width = 50
             elabel.style.horizontal_align = "right"
             elabel.style.right_margin = 10
-            set_effective_value(g, product_name, elabel)
+            local evalue = set_effective_value(g, product_name, elabel)
+
+            if g.iovalues[product_name] then
+                b.style = red_button
+            else
+                value = value or evalue
+                if value then
+                    if value < 0 then
+                        b.style = cyan_button
+                    else
+                        b.style = orange_button
+                    end
+                else
+                    b.style = default_button
+                end
+            end
 
             label.style.width = column_width
         end
@@ -289,9 +322,23 @@ local function update_products(g)
             for _, line in pairs(product_table.children) do
                 local b = line.product_button
                 local product_name = b.tags.product_name --[[@as string]]
-                set_output_value(g, product_name, b.label)
-
-                set_effective_value(g, product_name, line.elabel)
+                local value = set_output_value(g, product_name, b.label)
+                local evalue = set_effective_value(g, product_name, line.elabel)
+                if g.iovalues[product_name] then
+                    b.style = red_button
+                else
+                    value = value or evalue
+                    if value then
+                        if value < 0 then
+                            b.style = cyan_button
+                        else
+                            b.style = orange_button
+                        end
+                    else
+                        b.style = default_button
+                    end
+                end
+    
             end
         end
     end
@@ -432,36 +479,50 @@ function product_panel.update_machine_panel(g, container)
     end
     if #machines == 0 then return end
 
-    for _, machine in pairs(machines) do
-        local line = container.add { type = "flow", direction = "horizontal" }
+    table.sort(machines, function (m1, m2) return m1.grecipe.order < m2.grecipe.order end)
 
-        local b = line.add { type = "sprite-button", sprite = "entity/" .. machine.machine.name, style = default_button_style }
+    for _, machine in pairs(machines) do
+        local col1 = container.add { type = "flow", direction = "horizontal" }
+
+        local b = col1.add { type = "choose-elem-button", elem_type = "entity", entity = machine.machine.name, style = green_button }
+        b.locked = true
+
         local label = b.add { type = "label", style = default_button_label_style,
             caption = tostring(math.ceil(machine.count)), ignored_by_interaction = true }
 
-        local frecipe = line.add { type = "sprite-button", sprite = "recipe/" .. machine.name, style = default_button_style }
+        local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = default_button_style }
         frecipe.style.right_margin = 5
+        frecipe.locked = true
 
         for _, ingredient in pairs(machine.recipe.ingredients) do
-            b = line.add { type = "sprite-button",
-                sprite = ingredient.type .. "/" .. ingredient.name,
-                style = default_button_style }
+            local type = ingredient.type
+            if type == "item" then
+                b = col1.add { type = "choose-elem-button", elem_type = "item", item = ingredient.name, style = cyan_button }
+            else
+                b = col1.add { type = "choose-elem-button", elem_type = "fluid", fluid = ingredient.name, style = cyan_button }
+            end
+            b.locked = true
 
             local amount = ingredient.amount * machine.craft_per_s * machine.count
             amount = fround(amount)
-            label = b.add { type = "label", style = default_button_label_style,
-                caption = "[color=cyan]" .. tostring(amount) .. "[/color]", ignored_by_interaction = true }
+            b.add { type = "label", style = default_button_label_style,
+                caption = tostring(amount), ignored_by_interaction = true }
         end
 
-        local sep = line.add {type="sprite", sprite=arrow_sprite}
+        local col2 = container.add { type = "flow", direction = "horizontal" }
+        local sep = col2.add { type = "sprite", sprite = arrow_sprite }
         sep.style.left_margin = 5
-        sep.style.top_margin = 5
+        sep.style.top_margin = 10
         sep.style.right_margin = 5
 
         for _, product in pairs(machine.recipe.products) do
-            b = line.add { type = "sprite-button",
-                sprite = product.type .. "/" .. product.name,
-                style = default_button_style }
+            local type = product.type
+            if type == "item" then
+                b = col2.add { type = "choose-elem-button", elem_type = "item", item = product.name, style = orange_button }
+            else
+                b = col2.add { type = "choose-elem-button", elem_type = "fluid", fluid = product.name, style = orange_button }
+            end
+            b.locked = true
 
             local amount
             if product.amount_min then
@@ -471,8 +532,8 @@ function product_panel.update_machine_panel(g, container)
             end
             amount = amount * machine.craft_per_s * machine.count
             amount = fround(amount)
-            label = b.add { type = "label", style = default_button_label_style,
-                caption = "[color=orange]" .. tostring(amount) .. "[/color]", ignored_by_interaction = true }
+            b.add { type = "label", style = default_button_label_style,
+                caption = tostring(amount), ignored_by_interaction = true }
         end
     end
 end
