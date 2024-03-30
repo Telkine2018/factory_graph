@@ -1,4 +1,3 @@
-
 local dictionary = require("__flib__/dictionary-lite")
 
 local commons = require("scripts.commons")
@@ -9,6 +8,7 @@ local prefix = commons.prefix
 local graph = require("scripts.graph")
 local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
+local gutils = require("scripts.gutils")
 
 local main = {}
 
@@ -19,12 +19,12 @@ local switch_button_name = prefix .. "-switch"
 
 local excluded_categories = {
 
-     stacking = true, 
-     unstacking = true,
-     barrelling = true,
-     ["barreling-pump"] = true,
-     
-     -- Creative mod
+    stacking = true,
+    unstacking = true,
+    barrelling = true,
+    ["barreling-pump"] = true,
+
+    -- Creative mod
     ["creative-mod_free-fluids"] = true,
     ["creative-mod_energy-absorption"] = true,
 
@@ -43,7 +43,7 @@ local excluded_categories = {
     ["void-crushing"] = true, -- This doesn't actually exist yet, but will soon!
     -- Mining drones
     ["mining-depot"] = true,
-        -- Pyanodon's
+    -- Pyanodon's
     ["py-incineration"] = true,
     ["py-runoff"] = true,
     ["py-venting"] = true,
@@ -56,7 +56,7 @@ local excluded_categories = {
     ["fuel-depot"] = true,
     ["transport-drone-request"] = true,
     ["transport-fluid-request"] = true,
-    
+
 }
 
 ---@param e EventData.on_lua_shortcut
@@ -64,20 +64,22 @@ local function switch_surface(e)
     local player = game.players[e.player_index]
     local character = player.character
 
-    if not string.match(player.surface.name, commons.surface_prefix_filter) then
-
+    if not string.find(player.surface.name, commons.surface_prefix_filter) then
         if not player.gui.left[switch_button_name] then
-            player.gui.left.add {type="button", name=switch_button_name, caption="Grapher"}
+            player.gui.left.add { type = "button", name = switch_button_name, caption = "Grapher" }
         end
 
+        local vars = tools.get_vars(player)
         local surface = main.enter(player)
-        local g = graph.new(surface)
-        g.player = player
-        tools.get_vars(player).graph = g
-        local recipes = player.force.recipes
-        graph.add_recipes(g, recipes, excluded_categories)
-        graph.do_layout(g)
-        graph.draw(g)
+        if not vars.graph then
+            local g = graph.new(surface)
+            g.player = player
+            vars.graph = g
+            local recipes = player.force.recipes
+            graph.add_recipes(g, recipes, excluded_categories)
+            graph.do_layout(g)
+            graph.draw(g)
+        end
         command.open(player)
     else
         main.exit(player)
@@ -110,43 +112,47 @@ function main.enter(player)
     if not game.tile_prototypes[tile_name] then
         tile_name = "lab-dark-2"
     end
+    local surface_name = surface_prefix .. player.index
+    local surface = game.surfaces[surface_name]
 
-    local settings = {
-        height = 1000,
-        width = 1000,
-        autoplace_controls = {},
-        default_enable_all_autoplace_controls = false,
-        cliff_settings = { cliff_elevation_0 = 1024 },
-        starting_area = "none",
-        starting_points = {},
-        terrain_segmentation = "none",
-        autoplace_settings = {
-            entity = { treat_missing_as_default = false, frequency = "none" },
-            tile = {
-                treat_missing_as_default = false,
-                settings = {
-                    [tile_name] = {
-                        frequency = 6,
-                        size = 6,
-                        richness = 6
+    if not surface then
+        local settings = {
+            height = 1000,
+            width = 1000,
+            autoplace_controls = {},
+            default_enable_all_autoplace_controls = false,
+            cliff_settings = { cliff_elevation_0 = 1024 },
+            starting_area = "none",
+            starting_points = {},
+            terrain_segmentation = "none",
+            autoplace_settings = {
+                entity = { treat_missing_as_default = false, frequency = "none" },
+                tile = {
+                    treat_missing_as_default = false,
+                    settings = {
+                        [tile_name] = {
+                            frequency = 6,
+                            size = 6,
+                            richness = 6
+                        }
                     }
-                }
+                },
+                decorative = { treat_missing_as_default = false, frequency = "none" }
             },
-            decorative = { treat_missing_as_default = false, frequency = "none" }
-        },
-        property_expression_names = {
-            cliffiness = 0,
-            ["tile:water:probability"] = -1000,
-            ["tile:deep-water:probability"] = -1000,
-            ["tile:" .. tile_name .. ":probability"] = "inf"
+            property_expression_names = {
+                cliffiness = 0,
+                ["tile:water:probability"] = -1000,
+                ["tile:deep-water:probability"] = -1000,
+                ["tile:" .. tile_name .. ":probability"] = "inf"
+            }
         }
-    }
 
-    local surface = game.create_surface(surface_prefix .. player.index, settings)
-    surface.map_gen_settings = settings
-    surface.daytime = 0
-    surface.freeze_daytime = true
-    surface.show_clouds = false
+        surface = game.create_surface(surface_name, settings)
+        surface.map_gen_settings = settings
+        surface.daytime = 0
+        surface.freeze_daytime = true
+        surface.show_clouds = false
+    end
 
     local character = player.character
     vars.character = character
@@ -158,24 +164,50 @@ function main.enter(player)
     controller_type = defines.controllers.spectator
     controller_type = defines.controllers.god
     player.set_controller { type = controller_type }
-    player.teleport({ 0, 0 }, surface)
+
+    local g = gutils.get_graph(player)
+    ---@type MapPosition
+    local player_position = {0,0}
+    if g and g.player_position then
+        player_position = g.player_position
+    end 
+    player.teleport(player_position, surface)
     return surface
 end
 
 ---@param player LuaPlayer
 function main.exit(player)
     local vars = tools.get_vars(player)
-
-    tools.close_panels(player)
     local character = vars.character
-    player.teleport(character.position, character.surface)
-    player.associate_character(vars.character)
-    player.set_controller { type = defines.controllers.character, character = vars.character }
-    game.delete_surface(vars.surface)
-    command.close(player)
-    vars.graph = nil
+
+    if character then
+        local g = gutils.get_graph(player)
+        g.player_position = player.position
+        player.teleport(character.position, character.surface, true)
+    end
 end
 
+tools.on_event(defines.events.on_player_changed_surface,
+
+    ---@param e EventData.on_player_changed_surface
+    function(e)
+        local player = game.players[e.player_index]
+        local vars = tools.get_vars(player)
+        local g = gutils.get_graph(player)
+        if not g then return end
+
+        if e.surface_index == g.surface.index then
+            tools.close_panels(player)
+            command.close(player)
+            local character = vars.character
+            if vars.character then
+                player.teleport(character.position, character.surface)
+                player.associate_character(vars.character)
+                player.set_controller { type = defines.controllers.character, character = vars.character }
+                vars.character = nil
+            end
+        end
+    end)
 
 tools.on_configuration_changed(function(data)
     for _, player in pairs(game.players) do
@@ -210,4 +242,3 @@ tools.on_configuration_changed(function(data)
 end)
 
 return main
-

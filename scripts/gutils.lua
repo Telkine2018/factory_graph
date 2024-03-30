@@ -68,11 +68,21 @@ function gutils.get_product_name(player, name)
 end
 
 ---@param g Graph
----@param recipe GRecipe
-function gutils.get_position(g, recipe)
+---@param line integer
+---@param col integer
+---@return number
+---@return number
+function gutils.get_position(g, col, line)
     local grid_size = g.grid_size
-    local x = recipe.col * grid_size + 0.5
-    local y = recipe.line * grid_size + 0.5
+    local x = col * grid_size + 0.5
+    local y = line * grid_size + 0.5
+    return x, y
+end
+
+---@param g Graph
+---@param recipe GRecipe
+function gutils.get_recipe_position(g, recipe)
+    local x, y = gutils.get_position(g, recipe.col, recipe.line)
     return { x = x, y = y }
 end
 
@@ -104,7 +114,6 @@ end
 ---@param recipe_name string
 ---@param fast boolean?
 function gutils.move_to_recipe(player, recipe_name, fast)
-
     local g = gutils.get_graph(player)
     if not g then return end
 
@@ -113,7 +122,7 @@ function gutils.move_to_recipe(player, recipe_name, fast)
     local grecipe = g.recipes[recipe_name]
     if not grecipe or not grecipe.line then return end
 
-    local position = gutils.get_position(g, grecipe)
+    local position = gutils.get_recipe_position(g, grecipe)
 
     if fast then
         player.teleport(position)
@@ -121,7 +130,6 @@ function gutils.move_to_recipe(player, recipe_name, fast)
         gutils.move_view(player, position)
     end
 end
-
 
 ---@class MoveProcess
 ---@field dx number
@@ -249,7 +257,6 @@ end
 ---@param result table<string, GRecipe>?
 ---@return table<string, GRecipe>
 function gutils.get_connected_ingredients(grecipe, result)
-
     if not result then result = {} end
 
     for _, ingredient in pairs(grecipe.ingredients) do
@@ -266,7 +273,6 @@ end
 ---@param result table<string, GRecipe>?
 ---@return table<string, GRecipe>
 function gutils.get_connected_productions(grecipe, result)
-
     if not result then result = {} end
 
     for _, product in pairs(grecipe.products) do
@@ -280,11 +286,12 @@ function gutils.get_connected_productions(grecipe, result)
 end
 
 ---@param g Graph
+---@param all boolean?
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
-function gutils.get_product_flow(g)
-
+---@return integer
+function gutils.get_product_flow(g, all)
     ---@type table<string, GProduct>
     local inputs
     ---@type table<string, GProduct>
@@ -297,16 +304,18 @@ function gutils.get_product_flow(g)
     intermediates = {}
     local selection = g.selection
     if not selection then selection = {} end
+    local recipe_count = 0
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible and selection[recipe.name] and not recipe.is_product then
+        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
             for _, ingredient in pairs(recipe.ingredients) do
                 local name = ingredient.name
                 inputs[name] = ingredient
             end
         end
+        recipe_count = recipe_count + 1
     end
     for _, recipe in pairs(g.recipes) do
-        if recipe.visible and selection[recipe.name] and not recipe.is_product then
+        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
             for _, product in pairs(recipe.products) do
                 local name = product.name
                 if inputs[name] then
@@ -318,7 +327,7 @@ function gutils.get_product_flow(g)
             end
         end
     end
-    return inputs, outputs, intermediates
+    return inputs, outputs, intermediates, recipe_count
 end
 
 local line_margin = 5
@@ -342,7 +351,37 @@ end
 
 ---@param g Graph
 function gutils.fire_selection_change(g)
-    tools.fire_user_event(commons.selection_change_event, {g=g})
+    tools.fire_user_event(commons.selection_change_event, { g = g })
+end
+
+---@param g Graph
+function gutils.recenter(g)
+    local mincol, maxcol, minline, maxline
+
+    local count = 0
+    for _, grecipe in pairs(g.recipes) do
+        if grecipe.col then
+            if minline then
+                if grecipe.col < mincol then mincol = grecipe.col end
+                if grecipe.col > maxcol then maxcol = grecipe.col end
+                if grecipe.line < minline then minline = grecipe.line end
+                if grecipe.line > maxline then maxline = grecipe.line end
+            else
+                mincol, minline = grecipe.col, grecipe.line
+                maxcol, maxline = grecipe.col, grecipe.line
+            end
+        end
+    end
+
+    local center_col = 0
+    local center_line = 0
+    if minline then
+        center_col = math.floor((mincol + maxcol) / 2)
+        center_line = math.floor((minline + maxline) / 2)
+    end
+
+    local x, y = gutils.get_position(g, center_col, center_line)
+    g.player.teleport({x,y})
 end
 
 return gutils

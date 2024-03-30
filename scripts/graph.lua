@@ -33,7 +33,8 @@ function graph.new(surface)
         x_routing = {},
         y_routing = {},
         grid_size = commons.grid_size,
-        color_index = 0
+        color_index = 0,
+        iovalues = {}
     }
 end
 
@@ -340,12 +341,13 @@ function graph.do_layout(g)
         end
     end
 
+    local inputs, outputs, intermediates, recipe_count = gutils.get_product_flow(g, true)
     local gcol = {
         col = 1,
         line_set = {}
     }
     gcols[1] = gcol
-    for _, product in pairs(g.products) do
+    for _, product in pairs(inputs) do
         local recipe = product.root_recipe
         if recipe then
             if recipe.visible then
@@ -359,8 +361,10 @@ function graph.do_layout(g)
                     log("Process: " .. product.name)
                 end
             end
-            processed_products[product.name] = product
-            for _, recipe in pairs(product.ingredient_of) do
+        end
+        processed_products[product.name] = product
+        for _, recipe in pairs(product.ingredient_of) do
+            if recipe.visible then
                 remaining_recipes[recipe.name] = recipe
             end
         end
@@ -383,11 +387,6 @@ function graph.do_layout(g)
                     end
                     ::skip::
                 end
-                for _, prod in pairs(recipe.products) do
-                    if not processed_products[prod.name] then
-                        product_to_process[prod.name] = prod
-                    end
-                end
                 if is_root then
                     remaining_recipes[recipe.name] = recipe
                 end
@@ -396,6 +395,7 @@ function graph.do_layout(g)
         end
     end
 
+    
     local edge_size = math.max(math.ceil(0.5 * math.sqrt(recipe_count)), 3)
 
     g.current_col = initial_col
@@ -717,6 +717,7 @@ function graph.refresh(player)
     graph.do_layout(g)
     graph.draw(g)
     drawing.update_drawing(player)
+    gutils.recenter(g)
 end
 
 return graph

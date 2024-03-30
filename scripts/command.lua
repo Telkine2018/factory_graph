@@ -156,7 +156,7 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         local g = gutils.get_graph(player)
         g.visibility = e.element.selected_index
         graph.refresh(player)
-        player.teleport({ 0, 0 })
+        gutils.recenter(g)
     end)
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
@@ -167,8 +167,7 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
 
 tools.on_named_event(np("production"), defines.events.on_gui_click,
     function(e)
-        local player = game.players[e.player_index]
-        product_panel.create(player.index)
+        product_panel.create(e.player_index)
     end)
 
 

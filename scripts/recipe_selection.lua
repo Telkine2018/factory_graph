@@ -25,7 +25,8 @@ local sprite_button_size = 30
 ---@param g Graph
 ---@param product GProduct?
 ---@param recipe GRecipe?
-function recipe_selection.open(g, product, recipe)
+---@param only_product boolean?
+function recipe_selection.open(g, product, recipe, only_product)
     local player = g.player
     local player_index = player.index
 
@@ -53,8 +54,10 @@ function recipe_selection.open(g, product, recipe)
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
     elseif product and not recipe then
-        for name, i_recipe in pairs(product.ingredient_of) do
-            recipes[name] = i_recipe
+        if not only_product then
+            for name, i_recipe in pairs(product.ingredient_of) do
+                recipes[name] = i_recipe
+            end
         end
         for name, p_recipe in pairs(product.product_of) do
             recipes[name] = p_recipe
@@ -248,15 +251,6 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
         graph.draw(g)
         gutils.select_current_recipe(g, g.rs_recipe)
         drawing.update_drawing(player)
-        if e.element and e.element.state then
-            local recipe_name = e.element.tags.recipe_name
-            if recipe_name then
-                local recipe = g.recipes[recipe_name]
-                local position = gutils.get_position(g, recipe)
-                drawing.draw_target(g, recipe)
-                gutils.move_view(player, position)
-            end
-        end
     end)
 
 ---@param player_index integer
@@ -276,6 +270,7 @@ end
 ---@param recipe_table LuaGuiElement
 function recipe_selection.display(player, recipes, recipe_table)
     local player_index = player.index
+    ---@cast player_index integer
     local g = gutils.get_graph(player)
 
     local sorted_list = {}
@@ -310,6 +305,7 @@ function recipe_selection.display(player, recipes, recipe_table)
         }
         b.style.size = 18
         b.style.right_margin = 3
+        b.style.top_margin = 6
 
         if recipe then
             local tooltip_builder = {}
@@ -374,15 +370,21 @@ function recipe_selection.display(player, recipes, recipe_table)
                 end_color = "[/color]"
             end
             local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
-            recipe_line.add {
+            local cb = recipe_line.add {
                 type = "checkbox",
                 state = state,
-                caption = "[img=recipe/" .. recipe_name .. "] " .. start_color .. recipe_element.localised .. end_color,
+                --caption = "[img=recipe/" .. recipe_name .. "] " .. start_color .. recipe_element.localised .. end_color,
                 name = cb_name,
                 tooltip = tooltip,
                 tags = { recipe_name = recipe_name }
             }
+            cb.style.top_margin = 6
             recipe_line.tooltip = tooltip
+
+            local b_recipe = recipe_line.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
+            b_recipe.locked = true
+            b_recipe.style.size = 28
+
             local recipe_table = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }
             recipe_table.style.left_margin = 10
             for _, def in pairs(i_table) do
@@ -430,9 +432,10 @@ tools.on_gui_click(np("goto"),
         if not recipe.visible then
             return
         end
-        local position = gutils.get_position(g, recipe)
+        local position = gutils.get_recipe_position(g, recipe)
 
         drawing.draw_target(g, recipe)
+
         if e.control then
             player.teleport(position, g.surface, false)
         else

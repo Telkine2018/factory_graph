@@ -32,6 +32,7 @@ local tools = require("scripts.tools")
 ---@field product_effective {[string]:number}       
 ---@field production_failed string?
 ---@field recipe_order integer
+---@field player_position MapPosition
 
 ---@class GraphConfig
 ---@field selection {[string]:GElement}?
