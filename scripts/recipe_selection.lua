@@ -22,11 +22,11 @@ tools.add_panel_name(recipe_selection_frame_name)
 
 local sprite_button_size = 30
 
----@param player LuaPlayer
 ---@param g Graph
 ---@param product GProduct?
 ---@param recipe GRecipe?
-function recipe_selection.open(player, g, product, recipe)
+function recipe_selection.open(g, product, recipe)
+    local player = g.player
     local player_index = player.index
 
     g.rs_product = product
@@ -50,7 +50,6 @@ function recipe_selection.open(player, g, product, recipe)
         if g.show_only_researched then
             recipes = gutils.filter_enabled_recipe(recipes)
         end
-
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
     elseif product and not recipe then
@@ -198,7 +197,7 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
             local recipe_name = e.tags.recipe_name
             local g = gutils.get_graph(player)
             if g then
-                recipe_selection.open(player, g, g.products[product_name], g.recipes[recipe_name])
+                recipe_selection.open(g, g.products[product_name], g.recipes[recipe_name])
             end
         end
     end)

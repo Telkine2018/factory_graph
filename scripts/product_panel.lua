@@ -5,6 +5,8 @@ local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
+local drawing = require("scripts.drawing")
+
 local recipe_selection = require("scripts.recipe_selection")
 local production = require("scripts.production")
 
@@ -338,7 +340,6 @@ local function update_products(g)
                         b.style = default_button
                     end
                 end
-    
             end
         end
     end
@@ -377,7 +378,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
         if not product_name then return end
 
         if e.shift then
-            recipe_selection.open(player, g, g.products[product_name], nil)
+            recipe_selection.open(g, g.products[product_name], nil)
             product_panel.close(player)
         elseif e.control then
             get_vinput(e.element.parent)
@@ -479,7 +480,7 @@ function product_panel.update_machine_panel(g, container)
     end
     if #machines == 0 then return end
 
-    table.sort(machines, function (m1, m2) return m1.grecipe.order < m2.grecipe.order end)
+    table.sort(machines, function(m1, m2) return m1.grecipe.order < m2.grecipe.order end)
 
     for _, machine in pairs(machines) do
         local col1 = container.add { type = "flow", direction = "horizontal" }
@@ -493,6 +494,7 @@ function product_panel.update_machine_panel(g, container)
         local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = default_button_style }
         frecipe.style.right_margin = 5
         frecipe.locked = true
+        tools.set_name_handler(frecipe, np("goto_recipe"), { recipe_name = machine.name })
 
         for _, ingredient in pairs(machine.recipe.ingredients) do
             local type = ingredient.type
@@ -502,6 +504,7 @@ function product_panel.update_machine_panel(g, container)
                 b = col1.add { type = "choose-elem-button", elem_type = "fluid", fluid = ingredient.name, style = cyan_button }
             end
             b.locked = true
+            tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
 
             local amount = ingredient.amount * machine.craft_per_s * machine.count
             amount = fround(amount)
@@ -523,6 +526,7 @@ function product_panel.update_machine_panel(g, container)
                 b = col2.add { type = "choose-elem-button", elem_type = "fluid", fluid = product.name, style = orange_button }
             end
             b.locked = true
+            tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
 
             local amount
             if product.amount_min then
@@ -549,6 +553,39 @@ local function update_machines(g)
         product_panel.update_machine_panel(g, container)
     end
 end
+
+tools.on_named_event(np("goto_recipe"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local element = e.element
+        local player = game.players[e.player_index]
+        if not element or not element.valid then return end
+
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        if not recipe_name then return end
+        product_panel.close(player)
+        gutils.move_to_recipe(player, recipe_name, e.control)
+
+        local g = gutils.get_graph(player)
+        drawing.draw_target(g, g.recipes[recipe_name])
+    end)
+
+    tools.on_named_event(np("open_product"), defines.events.on_gui_click,
+
+---@param e EventData.on_gui_click
+function(e)
+    local element = e.element
+    local player = game.players[e.player_index]
+    if not element or not element.valid then return end
+
+    local recipe_name = element.tags.recipe_name --[[@as string]]
+    local product_name = element.tags.product_name  --[[@as string]]
+    if not recipe_name or not product_name then return end
+    
+    local g = gutils.get_graph(player)
+    recipe_selection.open(g, g.products[product_name], g.recipes[recipe_name])
+end)
+
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)

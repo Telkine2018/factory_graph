@@ -138,8 +138,7 @@ tools.on_named_event(np("search-text"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
-
-        recipe_selection.open(player, g)
+        recipe_selection.open(g)
     end)
 
 tools.on_named_event(np("selection"), defines.events.on_gui_selection_state_changed,

@@ -100,6 +100,29 @@ function gutils.move_view(player, position)
     }
 end
 
+---@param player LuaPlayer
+---@param recipe_name string
+---@param fast boolean?
+function gutils.move_to_recipe(player, recipe_name, fast)
+
+    local g = gutils.get_graph(player)
+    if not g then return end
+
+    if g.surface ~= player.surface then return end
+
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe or not grecipe.line then return end
+
+    local position = gutils.get_position(g, grecipe)
+
+    if fast then
+        player.teleport(position)
+    else
+        gutils.move_view(player, position)
+    end
+end
+
+
 ---@class MoveProcess
 ---@field dx number
 ---@field dy number
@@ -297,7 +320,6 @@ function gutils.get_product_flow(g)
     end
     return inputs, outputs, intermediates
 end
-
 
 local line_margin = 5
 

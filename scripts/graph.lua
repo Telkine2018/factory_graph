@@ -15,7 +15,7 @@ local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
-local log_enabled
+local log_enabled = nil
 
 ---@param  surface LuaSurface
 ---@return Graph
@@ -319,8 +319,6 @@ function graph.do_layout(g)
 
     ---@type {[string]:GRecipe}
     local remaining_recipes = {}
-    local root_products = {}
-    g.root_products = root_products
     g.product_line = 1
     g.recipe_order = 1
 
@@ -350,16 +348,20 @@ function graph.do_layout(g)
     for _, product in pairs(g.products) do
         local recipe = product.root_recipe
         if recipe then
-            add_processed_product(product)
-            recipe.col = 1
-            recipe.line = g.product_line
-            set_free_line(gcol, g.product_line, recipe)
-            g.product_line = g.product_line + 1
-            recipe.order = g.recipe_order
-            g.recipe_order = g.recipe_order + 1
-            root_products[product.name] = product
-            if log_enabled then
-                log("Process: " .. product.name)
+            if recipe.visible then
+                recipe.col = 1
+                recipe.line = g.product_line
+                set_free_line(gcol, g.product_line, recipe)
+                g.product_line = g.product_line + 1
+                recipe.order = g.recipe_order
+                g.recipe_order = g.recipe_order + 1
+                if log_enabled then
+                    log("Process: " .. product.name)
+                end
+            end
+            processed_products[product.name] = product
+            for _, recipe in pairs(product.ingredient_of) do
+                remaining_recipes[recipe.name] = recipe
             end
         end
     end
@@ -370,17 +372,21 @@ function graph.do_layout(g)
             if not recipe.line then
                 local is_root = true
                 for _, ing in pairs(recipe.ingredients) do
-                    product_to_process[ing.name] = ing
-                    for _, irecipe in pairs(ing.product_of) do
-                        if irecipe.visible then
-                            is_root = false
-                            goto skip
+                    if not processed_products[ing.name] then
+                        product_to_process[ing.name] = ing
+                        for _, irecipe in pairs(ing.product_of) do
+                            if irecipe.visible then
+                                is_root = false
+                                goto skip
+                            end
                         end
                     end
                     ::skip::
                 end
                 for _, prod in pairs(recipe.products) do
-                    product_to_process[prod.name] = prod
+                    if not processed_products[prod.name] then
+                        product_to_process[prod.name] = prod
+                    end
                 end
                 if is_root then
                     remaining_recipes[recipe.name] = recipe
@@ -530,7 +536,6 @@ function graph.do_layout(g)
         end
     end
     log("------- End layout ----------")
-
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
 end
@@ -553,7 +558,23 @@ function graph.reverse_equalize_recipes(g)
             ---@cast line_recipe GRecipe
             for _, product in pairs(line_recipe.products) do
                 for _, recipe in pairs(product.ingredient_of) do
-                    if recipe.visible then
+                    if recipe.visible and recipe.col and recipe.col >= line_recipe.col then
+                        local dcol = math.abs(recipe.col - line_recipe.col)
+                        if not min_dcol or dcol < min_dcol then
+                            min_dcol = dcol
+                            count = 1
+                            line = recipe.line
+                        elseif min_dcol == dcol then
+                            count = count + 1
+                            line = line + recipe.line
+                        end
+                    end
+                end
+            end
+
+            for _, ingredient in pairs(line_recipe.ingredients) do
+                for _, recipe in pairs(ingredient.product_of) do
+                    if recipe.visible and recipe.col and recipe.col >= line_recipe.col then
                         local dcol = math.abs(recipe.col - line_recipe.col)
                         if not min_dcol or dcol < min_dcol then
                             min_dcol = dcol
@@ -611,7 +632,23 @@ function graph.equalize_recipes(g)
                 else
                     for _, ingredient in pairs(line_recipe.ingredients) do
                         for _, recipe in pairs(ingredient.product_of) do
-                            if recipe.visible and recipe.col then
+                            if recipe.visible and recipe.col and recipe.col < line_recipe.col then
+                                local dcol = math.abs(recipe.col - line_recipe.col)
+                                if not min_dcol or dcol < min_dcol then
+                                    min_dcol = dcol
+                                    count = 1
+                                    line = recipe.line
+                                elseif min_dcol == dcol then
+                                    count = count + 1
+                                    line = line + recipe.line
+                                end
+                            end
+                        end
+                    end
+
+                    for _, product in pairs(line_recipe.products) do
+                        for _, recipe in pairs(product.ingredient_of) do
+                            if recipe.visible and recipe.col and recipe.col < line_recipe.col then
                                 local dcol = math.abs(recipe.col - line_recipe.col)
                                 if not min_dcol or dcol < min_dcol then
                                     min_dcol = dcol

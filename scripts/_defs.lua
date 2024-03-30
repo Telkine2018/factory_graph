@@ -8,7 +8,6 @@ local tools = require("scripts.tools")
 ---@field player LuaPlayer
 ---@field recipes {[string]:GRecipe}
 ---@field products {[string]:GProduct}
----@field root_products {[string]:GProduct}
 ---@field entity_map {[integer]:(GRecipe|GProduct)}
 ---@field gcols GCol[]
 ---@field current_col integer

@@ -757,6 +757,9 @@ end
 ---@param g Graph
 ---@param crecipe GRecipe
 function drawing.draw_target(g, crecipe)
+    if not crecipe then
+        return
+    end
     local margin = 0.7
     local grid_size = g.grid_size
     local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
@@ -848,8 +851,8 @@ local function highlight_recipes(g, recipes, color)
     end
 end
 
-local ingredient_color = { 255, 106, 0 }
-local production_color = { 1, 0, 0 }
+local ingredient_color = { 1, 0, 0 }
+local production_color = { 255, 106, 0 }
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -1086,7 +1089,7 @@ local function on_gui_opened(e)
         elseif entity_name == commons.product_selector_name then
             local product = drawing.get_product_from_selected(player, entity)
             if product then
-                drawing.open_recipe_selection(player, g, product, grecipe)
+                drawing.open_recipe_selection(g, product, grecipe)
             end
             player.opened = nil
         end
@@ -1137,11 +1140,10 @@ function drawing.delete_content(g)
     g.gcols = {}
 end
 
----@param player LuaPlayer
 ---@param g Graph
 ---@param product GProduct
 ---@param src GRecipe
-function drawing.open_recipe_selection(player, g, product, src)
+function drawing.open_recipe_selection(g, product, src)
 end
 
 return drawing
