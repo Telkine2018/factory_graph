@@ -46,6 +46,20 @@ local commons = {
 
 }
 
+commons.buttons = {
+    orange = prefix .. "_small_slot_button_orange",
+    green = prefix .. "_small_slot_button_green",
+    cyan = prefix .. "_small_slot_button_cyan",
+    red = prefix .. "_small_slot_button_red",
+    blue = prefix .. "_small_slot_button_blue",
+    yellow = prefix .. "_small_slot_button_yellow",
+    default = prefix .. "_small_slot_button_default"
+}
+
+commons.buttons.ingredient = commons.buttons.cyan
+commons.buttons.product = commons.buttons.orange
+commons.buttons.recipe = commons.buttons.blue
+
 commons.default_selection = commons.ingredient_and_product_selection
 commons.surface_prefix_filter = "^" .. commons.surface_prefix
 

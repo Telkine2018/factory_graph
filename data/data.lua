@@ -150,6 +150,15 @@ sprite = {
 }
 add(sprite)
 
+sprite = {
+  type = "sprite",
+  name = prefix .. "_switch",
+  filename = png("switch"),
+  width = 40,
+  height = 40
+}
+add(sprite)
+
 
 data:extend(declarations)
 

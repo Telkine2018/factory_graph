@@ -16,12 +16,6 @@ local math_precision = commons.math_precision
 function production.compute(g)
     machinedb.initialize()
 
-    g.preferred_machines = { "assembling-machine-2" }
-    g.preferred_modules = nil
-    g.preferred_beacon = nil
-    g.preferred_beacon_count = 0
-    -- g.iovalues = { ["item/electronic-circuit"] = 10 }
-
     local failed = nil
 
     ---@type {[string]:ProductionMachine}
@@ -142,7 +136,7 @@ function production.compute(g)
             if not coef then
                 coef = 0
             end
-            coef = coef - ingredient.amount * craft_per_s
+            coef = coef - ingredient.amount * craft_per_s / (1 + machine.productivity)
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
         end
@@ -411,7 +405,7 @@ function production.compute(g)
                 if not coef then
                     coef = 0
                 end
-                local total = ingredient.amount * craft_per_s * machine_count
+                local total = ingredient.amount * craft_per_s * machine_count / (machine.productivity + 1)
                 if abs(total) >= math_precision then
                     product_outputs[iname] = coef - total
                 end

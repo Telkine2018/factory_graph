@@ -44,7 +44,7 @@ local tools = require("scripts.tools")
 ---@field visibility integer?
 ---@field preferred_machines string[]
 ---@field preferred_modules string[]
----@field preferred_beacon string
+---@field preferred_beacon string?
 ---@field preferred_beacon_count integer
 ---@field iovalues {[string]:number|boolean}       
 
@@ -53,6 +53,7 @@ local tools = require("scripts.tools")
 ---@class GElement
 ---@field name string     @ name of product or recipe
 ---@field entity LuaEntity?
+---@field used boolean?
 
 ---@class GProduct : GElement
 ---@field ingredient_of {[string]:GRecipe}

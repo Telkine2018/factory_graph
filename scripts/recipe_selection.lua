@@ -15,6 +15,11 @@ local function np(name)
     return prefix .. "-recipe_selection." .. name
 end
 
+
+local ingredient_button_style = commons.buttons.ingredient
+local product_button_style = commons.buttons.product
+local recipe_button_style = commons.buttons.recipe
+
 local recipe_selection_frame_name = np("recipe_selection_frame")
 local cb_name = np("cb")
 
@@ -69,15 +74,6 @@ function recipe_selection.open(g, product, recipe, only_product)
         if recipe_count == 0 then return end
     end
 
-    local frame = player.gui.screen.add {
-        type = "frame",
-        direction = 'vertical',
-        name = recipe_selection_frame_name
-    }
-
-    frame.style.minimal_width = 400
-    --frame.style.minimal_height = 300
-
     local product_name
     if (product) then
         product_name = gutils.get_product_name(player, product.name)
@@ -85,37 +81,18 @@ function recipe_selection.open(g, product, recipe, only_product)
         product_name = { np("search-title") }
     end
 
-    local titleflow = frame.add { type = "flow" }
-    titleflow.add {
-        type = "label",
-        caption = { np("title"), product_name },
-        style = "frame_title",
-        ignored_by_interaction = true
+    ---@type Params.create_standard_panel
+    local params                               = {
+        panel_name           = recipe_selection_frame_name,
+        title                = { np("title"), product_name },
+        create_inner_frame   = true,
+        close_button_name    = np("close"),
+        close_button_tooltip = { np("close-tooltip") },
+        is_draggable = true
     }
+    local frame, inner_frame                   = tools.create_standard_panel(player, params)
 
-    local drag = titleflow.add {
-        type = "empty-widget",
-        style = "flib_titlebar_drag_handle"
-    }
-
-    drag.drag_target = frame
-    titleflow.drag_target = frame
-
-    titleflow.add {
-        type = "sprite-button",
-        name = np("close"),
-        tooltip = { np("close-tooltip") },
-        style = "frame_action_button",
-        mouse_button_filter = { "left" },
-        sprite = "utility/close_white",
-        hovered_sprite = "utility/close_black"
-    }
-
-    local inner_frame = frame.add {
-        type = "frame",
-        direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
-    }
+    frame.style.minimal_width                  = 400
     inner_frame.style.horizontally_stretchable = true
 
     if not product then
@@ -128,8 +105,10 @@ function recipe_selection.open(g, product, recipe, only_product)
 
     local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
     scroll.style.maximal_height = 700
+    scroll.style.horizontally_stretchable = true
 
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
+    recipe_table.style.horizontally_stretchable = true
 
     if product ~= nil then
         recipe_selection.display(player, recipes, recipe_table)
@@ -246,7 +225,7 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
 
         for _, grecipe in pairs(not_visible) do
             grecipe.visible = true
-            graph.layout_recipe(g, grecipe)
+            graph.insert_recipe(g, grecipe)
         end
         graph.draw(g)
         gutils.select_current_recipe(g, g.rs_recipe)
@@ -363,48 +342,52 @@ function recipe_selection.display(player, recipes, recipe_table)
             end
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
-            local start_color = ""
-            local end_color = ""
-            if not recipe_element.grecipe.enabled then
-                start_color = "[color=1,0.42,0]"
-                end_color = "[/color]"
-            end
             local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
+
+            local b_recipe = recipe_line.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
+            b_recipe.style = recipe_button_style
+            b_recipe.locked = true
+            b_recipe.style.size = 28
+
             local cb = recipe_line.add {
                 type = "checkbox",
                 state = state,
-                --caption = "[img=recipe/" .. recipe_name .. "] " .. start_color .. recipe_element.localised .. end_color,
                 name = cb_name,
                 tooltip = tooltip,
+                caption = recipe_element.localised,
                 tags = { recipe_name = recipe_name }
             }
             cb.style.top_margin = 6
             recipe_line.tooltip = tooltip
 
-            local b_recipe = recipe_line.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
-            b_recipe.locked = true
-            b_recipe.style.size = 28
-
-            local recipe_table = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }
-            recipe_table.style.left_margin = 10
+            local recipe_line = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }
+            recipe_line.style.left_margin = 10
             for _, def in pairs(i_table) do
-                local b = recipe_table.add { type = "sprite-button", sprite = def.name, tooltip = def.tooltip }
+                local b = gutils.create_product_button(recipe_line, def.name)
+                b.style = ingredient_button_style
                 b.style.size = sprite_button_size
                 b.style.margin = 0
                 tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
             end
-            recipe_table.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
+            local arrow = recipe_line.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
+            arrow.style.top_margin = 6
             for _, def in pairs(p_table) do
-                local b = recipe_table.add { type = "sprite-button", sprite = def.name, tooltip = def.tooltip }
+                local b = gutils.create_product_button(recipe_line, def.name)
+                b.style = product_button_style
                 b.style.size = sprite_button_size
                 b.style.margin = 0
                 tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
             end
+            recipe_line.style.horizontally_stretchable = true
         else
+
+            local b = gutils.create_product_button(recipe_line, recipe_name)
+            b.style.size = sprite_button_size
+            
             recipe_line.add {
                 type = "checkbox",
                 state = state,
-                caption = "[img=" .. recipe_name .. "] " .. recipe_element.localised,
+                caption = recipe_element.localised,
                 name = cb_name
             }
             recipe_table.add { type = "label", caption = "" }

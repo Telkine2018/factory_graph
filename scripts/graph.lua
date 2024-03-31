@@ -43,22 +43,23 @@ end
 local function get_product(g, name)
     ---@type GProduct
     local product = g.products[name]
-    if product then return product end
-
-    product = {
-        name = name,
-        ingredient_of = {},
-        product_of = {},
-        is_root = true
-    }
-    g.products[name] = product
+    if not product then
+        product = {
+            name = name,
+            ingredient_of = {},
+            product_of = {},
+            is_root = true
+        }
+        g.products[name] = product
+    end
+    product.used = true
     return product
 end
 
 ---@param g Graph
 ---@param recipes table<string, LuaRecipe>
 ---@param excluded_categories {[string]:boolean}?
-function graph.add_recipes(g, recipes, excluded_categories)
+function graph.update_recipes(g, recipes, excluded_categories)
     if not excluded_categories then
         excluded_categories = {}
     end
@@ -66,14 +67,17 @@ function graph.add_recipes(g, recipes, excluded_categories)
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] then
             if not recipe.hidden or g.show_hidden then
-                ---@type GRecipe
-                local grecipe = {
-                    name = name,
-                    ingredients = {},
-                    products = {},
-                    visible = true,
-                }
-                g.recipes[name] = grecipe
+                local grecipe = g.recipes[name]
+                if not grecipe then
+                    grecipe = {
+                        name = name,
+                        ingredients = {},
+                        products = {},
+                        visible = true
+                    }
+                    g.recipes[name] = grecipe
+                end
+                grecipe.used = true
                 if recipe.enabled then
                     grecipe.enabled = true
                 else
@@ -126,20 +130,94 @@ function graph.add_recipes(g, recipes, excluded_categories)
 
     for _, product in pairs(g.products) do
         if product.is_root then
-            local name = product.name
-            ---@type GRecipe
-            local grecipe = {
-                name = name,
-                ingredients = {},
-                products = { product },
-                is_product = true,
-                visible = true
-            }
-            g.recipes[name] = grecipe
-            product.root_recipe = grecipe
-            product.product_of[name] = grecipe
+            if not product.root_recipe then
+                local name = product.name
+                ---@type GRecipe
+                local grecipe = {
+                    name = name,
+                    ingredients = {},
+                    products = { product },
+                    is_product = true,
+                    visible = true,
+                    used = true
+                }
+                g.recipes[name] = grecipe
+                product.root_recipe = grecipe
+                product.product_of[name] = grecipe
+            else
+                product.root_recipe.used = true
+            end
         end
     end
+
+    graph.remove_unused(g)
+end
+
+---@param g Graph
+---@return boolean
+function graph.remove_unused(g)
+    local changed
+
+    if g.rs_recipe and not g.rs_recipe.used then
+        g.rs_recipe = nil
+    end
+    if g.rs_product and not g.rs_product.used then
+        g.rs_product = nil
+    end
+    if g.selected_recipe and not g.selected_recipe.used then
+        g.selected_recipe = nil
+    end
+
+    local to_remove = {}
+    for _, recipe in pairs(g.recipes) do
+        if not recipe.used then
+            to_remove[recipe.name] = true
+        else
+            recipe.used = nil
+        end
+    end
+    for name in pairs(to_remove) do
+        g.recipes[name] = nil
+        g.selection[name] = nil
+        changed = true
+    end
+
+    to_remove = {}
+    for _, product in pairs(g.products) do
+        if not product.used then
+            to_remove[product.name] = true
+            g.iovalues[product.name] = nil
+            g.product_outputs[product.name] = nil
+            g.product_effective[product.name] = nil
+        else
+            product.used = nil
+        end
+    end
+    for name in pairs(to_remove) do
+        g.products[name] = nil
+        changed = true
+    end
+
+    if changed then
+        if g.preferred_beacon and game.entity_prototypes[g.preferred_beacon] == nil then
+            g.preferred_beacon = nil
+        end
+        if g.preferred_machines then
+            for i = #g.preferred_machines, 1, -1 do
+                if game.entity_prototypes[g.preferred_machines[i]] == nil then
+                    table.remove(g.preferred_machines, i)
+                end
+            end
+        end
+        if g.preferred_modules then
+            for i = #g.preferred_modules, 1, -1 do
+                if game.item_prototypes[g.preferred_modules[i]] == nil then
+                    table.remove(g.preferred_modules, i)
+                end
+            end
+        end
+    end
+    return changed
 end
 
 ---@param gcol GCol
@@ -309,6 +387,86 @@ end
 local layout_recipe = graph.layout_recipe
 
 ---@param g Graph
+---@param grecipe GRecipe
+function graph.insert_recipe(g, grecipe)
+    local center_line, center_col, count = 0, 0, 0
+    local gcols = g.gcols
+
+    for _, ingredient in pairs(grecipe.ingredients) do
+        local col1, line1, count1 = gutils.compute_sum(ingredient.product_of)
+        center_col = center_col + col1
+        center_line = center_line + line1
+        count = count + count1
+    end
+    for _, product in pairs(grecipe.products) do
+        local col1, line1, count1 = gutils.compute_sum(product.ingredient_of)
+        center_col = center_col + col1
+        center_line = center_line + line1
+        count = count + count1
+    end
+    if count == 0 then
+        graph.layout_recipe(g, grecipe)
+        return
+    end
+    center_col = math.floor(center_col / count)
+    center_line = math.floor(center_line / count)
+
+    local min_d
+    local min_col
+    local min_line
+
+    ---@param col integer
+    ---@param line integer
+    local function process_position(col, line)
+        local gcol = gcols[col]
+        if gcol then
+            if gcol.line_set[line] then
+                return
+            end
+        end
+        if col <= 1 then
+            return
+        end
+        local dcol = col - center_col
+        local dline = line - center_line
+        local d = dcol * dcol + dline * dline
+        if not min_d or d < min_d then
+            min_col = col
+            min_line = line
+            min_d = d
+        end
+    end
+
+    local radius = 0
+    while (true) do
+        min_d = nil
+        for col = center_col - radius, center_col + radius do
+            process_position(col, center_line + radius)
+            process_position(col, center_line - radius)
+        end
+        for line = center_line - radius + 1, center_line + radius - 1 do
+            process_position(center_col + radius, line)
+            process_position(center_col - radius, line)
+        end
+        if min_d then
+            break
+        end
+        radius = radius + 1
+    end
+
+    local gcol = gcols[min_col]
+    if not gcol then
+        gcol = { col = g.current_col, line_set = {} }
+        gcols[min_col] = gcol
+    end
+
+    set_free_line(gcol, min_line, grecipe)
+    if log_enabled then
+        log("Process: " .. grecipe.name)
+    end
+end
+
+---@param g Graph
 function graph.do_layout(g)
     -- Processed product
     ---@type {[string]:GProduct}
@@ -395,7 +553,7 @@ function graph.do_layout(g)
         end
     end
 
-    
+
     local edge_size = math.max(math.ceil(0.5 * math.sqrt(recipe_count)), 3)
 
     g.current_col = initial_col
@@ -719,5 +877,13 @@ function graph.refresh(player)
     drawing.update_drawing(player)
     gutils.recenter(g)
 end
+
+---@param player LuaPlayer
+function graph.unselect(player)
+    local g = gutils.get_graph(player)
+    g.selection = {}
+    graph.refresh(player)
+end
+
 
 return graph

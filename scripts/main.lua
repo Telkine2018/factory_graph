@@ -1,3 +1,4 @@
+local mod_gui = require("mod-gui")
 local dictionary = require("__flib__/dictionary-lite")
 
 local commons = require("scripts.commons")
@@ -5,10 +6,11 @@ local tools = require("scripts.tools")
 local debug = tools.debug
 local prefix = commons.prefix
 
+local gutils = require("scripts.gutils")
 local graph = require("scripts.graph")
 local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
-local gutils = require("scripts.gutils")
+local product_panel = require("scripts.product_panel")
 
 local main = {}
 
@@ -59,14 +61,12 @@ local excluded_categories = {
 
 }
 
----@param e EventData.on_lua_shortcut
-local function switch_surface(e)
-    local player = game.players[e.player_index]
-    local character = player.character
+---@param player LuaPlayer
+local function switch_surface(player)
 
     if not string.find(player.surface.name, commons.surface_prefix_filter) then
-        if not player.gui.left[switch_button_name] then
-            player.gui.left.add { type = "button", name = switch_button_name, caption = "Grapher" }
+        if player.gui.left[switch_button_name] then
+            player.gui.left[switch_button_name].destroy()
         end
 
         local vars = tools.get_vars(player)
@@ -76,7 +76,7 @@ local function switch_surface(e)
             g.player = player
             vars.graph = g
             local recipes = player.force.recipes
-            graph.add_recipes(g, recipes, excluded_categories)
+            graph.update_recipes(g, recipes, excluded_categories)
             graph.do_layout(g)
             graph.draw(g)
         end
@@ -85,9 +85,15 @@ local function switch_surface(e)
         main.exit(player)
     end
 end
-script.on_event(prefix .. "-alt_k", switch_surface)
 
-tools.on_gui_click(switch_button_name, switch_surface)
+---@param e EventData.on_lua_shortcut
+local function on_switch_surface(e)
+    local player = game.players[e.player_index]
+    switch_surface(player)
+end
+
+script.on_event(prefix .. "-alt_k", on_switch_surface)
+tools.on_gui_click(switch_button_name, on_switch_surface)
 
 ---@param e EventData.on_lua_shortcut
 local function test_click(e)
@@ -167,10 +173,10 @@ function main.enter(player)
 
     local g = gutils.get_graph(player)
     ---@type MapPosition
-    local player_position = {0,0}
+    local player_position = { 0, 0 }
     if g and g.player_position then
         player_position = g.player_position
-    end 
+    end
     player.teleport(player_position, surface)
     return surface
 end
@@ -209,8 +215,41 @@ tools.on_event(defines.events.on_player_changed_surface,
         end
     end)
 
+
+---@param player LuaPlayer
+local function create_player_button(player)
+    local button_flow = mod_gui.get_button_flow(player)
+    local button_name = prefix .. "_switch"
+    if button_flow[button_name] then
+        button_flow[button_name].destroy()
+    end
+    if not button_flow[button_name] then
+        local button = button_flow.add {
+            type = "sprite-button",
+            name = button_name,
+            sprite = prefix .. "_switch"
+        }
+        button.style.width = 40
+        button.style.height = 40
+    end
+end
+
+tools.on_gui_click(prefix .. "_switch", 
+
+---@param e EventData.on_gui_click
+function(e)
+    if not e.shift and not e.alt and not e.control then
+        switch_surface(game.players[e.player_index])
+    elseif e.control then
+        product_panel.create(e.player_index)
+    end
+end)
+
 tools.on_configuration_changed(function(data)
     for _, player in pairs(game.players) do
+
+        create_player_button(player)
+
         ---@type Graph
         local g = tools.get_vars(player).graph
         if g then

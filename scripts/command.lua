@@ -9,6 +9,7 @@ local graph = require("scripts.graph")
 local drawing = require("scripts.drawing")
 local product_panel = require("scripts.product_panel")
 local production = require("scripts.production")
+local settings_panel = require("scripts.settings_panel")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -48,33 +49,19 @@ function command.open(player)
 
     command.close(player)
 
-    local frame = player.gui.left.add {
-        type = "frame",
-        direction = 'vertical',
-        name = command_frame_name
+    
+    ---@type Params.create_standard_panel
+    local params = {
+        panel_name = command_frame_name,
+        title  = {np("title")},
+        is_draggable = false,
+        container=player.gui.left,
+        create_inner_frame = true
     }
+    local frame, inner_frame = tools.create_standard_panel(player, params)
 
     --frame.style.width = 600
     --frame.style.minimal_height = 300
-
-    local titleflow = frame.add { type = "flow" }
-    local title_label = titleflow.add {
-        type = "label",
-        caption = { np("title") },
-        style = "frame_title",
-        ignored_by_interaction = true
-    }
-
-    local drag = titleflow.add {
-        type = "empty-widget",
-        style = "flib_titlebar_drag_handle"
-    }
-
-    local inner_frame = frame.add {
-        type = "frame",
-        direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
-    }
 
     local select_index = 1
     for i = 1, #select_modes do
@@ -113,7 +100,10 @@ function command.open(player)
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("production") }, name = np("production") }
     hflow.style.bottom_margin = 5
+    hflow.add { type = "button", caption = { np("settings") }, name = np("settings") }
 
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") }
 end
 
 tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
@@ -170,6 +160,16 @@ tools.on_named_event(np("production"), defines.events.on_gui_click,
         product_panel.create(e.player_index)
     end)
 
+tools.on_named_event(np("settings"), defines.events.on_gui_click,
+    function(e)
+        settings_panel.create(e.player_index)
+    end)
+
+tools.on_named_event(np("unselect_all"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        graph.unselect(game.players[e.player_index])
+    end)
 
 ---@param player LuaPlayer
 function command.close(player)

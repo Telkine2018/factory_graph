@@ -82,14 +82,14 @@ function recipe_panel.create(player_index, grecipe)
         name = { "", name, "[", grecipe.name, "]" }
     end
 
-    local frame = player.gui.left.add { type = "frame", caption = name, name = recipe_panel_name }
-    frame.style.minimal_width = 300
-
-    local flow = frame.add {
-        type = "frame",
-        direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
+    ---@type Params.create_standard_panel
+    local params = {
+        panel_name = recipe_panel_name,
+        title  = name,
+        create_inner_frame = true,
+        container = player.gui.left
     }
+    local _, flow  = tools.create_standard_panel(player, params)
 
     ---@param title LocalisedString?
     local function add_line(title)

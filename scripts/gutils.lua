@@ -384,4 +384,41 @@ function gutils.recenter(g)
     g.player.teleport({x,y})
 end
 
+---@param recipes table<any, GRecipe>
+function gutils.compute_sum(recipes)
+
+    local col, line, count = 0,0,0
+    for _, recipe in pairs(recipes) do
+        if recipe.visible and recipe.col then
+            col = col + recipe.col
+            line = line + recipe.line
+            count = count + 1
+        end
+    end
+    return col, line, count
+
+end
+
+---@param container LuaGuiElement
+---@param product_name string
+---@param button_name string?
+---@return LuaGuiElement
+function gutils.create_product_button(container, product_name,  button_name)
+    ---@cast button_name -nil
+    local b
+    if string.find(product_name, "^item/") then
+        b = container.add { type = "choose-elem-button", elem_type = "item", item = string.sub(product_name, 6), name = button_name }
+    else
+        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = string.sub(product_name, 7), name = button_name}
+    end
+    b.locked = true
+    return b
+end
+
+-- Fire production change
+---@param g Graph
+function gutils.fire_production_data_change(g)
+    tools.fire_user_event(commons.production_data_change_event, { g = g })
+end
+
 return gutils
