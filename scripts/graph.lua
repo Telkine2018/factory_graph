@@ -84,6 +84,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
                     grecipe.enabled = false
                 end
                 if recipe.ingredients then
+                    grecipe.ingredients = {}
                     for _, ingredient in pairs(recipe.ingredients) do
                         local iname = ingredient.type .. "/" .. ingredient.name
                         local gproduct = get_product(g, iname)
@@ -94,6 +95,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
                 end
 
                 if recipe.products then
+                    grecipe.products = {}
                     for _, production in pairs(recipe.products) do
                         local iname = production.type .. "/" .. production.name
                         local gproduct = get_product(g, iname)
