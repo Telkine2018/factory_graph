@@ -9,6 +9,7 @@ local drawing = require("scripts.drawing")
 
 local recipe_selection = require("scripts.recipe_selection")
 local production = require("scripts.production")
+local msettings_panel = require("scripts.msettings_panel")
 
 local product_panel = {}
 local prefix = commons.prefix
@@ -84,7 +85,6 @@ function product_panel.create(player_index)
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
     }
-
     local frame = tools.create_standard_panel(player, params)
     frame.style.maximal_height = 800
     frame.style.maximal_height = 800
@@ -419,7 +419,7 @@ end)
 tools.on_event(defines.events.on_gui_confirmed,
     ---@param e EventData.on_gui_confirmed
     function(e)
-        if e.element.name == np("qty") then
+        if e.element.valid and e.element.name == np("qty") then
             e.element.parent.destroy()
         end
     end)
@@ -428,12 +428,19 @@ tools.on_event(defines.events.on_gui_confirmed,
 tools.register_user_event(commons.production_compute_event, function(data)
     local player = data.g.player
     if not player.gui.screen[product_panel_name] then return end
+
+    if not data.g.selection or not next(data.g.selection) then
+        product_panel.close(player)
+        return
+    end
+
     if not data.structure_change then
         update_products(data.g)
     else
-        product_panel.close(data.g.player)
-        product_panel.create(data.g.player.index)
+        product_panel.close(player)
+        product_panel.create(player.index)
     end
+    
 end)
 
 
@@ -466,12 +473,12 @@ function product_panel.update_machine_panel(g, container)
             caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
         end
 
-        local b = col1.add { type = "choose-elem-button", elem_type = "entity", entity = machine.machine.name, style = green_button }
+        local b = col1.add { type = "choose-elem-button", elem_type = "entity", 
+            entity = machine.machine.name, style = green_button, tooltip={np("machine-tooltip")} }
         b.locked = true
         tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
         index = index + 1
-        local label = b.add { type = "label", style = default_button_label_style,
-            caption = caption, ignored_by_interaction = true }
+        local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
 
         local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
         frecipe.style.right_margin = 5
@@ -573,16 +580,20 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
-        if not e.control and not e.shift then
-            local element = e.element
-            local player = game.players[e.player_index]
-            if not element or not element.valid then return end
+        if e.button ~= defines.mouse_button_type.left then return end
 
-            local g = gutils.get_graph(player)
-            local recipe_name = element.tags.recipe_name --[[@as string]]
-            if not recipe_name then return end
+        local player = game.players[e.player_index]
 
-            local grecipe = g.recipes[recipe_name]
+        local element = e.element
+        if not element or not element.valid then return end
+
+        local g = gutils.get_graph(player)
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        if not recipe_name then return end
+        local grecipe = g.recipes[recipe_name]
+
+        if e.control then
+
             local machine = grecipe.machine
             if not machine then return end
 
@@ -596,7 +607,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             if machine.modules then
                 bp_entity.items = {}
                 for _, module in pairs(machine.modules) do
-                    bp_entity[module.name] = (bp_entity[module.name] or 0) + 1
+                    bp_entity.items[module.name] = (bp_entity.items[module.name] or 0) + 1
                 end
             end
 
@@ -607,6 +618,9 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             cursor_stack.set_stack { name = "blueprint", count = 1 }
             cursor_stack.set_blueprint_entities { bp_entity }
             player.cursor_stack_temporary = true
+        elseif not e.shift then
+
+            msettings_panel.create(e.player_index, grecipe)
         end
     end)
 

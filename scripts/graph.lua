@@ -885,6 +885,7 @@ function graph.unselect(player)
     local g = gutils.get_graph(player)
     g.selection = {}
     graph.refresh(player)
+    gutils.fire_production_data_change(g)
 end
 
 

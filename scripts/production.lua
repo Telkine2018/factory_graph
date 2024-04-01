@@ -7,10 +7,103 @@ local machinedb = require("scripts.machinedb")
 
 local production = {}
 
-
-local free_value = 1e8
 local abs = math.abs
 local math_precision = commons.math_precision
+
+---@param g Graph
+---@param grecipe GRecipe
+---@param config ProductionConfig
+---@return ProductionMachine?
+function production.compute_machine(g, grecipe, config)
+    local machine = nil
+
+    do
+        ---@cast grecipe GRecipe
+        if grecipe.is_product then goto skip end
+
+        local recipe_name = grecipe.name
+        local recipe = game.recipe_prototypes[recipe_name]
+
+        ---@type ProductionMachine
+        machine = {
+            recipe_name = recipe_name,
+            grecipe = grecipe,
+            recipe = recipe,
+            machine = game.entity_prototypes[config.machine_name],
+            config = config
+        }
+
+        if config.machine_modules then
+            machine.modules = {}
+            for _, module_name in pairs(config.machine_modules) do
+                table.insert(machine.modules, game.item_prototypes[module_name])
+            end
+        end
+
+        local speed = 0
+        ---@cast speed -nil
+        local productivity = 0
+        local consumption = 0
+        local pollution = 0
+
+        if machine.modules then
+            for _, module in pairs(machine.modules) do
+                local effects = module.module_effects
+                if effects then
+                    if effects.speed then speed = speed + effects.speed.bonus end
+                    if effects.productivity then productivity = productivity + effects.productivity.bonus end
+                    if effects.consumption then consumption = consumption + effects.consumption.bonus end
+                    if effects.pollution then pollution = pollution + effects.pollution.bonus end
+                end
+            end
+        end
+
+        if config.beacon_name and config.beacon_modules then
+            local beacon = game.entity_prototypes[config.beacon_name]
+            local effectivity = beacon.distribution_effectivity
+
+            local beacon_count = config.beacon_count or 0
+            for _, module_name in pairs(config.beacon_modules) do
+                local module = game.item_prototypes[module_name]
+                local effects = module.module_effects
+
+                if module.limitations and #module.limitations > 0 then
+                    if not g.module_limitations then
+                        g.module_limitations = {}
+                    end
+                    local limitation_map = g.module_limitations[module_name]
+                    if not limitation_map then
+                        limitation_map = {}
+                        g.module_limitations[module_name] = limitation_map
+                        for _, name in pairs(module.limitations) do
+                            limitation_map[name] = true
+                        end
+                    end
+                    if not limitation_map[recipe_name] then
+                        goto skip
+                    end
+                end
+                if effects then
+                    if effects.speed then speed = speed + beacon_count * effectivity * effects.speed.bonus end
+                    if effects.productivity then productivity = productivity + beacon_count * effectivity * effects.productivity.bonus end
+                    if effects.consumption then consumption = consumption + beacon_count * effectivity * effects.consumption.bonus end
+                    if effects.pollution then pollution = pollution + beacon_count * effectivity * effects.pollution.bonus end
+                end
+                ::skip::
+            end
+        end
+        machine.name = recipe_name
+        machine.speed = speed
+        machine.productivity = productivity
+        machine.consumption = consumption
+        machine.pollution = pollution
+        machine.craft_per_s = (1 + speed) * (1 + productivity) * machine.machine.crafting_speed / recipe.energy
+    end
+    ::skip::
+    return machine
+end
+
+local compute_machine = production.compute_machine
 
 ---@param g Graph
 function production.compute(g)
@@ -23,76 +116,20 @@ function production.compute(g)
 
     local enabled_cache = {}
     for recipe_name, grecipe in pairs(g.selection) do
-
         ---@cast grecipe GRecipe
-        grecipe.machine = nil
-        if grecipe.is_product then goto skip end
 
-        ---@cast grecipe GRecipe
         local config = grecipe.production_config
         if not config then
             config = machinedb.get_default_config(g, recipe_name, enabled_cache)
-            if not config then goto skip end
         end
 
-        local recipe = game.recipe_prototypes[recipe_name]
-
-        ---@type ProductionMachine
-        local machine = {
-            recipe_name = recipe_name,
-            grecipe = grecipe,
-            recipe = recipe,
-            machine = game.entity_prototypes[config.machine_name],
-        }
-
-        if config.machine_modules then
-            machine.modules = {}
-            for _, module_name in pairs(config.machine_modules) do
-                table.insert(machine.modules, game.item_prototypes[module_name])
+        if config then
+            local machine = compute_machine(g, grecipe, config)
+            grecipe.machine = machine
+            if machine then
+                machines[recipe_name] = machine
             end
         end
-
-        machines[recipe_name] = machine
-
-        local speed = 0
-        ---@cast speed -nil
-        local productivity = 0
-        local consumption = 0
-
-        if machine.modules then
-            for _, module in pairs(machine.modules) do
-                local effects = module.module_effects
-                if effects then
-                    if effects.speed then speed = speed + effects.speed.bonus end
-                    if effects.productivity then productivity = productivity + effects.productivity.bonus end
-                    if effects.consumption then consumption = consumption + effects.consumption.bonus end
-                end
-            end
-        end
-
-        if config.beacon_name and config.beacon_modules then
-            local beacon = game.entity_prototypes[config.beacon_name]
-            local effectivity = beacon.distribution_effectivity
-
-            local beacon_count = g.preferred_beacon_count
-            for _, module_name in pairs(config.beacon_modules) do
-                local module = game.item_prototypes[module_name]
-                local effects = module.module_effects
-                if effects then
-                    if effects.speed then speed = speed + beacon_count * effectivity * effects.speed.bonus end
-                    if effects.productivity then productivity = productivity + beacon_count * effectivity * effects.productivity.bonus end
-                    if effects.consumption then consumption = consumption + beacon_count * effectivity * effects.consumption.bonus end
-                end
-            end
-        end
-        machine.name = recipe_name
-        machine.speed = speed
-        machine.productivity = productivity
-        machine.consumption = consumption
-        machine.craft_per_s = (1 + speed) * (1 + productivity) * machine.machine.crafting_speed / recipe.energy
-        grecipe.machine = machine
-
-        ::skip::
     end
 
     ---@type {[string]:{[string]:number}}       @ prod name => recipe name => number
@@ -285,7 +322,7 @@ function production.compute(g)
                 if abs(cst) > math_precision then
                     failed = current_error
                 end
-            else 
+            else
                 if abs(cst) < math_precision then
                     cst = 0
                     machine_counts[var_name] = cst
@@ -396,7 +433,6 @@ function production.compute(g)
         local recipe_name = machine.name
         local machine_count = machine_counts[recipe_name]
         if machine_count then
-
             machine.count = machine_count
             local craft_per_s = machine.craft_per_s
             for _, ingredient in pairs(machine.recipe.ingredients) do

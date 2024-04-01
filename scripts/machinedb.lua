@@ -102,6 +102,8 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     if not recipe then
         return nil
     end
+    
+    machinedb.initialize()
     local machines           = machinedb.category_to_machines[recipe.category]
 
     local preferred_machines = g.preferred_machines
@@ -214,7 +216,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             table.insert(config.beacon_modules, found_beacon_module)
         end
     end
-
+    config.beacon_count = g.preferred_beacon_count or 0
     return config
 end
 

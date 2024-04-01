@@ -23,7 +23,7 @@ tools.add_panel_name(settings_panel_name)
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
     local b = container.add { type = "choose-elem-button", elem_type = "entity", entity = machine_name,
-        elem_filters = { { filter = "type", type = "assembling-machine" } } }
+        elem_filters = { { filter = "type", type = "assembling-machine" },  { filter = "type", type = "furnace" } } }
     tools.set_name_handler(b, np("preferred_machines"))
     return b
 end

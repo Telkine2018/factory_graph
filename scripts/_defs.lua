@@ -1,4 +1,3 @@
-
 local tools = require("scripts.tools")
 
 ---@class GContext
@@ -26,13 +25,14 @@ local tools = require("scripts.tools")
 ---@field rs_recipe GRecipe?                        @ recipe for product selection
 ---@field rs_product GProduct?                      @ product for product selection
 ---@field rs_location GuiLocation?
----@field selector_id integer?                      @ selector rectangle id 
+---@field selector_id integer?                      @ selector rectangle id
 ---@field selector_product_name_id integer?         @ selector text id
----@field product_outputs {[string]:number}       
----@field product_effective {[string]:number}       
+---@field product_outputs {[string]:number}
+---@field product_effective {[string]:number}
 ---@field production_failed string?
 ---@field recipe_order integer
 ---@field player_position MapPosition
+---@field module_limitations {[string]:({[string]:true})}
 
 ---@class GraphConfig
 ---@field selection {[string]:GElement}?
@@ -46,7 +46,7 @@ local tools = require("scripts.tools")
 ---@field preferred_modules string[]
 ---@field preferred_beacon string?
 ---@field preferred_beacon_count integer
----@field iovalues {[string]:number|boolean}       
+---@field iovalues {[string]:number|boolean}
 
 ---@class Graph : GraphRuntime, GraphConfig
 
@@ -120,12 +120,14 @@ local tools = require("scripts.tools")
 ---@class ProductionMachine
 ---@field name string
 ---@field grecipe GRecipe
+---@field config ProductionConfig
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype
 ---@field modules LuaItemPrototype[]
 ---@field speed number
 ---@field productivity number
 ---@field consumption number
+---@field pollution number
 ---@field craft_per_s number
 ---@field count number
 
