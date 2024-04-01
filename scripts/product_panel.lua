@@ -41,6 +41,7 @@ end
 local product_panel_name = np("frame")
 local input_qty_name = np("frame")
 local location_name = np("location")
+local min_name = np("mini")
 -- tools.add_panel_name(product_panel_name)
 
 local round_digit = 2
@@ -77,6 +78,9 @@ function product_panel.create(player_index)
         return
     end
 
+    local vars = tools.get_vars(player)
+    local is_mini = vars[min_name]
+
     ---@type Params.create_standard_panel
     local params = {
         panel_name           = product_panel_name,
@@ -84,6 +88,19 @@ function product_panel.create(player_index)
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
+        title_menu_func = function(flow)
+
+            local b = flow.add {
+                type = "sprite-button",
+                tooltip = np("mini_tooltip"),
+                name = "mini_maxi",
+                style = "frame_action_button",
+                mouse_button_filter = { "left" },
+                sprite = not is_mini and commons.prefix .. "_mini_white" or commons.prefix .. "_maxi_white",
+                hovered_sprite = not is_mini and commons.prefix .. "_mini_black" or commons.prefix .. "_maxi_black"
+            }
+            tools.set_name_handler(b, np("mini_maxi"))
+        end
     }
     local frame = tools.create_standard_panel(player, params)
     frame.style.maximal_height = 800
@@ -93,7 +110,8 @@ function product_panel.create(player_index)
     local product_frame = inner_flow.add {
         type = "frame",
         direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
+        style = "inside_shallow_frame_with_padding",
+        name = "product_frame"
     }
     product_frame.style.vertically_stretchable = true
     product_frame.style.horizontally_stretchable = true
@@ -111,12 +129,14 @@ function product_panel.create(player_index)
     local machine_flow = machine_scroll.add { type = "table", column_count = 2, name = "machine_container" }
     product_panel.update_machine_panel(g, machine_flow)
 
-    local vars = tools.get_vars(player)
     local location = vars[location_name]
     if location then
         frame.location = location
     else
         frame.force_auto_center()
+    end
+    if is_mini then
+        product_frame.visible = false 
     end
 end
 
@@ -630,5 +650,35 @@ tools.register_user_event(commons.production_compute_event, function(data)
         update_machines(data.g)
     end
 end)
+
+tools.on_named_event(np("mini_maxi"), defines.events.on_gui_click,
+---@param e EventData.on_gui_click
+    function(e) 
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[product_panel_name]
+        if not frame then return end
+
+        local vars = tools.get_vars(player)
+        local is_mini = vars[min_name]
+
+        product_frame = tools.get_child(frame, "product_frame")
+        if not product_frame then return end
+
+        if is_mini then
+            product_frame.visible = true
+        else
+            product_frame.visible = false
+        end
+
+        local button = tools.get_child(frame, "mini_maxi")
+        is_mini = not is_mini
+        if button then
+            button.sprite = not is_mini and commons.prefix .. "_mini_white" or commons.prefix .. "_maxi_white"
+            button.hovered_sprite = not is_mini and commons.prefix .. "_mini_black" or commons.prefix .. "_maxi_black"
+        end
+
+        vars[min_name] = is_mini
+    end
+)
 
 return product_panel

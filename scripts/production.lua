@@ -336,7 +336,7 @@ function production.compute(g)
     end
 
     if table_size(free_recipes) > 1 then
-        if abs(constant_list[count]) < math_precision then
+        if count > 0 and abs(constant_list[count]) < math_precision then
             for name, _ in pairs(free_recipes) do
                 machine_counts[name] = 0
             end

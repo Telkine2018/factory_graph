@@ -159,6 +159,42 @@ sprite = {
 }
 add(sprite)
 
+sprite = {
+  type = "sprite",
+  name = prefix .. "_mini_white",
+  filename = png("mini_white"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
+sprite = {
+  type = "sprite",
+  name = prefix .. "_mini_black",
+  filename = png("mini_black"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
+sprite = {
+  type = "sprite",
+  name = prefix .. "_maxi_white",
+  filename = png("maxi_white"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
+sprite = {
+  type = "sprite",
+  name = prefix .. "_maxi_black",
+  filename = png("maxi_black"),
+  width = 32,
+  height = 32
+}
+add(sprite)
+
 
 data:extend(declarations)
 

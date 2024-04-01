@@ -954,6 +954,8 @@ end
 
 ---@param player LuaPlayer
 ---@param params Params.create_standard_panel
+---@return LuaGuiElement
+---@return LuaGuiElement
 function tools.create_standard_panel(player, params)
     local container = params.container
     if not container then

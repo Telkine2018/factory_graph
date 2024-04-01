@@ -381,13 +381,12 @@ function gutils.recenter(g)
     end
 
     local x, y = gutils.get_position(g, center_col, center_line)
-    g.player.teleport({x,y})
+    g.player.teleport({ x, y })
 end
 
 ---@param recipes table<any, GRecipe>
 function gutils.compute_sum(recipes)
-
-    local col, line, count = 0,0,0
+    local col, line, count = 0, 0, 0
     for _, recipe in pairs(recipes) do
         if recipe.visible and recipe.col then
             col = col + recipe.col
@@ -396,20 +395,19 @@ function gutils.compute_sum(recipes)
         end
     end
     return col, line, count
-
 end
 
 ---@param container LuaGuiElement
 ---@param product_name string
 ---@param button_name string?
 ---@return LuaGuiElement
-function gutils.create_product_button(container, product_name,  button_name)
+function gutils.create_product_button(container, product_name, button_name)
     ---@cast button_name -nil
     local b
     if string.find(product_name, "^item/") then
         b = container.add { type = "choose-elem-button", elem_type = "item", item = string.sub(product_name, 6), name = button_name }
     else
-        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = string.sub(product_name, 7), name = button_name}
+        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = string.sub(product_name, 7), name = button_name }
     end
     b.locked = true
     return b
@@ -419,6 +417,20 @@ end
 ---@param g Graph
 function gutils.fire_production_data_change(g)
     tools.fire_user_event(commons.production_data_change_event, { g = g })
+end
+
+---@param g Graph
+---@return {[string]:GProduct}
+function gutils.get_output_products(g)
+    ---@type {[string]:GProduct}
+    local products = {}
+    for _, recipe in pairs(g.selection) do
+        for _, product in pairs(recipe.products) do
+            local name = product.name
+            products[name] = product
+        end
+    end
+    return products
 end
 
 return gutils

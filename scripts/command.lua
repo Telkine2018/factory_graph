@@ -10,6 +10,7 @@ local drawing = require("scripts.drawing")
 local product_panel = require("scripts.product_panel")
 local production = require("scripts.production")
 local settings_panel = require("scripts.settings_panel")
+local recipe_chooser = require("scripts.recipe_chooser")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -88,22 +89,21 @@ function command.open(player)
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("search-text") }, name = np("search-text") }
-    hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
-    hflow.style.bottom_margin = 5
-
-
-    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "checkbox", caption = { np("only-researched") }, name = np("only-researched"), state = not not g.show_only_researched }
-    hflow.style.bottom_margin = 5
-
-    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "button", caption = { np("add") }, name = np("add") }
     hflow.add { type = "button", caption = { np("production") }, name = np("production") }
     hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("settings") }, name = np("settings") }
+    hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") }
+    hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
+    hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "checkbox", caption = { np("only-researched") }, name = np("only-researched"), state = not not g.show_only_researched }
 end
 
 tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
@@ -124,7 +124,7 @@ tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
         drawing.update_drawing(player)
     end)
 
-tools.on_named_event(np("search-text"), defines.events.on_gui_click,
+tools.on_named_event(np("add"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
@@ -142,7 +142,6 @@ tools.on_named_event(np("selection"), defines.events.on_gui_selection_state_chan
 tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_changed,
     function(e)
         local player = game.players[e.player_index]
-        ---@type Graph
         local g = gutils.get_graph(player)
         g.visibility = e.element.selected_index
         graph.refresh(player)
@@ -153,6 +152,8 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
         graph.refresh(player)
+        local g = gutils.get_graph(player)
+        gutils.fire_production_data_change(g)
     end)
 
 tools.on_named_event(np("production"), defines.events.on_gui_click,

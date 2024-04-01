@@ -15,7 +15,7 @@ local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
-local log_enabled = nil
+local log_enabled = true
 
 ---@param  surface LuaSurface
 ---@return Graph
@@ -884,6 +884,7 @@ end
 function graph.unselect(player)
     local g = gutils.get_graph(player)
     g.selection = {}
+    g.iovalues = {}
     graph.refresh(player)
     gutils.fire_production_data_change(g)
 end
