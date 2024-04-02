@@ -19,6 +19,14 @@ tools.add_panel_name(panel_name)
 local saving = {}
 local button_size = 28
 
+---@param flow LuaGuiElement
+---@param save Saving
+local function load_current(flow, save)
+    flow.icon1.elem_value = tools.sprite_to_signal(save.icon1)
+    flow.icon2.elem_value = tools.sprite_to_signal(save.icon2)
+    flow.label.text = save.label
+end
+
 ---@param player_index integer
 function saving.create(player_index)
     local player = game.players[player_index]
@@ -63,6 +71,10 @@ function saving.create(player_index)
     local container                          = scroll.add { type = "table", column_count = 1, name = "save_list" }
     container.style.horizontally_stretchable = true
     container.style.vertically_stretchable   = true
+
+    if vars.current_save then
+        load_current(newflow, vars.current_save)
+    end
 
     ---@type Saving[]
     local saves                              = vars.saves
@@ -169,12 +181,14 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
                 existing.icon2 == save.icon2 and
                 existing.label == save.label then
                 existing.json = json
+                save = existing
                 goto done
             end
         end
         table.insert(saves, save)
         ::done::
 
+        vars.current_save = save
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
@@ -212,18 +226,26 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local player = game.players[e.player_index]
         local vars = tools.get_vars(player)
         local g = gutils.get_graph(player)
+        local frame = player.gui.screen[panel_name]
 
         local line = e.element.parent
         if not line then return end
         local index = line.get_index_in_parent()
+        
+        ---@type Saving[]
         local saves = vars.saves
 
         local save = saves[index]
         local json = game.decode_string(save.json) --[[@as string]]
         local data = game.json_to_table(json) --[[@as SavingData]]
 
-        graph.load_saving(g, data)
+        local new_flow = tools.get_child(frame, "new_flow")
+        if new_flow then 
+            load_current(new_flow, save)
+        end
+        vars.current_save = save
 
+        graph.load_saving(g, data)
         saving.close(player)
     end)
 

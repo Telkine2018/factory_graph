@@ -63,7 +63,6 @@ local excluded_categories = {
 
 ---@param player LuaPlayer
 local function switch_surface(player)
-
     if not string.find(player.surface.name, commons.surface_prefix_filter) then
         if player.gui.left[switch_button_name] then
             player.gui.left[switch_button_name].destroy()
@@ -234,20 +233,19 @@ local function create_player_button(player)
     end
 end
 
-tools.on_gui_click(prefix .. "_switch", 
+tools.on_gui_click(prefix .. "_switch",
 
----@param e EventData.on_gui_click
-function(e)
-    if not e.shift and not e.alt and not e.control then
-        switch_surface(game.players[e.player_index])
-    elseif e.control then
-        product_panel.create(e.player_index)
-    end
-end)
+    ---@param e EventData.on_gui_click
+    function(e)
+        if not e.shift and not e.alt and not e.control then
+            switch_surface(game.players[e.player_index])
+        elseif e.control then
+            product_panel.create(e.player_index)
+        end
+    end)
 
 tools.on_configuration_changed(function(data)
     for _, player in pairs(game.players) do
-
         create_player_button(player)
 
         ---@type Graph
@@ -265,17 +263,7 @@ tools.on_configuration_changed(function(data)
                 command.open(player)
             end
             local recipes = player.force.recipes
-            for _, grecipe in pairs(g.recipes) do
-                local r = recipes[grecipe.name]
-                if r then
-                    grecipe.enabled = r.enabled
-                else
-                    grecipe.enabled = true
-                end
-                if not grecipe.order then
-                    grecipe.order = 1
-                end
-            end
+            graph.update_recipes(g, recipes, g.excluded_categories)
         end
     end
 end)

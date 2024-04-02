@@ -359,7 +359,7 @@ function production.compute(g)
 
                 if coef then
                     if abs(coef) < math_precision then
-                        if abs(cst) < math_precision then
+                        if abs(cst) > math_precision then
                             failed = commons.production_failures.linear_dependecy
                         end
                     else
@@ -381,7 +381,13 @@ function production.compute(g)
             local main_value
             if minv then
                 if maxv then
-                    main_value = (minv + maxv) / 2
+                    if minv >= maxv then
+                        main_value = 0
+                        failed = commons.production_failures.too_many_constraints
+                        goto end_compute
+                    else
+                        main_value = (minv + maxv) / 2
+                    end
                 else
                     main_value = minv
                 end

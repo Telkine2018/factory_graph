@@ -64,6 +64,12 @@ function graph.update_recipes(g, recipes, excluded_categories)
         excluded_categories = {}
     end
     g.excluded_categories = excluded_categories
+
+    for _, gproduct in pairs(g.products) do
+        gproduct.ingredient_of = {}
+        gproduct.product_of = {}
+    end
+
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] then
             if not recipe.hidden or g.show_hidden then
@@ -73,7 +79,8 @@ function graph.update_recipes(g, recipes, excluded_categories)
                         name = name,
                         ingredients = {},
                         products = {},
-                        visible = true
+                        visible = true,
+                        order = 1
                     }
                     g.recipes[name] = grecipe
                 end
@@ -132,10 +139,11 @@ function graph.update_recipes(g, recipes, excluded_categories)
 
     for _, product in pairs(g.products) do
         if product.is_root then
-            if not product.root_recipe then
-                local name = product.name
+            local name = product.name
+            local grecipe = product.root_recipe
+            if not grecipe then
                 ---@type GRecipe
-                local grecipe = {
+                grecipe = {
                     name = name,
                     ingredients = {},
                     products = { product },
@@ -145,10 +153,10 @@ function graph.update_recipes(g, recipes, excluded_categories)
                 }
                 g.recipes[name] = grecipe
                 product.root_recipe = grecipe
-                product.product_of[name] = grecipe
             else
                 product.root_recipe.used = true
             end
+            product.product_of[name] = grecipe
         end
     end
 
@@ -714,6 +722,7 @@ function graph.do_layout(g)
     log("------- End layout ----------")
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
+    graph.reverse_equalize_recipes(g)
 end
 
 ---@param g Graph
