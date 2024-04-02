@@ -10,7 +10,7 @@ local drawing = require("scripts.drawing")
 local product_panel = require("scripts.product_panel")
 local production = require("scripts.production")
 local settings_panel = require("scripts.settings_panel")
-local recipe_chooser = require("scripts.recipe_chooser")
+local saving = require("scripts.saving")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -95,6 +95,7 @@ function command.open(player)
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("settings") }, name = np("settings") }
+    hflow.add { type = "button", caption = { np("save") }, name = np("save") }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
@@ -179,5 +180,10 @@ function command.close(player)
         frame.destroy()
     end
 end
+
+tools.on_named_event(np("save"), defines.events.on_gui_click,
+    function(e)
+        saving.create(e.player_index)
+    end)
 
 return command

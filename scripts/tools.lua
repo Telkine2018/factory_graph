@@ -899,6 +899,14 @@ function tools.number_to_text(value)
     return tostring(value)
 end
 
+---@param s string?
+---@return string
+function tools.trim(s)
+    if not s then return "" end
+    return s:match "^%s*(.-)%s*$"
+ end
+
+
 ---@param text string?
 ---@return number?
 function tools.text_to_number(text)
@@ -1010,6 +1018,13 @@ function tools.create_standard_panel(player, params)
             type = "frame",
             direction = "vertical",
             style = "inside_shallow_frame_with_padding"
+        }
+        inner_frame.style.vertically_stretchable = true
+        inner_frame.style.horizontally_stretchable = true
+    else
+        inner_frame = frame.add {
+            type = "frame",
+            direction = "vertical"
         }
         inner_frame.style.vertically_stretchable = true
         inner_frame.style.horizontally_stretchable = true

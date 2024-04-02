@@ -33,15 +33,15 @@ local tools = require("scripts.tools")
 ---@field recipe_order integer
 ---@field player_position MapPosition
 ---@field module_limitations {[string]:({[string]:true})}
-
----@class GraphConfig
----@field selection {[string]:GElement}?
 ---@field excluded_categories {[string]:boolean}?
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
 ---@field grid_size integer
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
+
+---@class GraphConfig
 ---@field visibility integer?
+---@field selection {[string]:GElement}?
 ---@field preferred_machines string[]
 ---@field preferred_modules string[]
 ---@field preferred_beacon string?
@@ -72,12 +72,12 @@ local tools = require("scripts.tools")
 ---@field craft_per_s number?
 ---@field machine ProductionMachine?
 ---@field order integer?
+---@field visible boolean?
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?
 ---@field line integer?
 ---@field col integer?
----@field visible boolean?
 
 ---@class GCol
 ---@field col integer
@@ -133,3 +133,13 @@ local tools = require("scripts.tools")
 
 ---@class GraphSelectionChangeEvent
 ---@field g Graph
+
+---@class Saving
+---@field icon1 string?
+---@field icon2 string?
+---@field label string
+---@field json string 
+
+---@class SavingData
+---@field config GraphConfig
+---@field selection GRecipeConfig[]

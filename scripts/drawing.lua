@@ -1146,4 +1146,5 @@ end
 function drawing.open_recipe_selection(g, product, src)
 end
 
+
 return drawing

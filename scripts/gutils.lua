@@ -177,7 +177,8 @@ function gutils.select_current_recipe(g, recipe)
 end
 
 ---@param g Graph
-function gutils.compute_visibility(g)
+---@param keep_position boolean?
+function gutils.compute_visibility(g, keep_position)
     local show_only_researched = g.show_only_researched
     if g.visibility == commons.visibility_selection then
         local selection = g.selection
@@ -185,15 +186,19 @@ function gutils.compute_visibility(g)
             selection = {}
         end
         for _, grecipe in pairs(g.recipes) do
-            grecipe.line = nil
-            grecipe.col = nil
             grecipe.selector_positions = nil
             if selection[grecipe.name] then
+                if not keep_position then
+                    grecipe.line = nil
+                    grecipe.col = nil
+                end
                 grecipe.visible = true
                 if show_only_researched and not grecipe.enabled then
                     grecipe.visible = false
                 end
             else
+                grecipe.line = nil
+                grecipe.col = nil
                 grecipe.visible = false
             end
         end
@@ -431,6 +436,47 @@ function gutils.get_output_products(g)
         end
     end
     return products
+end
+
+local saved_graph_fields = {
+    "preferred_machines",
+    "preferred_modules",
+    "preferred_beacon",
+    "preferred_beacon_count",
+    "iovalues",
+    "visibility"
+}
+
+local saved_reciped_fields = {
+    "name",
+    "production_config",
+    "line",
+    "col"
+}
+
+gutils.saved_graph_fields = saved_graph_fields
+
+---@param g Graph
+---@return SavingData
+function gutils.create_saving_data(g)
+    ---@type SavingData
+    local saved = {}
+    saved.config = {}
+    for _, field in pairs(saved_graph_fields) do
+        saved.config[field] = g[field]
+    end
+
+    saved.selection = {}
+    if g.selection then
+        for _, grecipe in pairs(g.selection) do
+            local saved_recipe = {}
+            for _, field in pairs(saved_reciped_fields) do
+                saved_recipe[field] = grecipe[field]
+            end
+            table.insert(saved.selection, saved_recipe)
+        end
+    end
+    return saved
 end
 
 return gutils

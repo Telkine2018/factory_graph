@@ -260,6 +260,22 @@ function set_free_line(gcol, line, recipe)
     return line
 end
 
+---@param g Graph
+---@param recipe GRecipe
+---@param col integer
+---@param line integer
+function set_recipe_location(g, recipe, col, line)
+    local gcol = g.gcols[col]
+    if not gcol then
+        gcol = {
+            col = col,
+            line_set = {}
+        }
+        g.gcols[col] = gcol
+    end
+    set_free_line(gcol, line, recipe)
+end
+
 ---@param gcol GCol
 ---@param initial integer
 ---@param recipe GRecipe
@@ -887,6 +903,47 @@ function graph.unselect(player)
     g.iovalues = {}
     graph.refresh(player)
     gutils.fire_production_data_change(g)
+end
+
+---@param g Graph
+---@param data SavingData
+function graph.load_saving(g, data)
+    drawing.delete_content(g)
+    local selection = {}
+    for _, grecipe in pairs(data.selection) do
+        local current = g.recipes[grecipe.name]
+        selection[grecipe.name] = current
+        set_recipe_location(g, current, grecipe.col, grecipe.line)
+    end
+    g.selection = selection
+
+    for _, field in pairs(gutils.saved_graph_fields) do
+        if field ~= "visibility" then
+            g[field] = data.config[field]
+        end
+    end
+
+    if g.visibility == commons.visibility_selection and
+        data.config.visibility == commons.visibility_selection then
+        gutils.compute_visibility(g, true)
+        graph.draw(g)
+        drawing.update_drawing(g.player)
+        gutils.recenter(g)
+    else
+        graph.refresh(g)
+    end
+end
+
+---@param g Graph
+---@param data SavingData
+function graph.import_saving(g, data)
+    drawing.delete_content(g)
+    local selection = g.selection
+    for _, grecipe in pairs(data.selection) do
+        local current = g.recipes[grecipe.name]
+        selection[grecipe.name] = current
+    end
+    graph.refresh(g.player)
 end
 
 
