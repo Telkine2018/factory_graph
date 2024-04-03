@@ -69,6 +69,9 @@ function settings_panel.create(player_index)
     flow.add { type = "label", caption = { np("show_hidden") } }
     flow.add { type = "checkbox", numeric = true, state = not not g.show_hidden, name = "show_hidden" }
 
+    flow.add { type = "label", caption = { np("only-researched") } }
+    flow.add { type = "checkbox", name = "show_only_researched", state = not not g.show_only_researched }
+
     flow.add { type = "label", caption = { np("preferred_machines") }}
     local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name="preferred_machines"  }
     if g.preferred_machines then
@@ -198,6 +201,8 @@ local function save(player, frame)
 
     local show_hidden = field_table.show_hidden.state
 
+    local show_only_researched = field_table.show_only_researched.state
+
     local preferred_machines = blist_values(field_table.preferred_machines)
 
     local preferred_modules = blist_values(field_table.preferred_modules)
@@ -206,9 +211,9 @@ local function save(player, frame)
 
     local preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
 
-    if show_hidden ~= g.show_hidden then
+    if show_hidden ~= g.show_hidden or show_only_researched ~= g.show_only_researched then
         g.show_hidden = show_hidden
-
+        g.show_only_researched = show_only_researched
         local recipes = player.force.recipes
         graph.update_recipes(g, recipes, g.excluded_categories)
         graph.refresh(player)

@@ -25,6 +25,9 @@ local function install_modules(container, config)
     container.clear()
 
     local machine = game.entity_prototypes[config.machine_name]
+    if not machine then
+        return
+    end
     local count = machine.module_inventory_size
     if count == 0 then
         return
@@ -32,18 +35,22 @@ local function install_modules(container, config)
 
     ---@cast count -nil
     for i = 1, count do
-        local module_name = config.machine_modules[i]
-        if module_name then
-            local module = game.item_prototypes[module_name]
-            if module then
-                for effect in pairs(module.module_effects) do
-                    if not machine.allowed_effects[effect] then
-                        goto skip
+        local module_name
+
+        if config.machine_modules then
+            module_name = config.machine_modules[i]
+            if module_name then
+                local module = game.item_prototypes[module_name]
+                if module then
+                    for effect in pairs(module.module_effects) do
+                        if not machine.allowed_effects[effect] then
+                            goto skip
+                        end
                     end
                 end
+                module_name = module.name
+                ::skip::
             end
-            module_name = module.name
-            ::skip::
         end
 
         local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
@@ -64,7 +71,7 @@ local function install_beacon_modules(container, g, config, grecipe)
     end
 
     container.clear()
-    if config.beacon_name and config.beacon_modules then
+    if config.beacon_name then
         local beacon = game.entity_prototypes[config.beacon_name]
         if not beacon then return end
 
@@ -90,7 +97,10 @@ local function install_beacon_modules(container, g, config, grecipe)
         end
 
         for i = 1, count do
-            local module_name = config.beacon_modules[i]
+            local module_name
+            if config.beacon_modules and config.beacon_modules[i] then
+                module_name = config.beacon_modules[i]
+            end
             local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
                 elem_filters = { { filter = "name", name = allowed } } }
             tools.set_name_handler(b, np("module_button"), { count = count })
@@ -194,7 +204,7 @@ function msettings.create(player_index, grecipe)
     msettings.report(player)
 
     if vars.msettings_location then
-        frame.location = vars.msettings_location 
+        frame.location = vars.msettings_location
     else
         frame.force_auto_center()
     end
@@ -375,7 +385,7 @@ end
 ---@param player LuaPlayer
 function msettings.close(player)
     local frame = player.gui.screen[panel_name]
-    if frame and frame.valid then 
+    if frame and frame.valid then
         local vars = tools.get_vars(player)
         vars.msettings_location = frame.location
         frame.destroy()
@@ -435,13 +445,13 @@ function msettings.report(player)
     end
 
     local function report_value(caption, value)
-        label = report_table.add { type = "label", caption = caption } 
+        label = report_table.add { type = "label", caption = caption }
         label.style.width = 100
         label = report_table.add { type = "label", caption = format(value) }
         label.style.width = 100
         label.style.horizontal_align = "right"
     end
-    
+
     report_value({ np("report_speed") }, machine.speed)
     report_value({ np("report_productivity") }, machine.productivity)
     report_value({ np("report_consumption") }, machine.consumption)

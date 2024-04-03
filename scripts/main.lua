@@ -61,25 +61,33 @@ local excluded_categories = {
 
 }
 
+---@param player any
+function main.enter(player)
+    if string.find(player.surface.name, commons.surface_prefix_filter) then
+        return
+    end
+    if player.gui.left[switch_button_name] then
+        player.gui.left[switch_button_name].destroy()
+    end
+
+    local vars = tools.get_vars(player)
+    local surface = main.enter_surface(player)
+    if not vars.graph then
+        local g = graph.new(surface)
+        g.player = player
+        vars.graph = g
+        local recipes = player.force.recipes
+        graph.update_recipes(g, recipes, excluded_categories)
+        graph.do_layout(g)
+        graph.draw(g)
+    end
+    command.open(player)
+end
+
 ---@param player LuaPlayer
 local function switch_surface(player)
     if not string.find(player.surface.name, commons.surface_prefix_filter) then
-        if player.gui.left[switch_button_name] then
-            player.gui.left[switch_button_name].destroy()
-        end
-
-        local vars = tools.get_vars(player)
-        local surface = main.enter(player)
-        if not vars.graph then
-            local g = graph.new(surface)
-            g.player = player
-            vars.graph = g
-            local recipes = player.force.recipes
-            graph.update_recipes(g, recipes, excluded_categories)
-            graph.do_layout(g)
-            graph.draw(g)
-        end
-        command.open(player)
+        main.enter(player)
     else
         main.exit(player)
     end
@@ -111,7 +119,7 @@ local tile_name = commons.tile_name
 
 ---@param player LuaPlayer
 ---@return LuaSurface
-function main.enter(player)
+function main.enter_surface(player)
     local vars = tools.get_vars(player)
 
     if not game.tile_prototypes[tile_name] then
@@ -234,7 +242,6 @@ local function create_player_button(player)
 end
 
 tools.on_gui_click(prefix .. "_switch",
-
     ---@param e EventData.on_gui_click
     function(e)
         if not e.shift and not e.alt and not e.control then
@@ -244,7 +251,17 @@ tools.on_gui_click(prefix .. "_switch",
         end
     end)
 
+local function picker_dolly_install()
+    if remote.interfaces["PickerDollies"] then
+        remote.call("PickerDollies", "add_blacklist_name", commons.recipe_symbol_name)
+        remote.call("PickerDollies", "add_blacklist_name", commons.unresearched_symbol_name)
+        remote.call("PickerDollies", "add_blacklist_name", commons.product_symbol_name)
+        remote.call("PickerDollies", "add_blacklist_name", commons.product_selector_name)
+    end
+end
+
 tools.on_configuration_changed(function(data)
+    picker_dolly_install()
     for _, player in pairs(game.players) do
         create_player_button(player)
 
@@ -266,6 +283,10 @@ tools.on_configuration_changed(function(data)
             graph.update_recipes(g, recipes, g.excluded_categories)
         end
     end
+end)
+
+tools.on_load(function() 
+    picker_dolly_install()
 end)
 
 return main

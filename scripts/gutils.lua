@@ -444,7 +444,8 @@ local saved_graph_fields = {
     "preferred_beacon",
     "preferred_beacon_count",
     "iovalues",
-    "visibility"
+    "visibility",
+    "color_index"
 }
 
 local saved_reciped_fields = {
@@ -476,7 +477,47 @@ function gutils.create_saving_data(g)
             table.insert(saved.selection, saved_recipe)
         end
     end
+    saved.colors = {}
+    for _, gproduct in pairs(g.products) do
+        if gproduct.color then
+            saved.colors[gproduct.name] = gproduct.color
+        end
+    end
     return saved
+end
+
+---@param g Graph
+---@param products {[string]:any}
+---@return {[string]:GRecipe}
+function gutils.get_connected_recipes(g, products)
+
+    ---@type {[string]:GProduct}
+    local to_scan = {}
+    local done_scan = {}
+    for product_name, _ in pairs(products) do
+        local product = g.products[product_name]
+        to_scan[product_name] = product
+    end
+
+    ---@type {[string]:GRecipe}
+    local connected_recipes = {}
+    while (true) do
+        local product_name, gproduct = next(to_scan)
+        if not product_name then break end
+        to_scan[product_name] = nil
+        done_scan[product_name] = true
+        for _, grecipe in pairs(gproduct.product_of) do
+            if g.selection[grecipe.name] then
+                connected_recipes[grecipe.name] = grecipe
+                for _, ingredient in pairs(grecipe.ingredients) do
+                    if not done_scan[ingredient.name] then
+                        to_scan[ingredient.name] = ingredient
+                    end
+                end
+            end
+        end
+    end
+    return connected_recipes
 end
 
 return gutils

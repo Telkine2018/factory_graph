@@ -192,6 +192,8 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
+
+        saving.close(player)
     end)
 
 tools.on_named_event(np("close"), defines.events.on_gui_click,

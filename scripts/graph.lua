@@ -910,6 +910,10 @@ function graph.unselect(player)
     local g = gutils.get_graph(player)
     g.selection = {}
     g.iovalues = {}
+    g.color_index = 0
+    for _, gproduct in pairs(g.products) do
+        gproduct.color = nil
+    end
     graph.refresh(player)
     gutils.fire_production_data_change(g)
 end
@@ -921,14 +925,26 @@ function graph.load_saving(g, data)
     local selection = {}
     for _, grecipe in pairs(data.selection) do
         local current = g.recipes[grecipe.name]
-        selection[grecipe.name] = current
-        set_recipe_location(g, current, grecipe.col, grecipe.line)
+        if current then
+            selection[grecipe.name] = current
+            set_recipe_location(g, current, grecipe.col, grecipe.line)
+        end
     end
     g.selection = selection
 
     for _, field in pairs(gutils.saved_graph_fields) do
         if field ~= "visibility" then
             g[field] = data.config[field]
+        end
+    end
+    if not g.color_index then g.color_index = 0 end
+
+    if data.colors then
+        for product_name, color in pairs(data.colors) do
+            local gproduct = g.products[product_name]
+            if gproduct then
+                gproduct.color = color
+            end
         end
     end
 
@@ -941,6 +957,7 @@ function graph.load_saving(g, data)
     else
         graph.refresh(g)
     end
+    gutils.fire_selection_change(g)
 end
 
 ---@param g Graph
@@ -953,7 +970,7 @@ function graph.import_saving(g, data)
         selection[grecipe.name] = current
     end
     graph.refresh(g.player)
+    gutils.fire_selection_change(g)
 end
-
 
 return graph

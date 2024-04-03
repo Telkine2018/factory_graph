@@ -115,7 +115,11 @@ function production.compute(g)
     local machines = {}
 
     local enabled_cache = {}
-    for recipe_name, grecipe in pairs(g.selection) do
+
+    ---@type {[string]:GRecipe}
+    local connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
+
+    for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
 
         local config = grecipe.production_config
@@ -432,7 +436,7 @@ function production.compute(g)
     end
     ::end_compute::
 
-    --- compute products
+    --- compute products    
     local product_outputs = {}
     local product_effective = {}
     for _, machine in pairs(machines) do

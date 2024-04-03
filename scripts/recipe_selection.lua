@@ -124,7 +124,7 @@ function recipe_selection.open(g, product, recipe, only_product)
         search_text.style.width = 100
 
         search_text_flow.add { type = "drop-down", items =
-        { { np("action_in_list") }, { np("action_add_all") } },
+        { { np("action_in_list") }, { np("action_add_all") }, { np("action_in_selection") } },
             selected_index = 1,
             name = np("action") }
         b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
@@ -515,7 +515,13 @@ function recipe_selection.process_query(player, name)
             local _, product = next(uproducts)
             if not product then break end
 
-            local _, frecipe = next(product.product_of)
+            local frecipe
+            if product.root_recipe then
+                frecipe = product.root_recipe
+            else
+                _, frecipe = next(product.product_of)
+            end
+
             uproducts[product.name] = nil
             kproducts[product.name] = product
 
@@ -531,6 +537,9 @@ function recipe_selection.process_query(player, name)
                 end
             end
         end
+        recipe_selection.show_recipes(player, recipes)
+    elseif action == 3 then
+        local recipes = gutils.get_connected_recipes(g, {[name]=g.products[name]})
         recipe_selection.show_recipes(player, recipes)
     end
 end

@@ -21,7 +21,6 @@ local tools = require("scripts.tools")
 ---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
 ---@field selector_product_name string?             @ selected product
 ---@field product_selectors {[string]:LuaEntity}    @ product name => entity
----@field color_index integer
 ---@field rs_recipe GRecipe?                        @ recipe for product selection
 ---@field rs_product GProduct?                      @ product for product selection
 ---@field rs_location GuiLocation?
@@ -47,6 +46,7 @@ local tools = require("scripts.tools")
 ---@field preferred_beacon string?
 ---@field preferred_beacon_count integer
 ---@field iovalues {[string]:number|boolean}
+---@field color_index integer
 
 ---@class Graph : GraphRuntime, GraphConfig
 
@@ -143,3 +143,10 @@ local tools = require("scripts.tools")
 ---@class SavingData
 ---@field config GraphConfig
 ---@field selection GRecipeConfig[]
+---@field colors {[string]:Color}?
+
+---@class RemoteRecipe : ProductionConfig
+---@field name string
+
+---@class RemoteConfig
+---@field recipes {[string]:RemoteRecipe}

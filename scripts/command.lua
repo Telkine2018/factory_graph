@@ -103,19 +103,7 @@ function command.open(player)
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
     hflow.style.bottom_margin = 5
 
-    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "checkbox", caption = { np("only-researched") }, name = np("only-researched"), state = not not g.show_only_researched }
 end
-
-tools.on_named_event(np("only-researched"), defines.events.on_gui_checked_state_changed,
-    function(e)
-        local player = game.players[e.player_index]
-        local g = gutils.get_graph(player)
-        local state = e.element.state
-
-        g.show_only_researched = state
-        graph.refresh(player)
-    end)
 
 tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
     function(e)
