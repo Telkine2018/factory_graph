@@ -249,7 +249,6 @@ function product_panel.create_product_tables(player)
         local product_table = scroll.add { type = "table", column_count = column_count, name = table_name,
             style = prefix .. "_default_table", draw_vertical_lines = true }
         product_table.style.cell_padding = 0
-        local production_only = products == inputs
         for _, product in pairs(list) do
             local product_name = product.product.name
             local pline = product_table.add { type = "flow", direction = "horizontal" }
@@ -257,7 +256,7 @@ function product_panel.create_product_tables(player)
             local b = gutils.create_product_button(pline, product_name, "product_button")
             b.tooltip = product_button_tooltip
 
-            tools.set_name_handler(b, np("product"), { product_name = product_name, production_only = production_only })
+            tools.set_name_handler(b, np("product"), { product_name = product_name })
 
             local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
             local value = set_output_value(g, product_name, qtlabel)
@@ -373,10 +372,8 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
         local product_name = e.element.tags.product_name
         if not product_name then return end
 
-        local production_only = e.element.tags.production_only --[[@as boolean]]
-
         if e.button == defines.mouse_button_type.right then
-            recipe_selection.open(g, g.products[product_name], nil, production_only)
+            recipe_selection.open(g, g.products[product_name], nil)
         elseif e.control then
             get_vinput(e.element.parent)
             if g.iovalues[product_name] == true then
@@ -463,6 +460,7 @@ tools.register_user_event(commons.production_compute_event, function(data)
     
 end)
 
+local get_product_amount = production.get_product_amount
 
 ---@param g Graph
 ---@param container LuaGuiElement
@@ -529,13 +527,9 @@ function product_panel.update_machine_panel(g, container)
             b.locked = true
             tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
 
-            local amount
-            if product.amount_min then
-                amount = (product.amount_min + product.amount_max) / 2
-            else
-                amount = product.amount
-            end
-            amount = amount * machine.craft_per_s * machine.count
+            local amount = get_product_amount(machine, product)
+            
+            amount = amount * machine.count
             amount = fround(amount)
             b.add { type = "label", style = default_button_label_style,
                 caption = tostring(amount), ignored_by_interaction = true }

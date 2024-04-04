@@ -37,6 +37,7 @@ local tools = require("scripts.tools")
 ---@field grid_size integer
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
+---@field unrestricted_production boolean?
 
 ---@class GraphConfig
 ---@field visibility integer?
@@ -73,6 +74,7 @@ local tools = require("scripts.tools")
 ---@field machine ProductionMachine?
 ---@field order integer?
 ---@field visible boolean?
+---@field is_void boolean?
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?

@@ -10,6 +10,33 @@ local production = {}
 local abs = math.abs
 local math_precision = commons.math_precision
 
+---@param machine ProductionMachine
+---@param product Product
+---@return number
+local function get_product_amount(machine, product)
+    local amount
+    local probability = product.probability
+    if not probability then
+        probability = 1
+    end
+
+    if product.amount_min then
+        amount = (product.amount_max + product.amount_min) / 2 * probability
+    else
+        amount = product.amount * probability
+    end
+
+    local catalyst_amount = product.catalyst_amount
+    local craft_per_s = machine.craft_per_s
+    if catalyst_amount and catalyst_amount > 0 then
+        local productivity = (1 + machine.productivity)
+        craft_per_s = craft_per_s * ((amount - catalyst_amount) + catalyst_amount / productivity) / amount
+    end
+    return craft_per_s * amount
+end
+
+production.get_product_amount = get_product_amount
+
 ---@param g Graph
 ---@param grecipe GRecipe
 ---@param config ProductionConfig
@@ -117,7 +144,12 @@ function production.compute(g)
     local enabled_cache = {}
 
     ---@type {[string]:GRecipe}
-    local connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
+    local connected_recipes
+    if g.unrestricted_production then
+        connected_recipes = g.selection --[[@as {[string]:GRecipe}]]
+    else
+        connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
+    end
 
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
@@ -126,7 +158,6 @@ function production.compute(g)
         if not config then
             config = machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
-
         if config then
             local machine = compute_machine(g, grecipe, config)
             grecipe.machine = machine
@@ -194,13 +225,9 @@ function production.compute(g)
             if not coef then
                 coef = 0
             end
-            local amount
-            if product.amount_min then
-                amount = (product.amount_max + product.amount_min) / 2 * product.probability
-            else
-                amount = product.amount
-            end
-            coef = coef + amount * craft_per_s
+
+            local amount = get_product_amount(machine, product)
+            coef = coef + amount
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
         end
@@ -234,7 +261,7 @@ function production.compute(g)
         table.insert(product_name_list, product_name)
     end
 
-    local function trim(v) return math.abs(v) > math_precision and v or nil end
+    local function trim(v) return abs(v) > math_precision and v or nil end
 
     --[[
     local saved_equations = tools.table_deep_copy(equation_list)
@@ -257,7 +284,7 @@ function production.compute(g)
                 if not pivot_value then
                     pivot_var = var_name
                     pivot_value = value
-                elseif math.abs(value) > math.abs(pivot_value) then
+                elseif abs(value) > abs(pivot_value) then
                     pivot_var = var_name
                     pivot_value = value
                 end
@@ -284,13 +311,14 @@ function production.compute(g)
             end
 
             -- check linear depencies
-            if not next(eq_line) and math.abs(constant_list[j]) > math_precision then
+            if not next(eq_line) and abs(constant_list[j]) > math_precision then
                 failed = commons.production_failures.linear_dependecy
             end
         end
 
         ::next_eq::
     end
+
 
     -- Reverse
     for i = #equation_list, 1, -1 do
@@ -312,49 +340,56 @@ function production.compute(g)
         ::next_eq::
     end
 
-
     -- Compute end values
     machine_counts = {}
     local count = #equation_list
     local main_var
+    local product_outputs = {}
+    local product_effective = {}
 
-    local function solve_linear(current_error)
-        for i = 1, count do
-            local cst = constant_list[i]
-            local var_name = var_list[i]
-            if not var_name then
-                if abs(cst) > math_precision then
-                    failed = current_error
-                end
-            else
-                if abs(cst) < math_precision then
-                    cst = 0
-                    machine_counts[var_name] = cst
-                elseif cst < 0 then
-                    failed = current_error
-                else
-                    machine_counts[var_name] = cst
-                end
+    ---@param recipe_name any
+    ---@param machine_count any
+    ---@return { [string]: ProductionMachine }
+    local function compensate(recipe_name, machine_count)
+        --- compensate < 0
+        machine_counts[recipe_name] = 0
+        local machine = machines[recipe_name]
+        for _, ingredient in pairs(machine.recipe.ingredients) do
+            local pname = ingredient.type .. "/" .. ingredient.name
+            local coef = product_outputs[pname]
+            if not coef then
+                coef = 0
+            end
+
+            local total = ingredient.amount * machine.craft_per_s * -machine_count
+            if abs(total) >= math_precision then
+                product_outputs[pname] = coef + total
+                product_effective[pname] = (product_effective[pname] or 0) + total
+            end
+        end
+
+        for _, product in pairs(machine.recipe.products) do
+            local pname = product.type .. "/" .. product.name
+            local coef = product_outputs[pname]
+            if not coef then
+                coef = 0
+            end
+            local total = get_product_amount(machine, product)
+            if abs(total) >= math_precision then
+                product_outputs[pname] = coef + total
+                product_effective[pname] = (product_effective[pname] or 0) + total
             end
         end
     end
 
     if table_size(free_recipes) > 1 then
-        if count > 0 and abs(constant_list[count]) < math_precision then
-            for name, _ in pairs(free_recipes) do
-                machine_counts[name] = 0
-            end
-            solve_linear(commons.production_failures.too_many_free_variables)
-        else
-            failed = commons.production_failures.too_many_free_variables
+        for name, _ in pairs(free_recipes) do
+            machine_counts[name] = 0
         end
-        goto end_compute
+        failed = commons.production_failures.too_many_free_variables
     else
         main_var = next(free_recipes)
-        if not main_var then
-            solve_linear(commons.production_failures.too_many_constraints)
-            goto end_compute
-        else
+        if main_var then
             local minv, maxv
             for i = 1, count do
                 local eq = equation_list[i]
@@ -382,15 +417,12 @@ function production.compute(g)
             end
 
             --- compute end value
-            local main_value
+            local main_value = 0
             if minv then
                 if maxv then
-                    if minv >= maxv then
-                        main_value = 0
+                    main_value = math.min(maxv, minv)
+                    if minv > maxv then
                         failed = commons.production_failures.too_many_constraints
-                        goto end_compute
-                    else
-                        main_value = (minv + maxv) / 2
                     end
                 else
                     main_value = minv
@@ -399,50 +431,43 @@ function production.compute(g)
                 main_value = maxv
             end
             if not main_value then
-                failed = commons.production_failures.linear_dependecy
-                goto end_compute
+                failed = commons.production_failures.no_soluce
             else
                 machine_counts[main_var] = main_value
             end
         end
+    end
 
-        for i = count, 1, -1 do
-            local eq = equation_list[i]
-            local recipe_name = var_list[i]
+    for i = count, 1, -1 do
+        local eq = equation_list[i]
+        local recipe_name = var_list[i]
 
-            if recipe_name then
-                local machine_count = constant_list[i]
-                for name, value in pairs(eq) do
-                    if name ~= recipe_name then
-                        local mc = machine_counts[name]
-                        if mc then
-                            machine_count = machine_count - mc * value
-                        end
+        if recipe_name then
+            local machine_count = constant_list[i]
+            for name, value in pairs(eq) do
+                if name ~= recipe_name then
+                    local mc = machine_counts[name]
+                    if mc then
+                        machine_count = machine_count - mc * value
                     end
                 end
-                if math.abs(machine_count) < math_precision then
-                    machine_count = 0
-                end
-                machine_counts[recipe_name] = machine_count
-                if machine_count < 0 then
-                    if not fail_index then
-                        fail_index = i
-                    end
-                    failed = commons.production_failures.invalid_soluce
-                    goto end_compute
-                end
+            end
+            if abs(machine_count) < math_precision then
+                machine_count = 0
+            end
+            machine_counts[recipe_name] = machine_count
+            if machine_count < 0 then
+                failed = commons.production_failures.no_soluce
+                compensate(recipe_name, machine_count)
             end
         end
     end
-    ::end_compute::
 
-    --- compute products    
-    local product_outputs = {}
-    local product_effective = {}
+    --- compute products
     for _, machine in pairs(machines) do
         local recipe_name = machine.name
         local machine_count = machine_counts[recipe_name]
-        if machine_count then
+        if machine_count and machine_count > 0 then
             machine.count = machine_count
             local craft_per_s = machine.craft_per_s
             for _, ingredient in pairs(machine.recipe.ingredients) do
@@ -463,17 +488,14 @@ function production.compute(g)
                 if not coef then
                     coef = 0
                 end
-                local amount
-                if product.amount_min then
-                    amount = (product.amount_max + product.amount_min) / 2 * product.probability
-                else
-                    amount = product.amount
-                end
+
+                local amount = get_product_amount(machine, product)
+
                 ---@cast amount -nil
                 if abs(amount) <= math_precision then
                     amount = 0
                 else
-                    local total = amount * craft_per_s * machine_count
+                    local total = amount * machine_count
                     if abs(total) >= math_precision then
                         product_outputs[pname] = coef + total
                         product_effective[pname] = (product_effective[pname] or 0) + total

@@ -17,6 +17,12 @@ local initial_col = 2
 
 local log_enabled = true
 
+local floor = math.floor
+local ceil = math.ceil
+local abs = math.abs
+local max = math.max
+local sqrt = math.sqrt
+
 ---@param  surface LuaSurface
 ---@return Graph
 function graph.new(surface)
@@ -110,6 +116,9 @@ function graph.update_recipes(g, recipes, excluded_categories)
                         table.insert(grecipe.products, gproduct)
                         gproduct.product_of[recipe.name] = grecipe
                         gproduct.is_root = nil
+                    end
+                    if #grecipe.products == 1 and recipe.products[1].probability == 0 then
+                        grecipe.is_void = true
                     end
                 end
             end
@@ -355,7 +364,7 @@ function graph.layout_recipe(g, grecipe)
             line = find_free_line(gcol, gcol.max_line + 1)
         end
     else
-        line = math.ceil(line / count)
+        line = ceil(line / count)
     end
 
     local found_dist
@@ -366,7 +375,7 @@ function graph.layout_recipe(g, grecipe)
         if not gcol.max_line then
             local prevcol = gcols[g.current_col - 1]
             if prevcol and prevcol.line then
-                line = math.floor((prevcol.min_line + prevcol.max_line) / 2)
+                line = floor((prevcol.min_line + prevcol.max_line) / 2)
             else
                 line = 1
             end
@@ -389,7 +398,7 @@ function graph.layout_recipe(g, grecipe)
 
             local free_line = find_free_line(gcol, line)
             local dcol = col - max_col
-            local d = math.abs(free_line - line) + dcol
+            local d = abs(free_line - line) + dcol
 
             if not found_dist or d < found_dist then
                 found_dist = d
@@ -434,8 +443,8 @@ function graph.insert_recipe(g, grecipe)
         graph.layout_recipe(g, grecipe)
         return
     end
-    center_col = math.floor(center_col / count)
-    center_line = math.floor(center_line / count)
+    center_col = floor(center_col / count)
+    center_line = floor(center_line / count)
 
     local min_d
     local min_col
@@ -580,7 +589,7 @@ function graph.do_layout(g)
     end
 
 
-    local edge_size = math.max(math.ceil(0.5 * math.sqrt(recipe_count)), 3)
+    local edge_size = max(ceil(0.5 * sqrt(recipe_count)), 3)
 
     g.current_col = initial_col
     while true do
@@ -636,26 +645,13 @@ function graph.do_layout(g)
                     local avg_col = 0
                     local avg_col_count = 0
                     for _, grecipe in pairs(gproduct.ingredient_of) do
-                        if not grecipe.col then
-                            for _, ingredient in pairs(grecipe.ingredients) do
-                                if ingredient ~= gproduct and not processed_products[ingredient.name] then
-                                    count = count + 1
-                                end
-                            end
-                        else
+                        if grecipe.col then
                             avg_col = avg_col + grecipe.col
                             avg_col_count = avg_col_count + 1
                         end
                     end
                     for _, grecipe in pairs(gproduct.product_of) do
-                        if not grecipe.col then
-                            local count = 0
-                            for _, prod in pairs(grecipe.products) do
-                                if prod ~= gproduct and not processed_products[prod.name] then
-                                    count = count + 1
-                                end
-                            end
-                        else
+                        if grecipe.col then
                             avg_col = avg_col + grecipe.col
                             avg_col_count = avg_col_count + 1
                         end
@@ -683,7 +679,7 @@ function graph.do_layout(g)
             end
 
             if found_avg_col then
-                found_avg_col = math.ceil(found_avg_col / found_avg_col_count)
+                found_avg_col = ceil(found_avg_col / found_avg_col_count)
                 if found_avg_col < g.current_col - 1 then
                     local col = found_avg_col + 1
                     local gcol = gcols[col]
@@ -744,7 +740,7 @@ function graph.reverse_equalize_recipes(g)
             for _, product in pairs(line_recipe.products) do
                 for _, recipe in pairs(product.ingredient_of) do
                     if recipe.visible and recipe.col and recipe.col >= line_recipe.col then
-                        local dcol = math.abs(recipe.col - line_recipe.col)
+                        local dcol = abs(recipe.col - line_recipe.col)
                         if not min_dcol or dcol < min_dcol then
                             min_dcol = dcol
                             count = 1
@@ -760,7 +756,7 @@ function graph.reverse_equalize_recipes(g)
             for _, ingredient in pairs(line_recipe.ingredients) do
                 for _, recipe in pairs(ingredient.product_of) do
                     if recipe.visible and recipe.col and recipe.col >= line_recipe.col then
-                        local dcol = math.abs(recipe.col - line_recipe.col)
+                        local dcol = abs(recipe.col - line_recipe.col)
                         if not min_dcol or dcol < min_dcol then
                             min_dcol = dcol
                             count = 1
@@ -776,7 +772,7 @@ function graph.reverse_equalize_recipes(g)
             if count == 0 then
                 alloc_free_line(new_cols, line_recipe.line, line_recipe)
             else
-                line = math.ceil(line / count)
+                line = ceil(line / count)
                 alloc_free_line(new_cols, line, line_recipe)
             end
         end
@@ -803,7 +799,7 @@ function graph.equalize_recipes(g)
                 if i == 1 then
                     for _, product in pairs(line_recipe.ingredients) do
                         if product.col then
-                            local dcol = math.abs(product.col - line_recipe.col)
+                            local dcol = abs(product.col - line_recipe.col)
                             if not min_dcol or dcol < min_dcol then
                                 min_dcol = dcol
                                 count = 1
@@ -818,7 +814,7 @@ function graph.equalize_recipes(g)
                     for _, ingredient in pairs(line_recipe.ingredients) do
                         for _, recipe in pairs(ingredient.product_of) do
                             if recipe.visible and recipe.col and recipe.col < line_recipe.col then
-                                local dcol = math.abs(recipe.col - line_recipe.col)
+                                local dcol = abs(recipe.col - line_recipe.col)
                                 if not min_dcol or dcol < min_dcol then
                                     min_dcol = dcol
                                     count = 1
@@ -834,7 +830,7 @@ function graph.equalize_recipes(g)
                     for _, product in pairs(line_recipe.products) do
                         for _, recipe in pairs(product.ingredient_of) do
                             if recipe.visible and recipe.col and recipe.col < line_recipe.col then
-                                local dcol = math.abs(recipe.col - line_recipe.col)
+                                local dcol = abs(recipe.col - line_recipe.col)
                                 if not min_dcol or dcol < min_dcol then
                                     min_dcol = dcol
                                     count = 1
@@ -850,7 +846,7 @@ function graph.equalize_recipes(g)
                 if count == 0 then
                     alloc_free_line(new_col, line_recipe.line, line_recipe)
                 else
-                    line = math.ceil(line / count)
+                    line = ceil(line / count)
                     alloc_free_line(new_col, line, line_recipe)
                 end
             end

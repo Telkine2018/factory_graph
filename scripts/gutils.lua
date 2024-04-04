@@ -516,8 +516,14 @@ function gutils.get_connected_recipes(g, products)
                 end
             end
         end
+        for _, grecipe in pairs(gproduct.ingredient_of) do
+            if grecipe.is_void and g.selection[grecipe.name] then
+                connected_recipes[grecipe.name] = grecipe
+            end
+        end
     end
     return connected_recipes
 end
+
 
 return gutils
