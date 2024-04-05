@@ -187,6 +187,7 @@ function gutils.compute_visibility(g, keep_position)
         end
         for _, grecipe in pairs(g.recipes) do
             grecipe.selector_positions = nil
+            grecipe.entity = nil
             if selection[grecipe.name] then
                 if not keep_position then
                     grecipe.line = nil
@@ -204,8 +205,11 @@ function gutils.compute_visibility(g, keep_position)
         end
     else -- if g.visibility == commons.visibility_all then
         for _, grecipe in pairs(g.recipes) do
-            grecipe.line = nil
-            grecipe.col = nil
+            if not keep_position then
+                grecipe.line = nil
+                grecipe.col = nil
+            end
+            grecipe.entity = nil
             grecipe.selector_positions = nil
             grecipe.visible = true
             if show_only_researched and not grecipe.enabled then

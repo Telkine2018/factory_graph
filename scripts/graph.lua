@@ -40,7 +40,10 @@ function graph.new(surface)
         y_routing = {},
         grid_size = commons.grid_size,
         color_index = 0,
-        iovalues = {}
+        iovalues = {},
+        show_hidden = false,
+        show_only_researched = false,
+        visibility = commons.visibility_all
     }
 end
 
@@ -856,7 +859,7 @@ end
 
 ---@param g Graph
 ---@param grecipe GRecipe
-local function draw_recipe(g, grecipe)
+local function create_recipe_object(g, grecipe)
     if not grecipe.line or not grecipe.visible or grecipe.entity then
         return
     end
@@ -884,21 +887,26 @@ local function draw_recipe(g, grecipe)
 end
 
 ---@param g Graph
-function graph.draw(g)
+function graph.create_recipe_objects(g)
     for _, grecipe in pairs(g.recipes) do
-        draw_recipe(g, grecipe)
+        create_recipe_object(g, grecipe)
     end
 end
 
 ---@param player LuaPlayer
-function graph.refresh(player)
+---@param keep_location boolean?
+function graph.refresh(player, keep_location)
     local g = gutils.get_graph(player)
-    gutils.compute_visibility(g)
-    drawing.delete_content(g)
-    graph.do_layout(g)
-    graph.draw(g)
-    drawing.update_drawing(player)
-    gutils.recenter(g)
+    gutils.compute_visibility(g, keep_location)
+    drawing.delete_content(g, keep_location)
+    if not keep_location then
+        graph.do_layout(g)
+    end
+    graph.create_recipe_objects(g)
+    drawing.redraw_selection(player)
+    if not keep_location then
+        gutils.recenter(g)
+    end
 end
 
 ---@param player LuaPlayer
@@ -947,8 +955,8 @@ function graph.load_saving(g, data)
     if g.visibility == commons.visibility_selection and
         data.config.visibility == commons.visibility_selection then
         gutils.compute_visibility(g, true)
-        graph.draw(g)
-        drawing.update_drawing(g.player)
+        graph.create_recipe_objects(g)
+        drawing.redraw_selection(g.player)
         gutils.recenter(g)
     else
         graph.refresh(g)

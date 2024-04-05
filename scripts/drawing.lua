@@ -682,7 +682,7 @@ end
 
 
 ---@param g Graph
-local function draw_graph(g)
+local function redraw_connections(g)
     drawing.clear_selection(g)
 
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
@@ -754,6 +754,7 @@ local function draw_graph(g)
     g.graph_ids = ids
 end
 
+--- Draw blink rectangle for goto target
 ---@param g Graph
 ---@param crecipe GRecipe
 function drawing.draw_target(g, crecipe)
@@ -771,12 +772,13 @@ function drawing.draw_target(g, crecipe)
     function draw_color(color, time_to_live)
         rendering.draw_rectangle { surface = g.surface, color = color, left_top = top, right_bottom = bottom, width = 2, time_to_live = time_to_live }
     end
+
     for i = 2, 0, -1 do
         local j = 2 * i + 2
-        draw_color({1, 0, 0}, (j + 1) * 30)
-        draw_color({0, 0, 0}, j * 30)
+        draw_color({ 1, 0, 0 }, (j + 1) * 30)
+        draw_color({ 0, 0, 0 }, j * 30)
     end
-    draw_color({1, 0, 0}, 1 * 30)
+    draw_color({ 1, 0, 0 }, 1 * 30)
 end
 
 ---@param g Graph
@@ -1082,7 +1084,7 @@ local function on_gui_opened(e)
             end
             gutils.fire_selection_change(g)
 
-            draw_graph(g)
+            redraw_connections(g)
             draw_selected_entity(player, entity, grecipe)
 
             player.opened = nil
@@ -1111,18 +1113,19 @@ function drawing.get_product_from_selected(player, entity)
 end
 
 ---@param player LuaPlayer
-function drawing.update_drawing(player)
+function drawing.redraw_selection(player)
     local g = gutils.get_graph(player)
 
     drawing.clear_selection(g)
-    draw_graph(g)
+    redraw_connections(g)
     if g.selected_recipe and g.selected_recipe_entity then
         draw_selected_entity(player, g.selected_recipe_entity, g.selected_recipe)
     end
 end
 
 ---@param g Graph
-function drawing.delete_content(g)
+---@param keep_location boolean?
+function drawing.delete_content(g, keep_location)
     drawing.clear_selection(g)
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
 
@@ -1130,14 +1133,17 @@ function drawing.delete_content(g)
     for _, entity in pairs(entities) do
         entity.destroy { raise_destroy = false }
     end
-    -- g.surface.clear(true)
-    for _, recipe in pairs(g.recipes) do
-        recipe.entity = nil
-        recipe.line = nil
-        recipe.col = nil
+
+    if not keep_location then
+        -- g.surface.clear(true)
+        for _, recipe in pairs(g.recipes) do
+            recipe.entity = nil
+            recipe.line = nil
+            recipe.col = nil
+        end
+        g.entity_map = {}
+        g.gcols = {}
     end
-    g.entity_map = {}
-    g.gcols = {}
 end
 
 ---@param g Graph
@@ -1145,6 +1151,5 @@ end
 ---@param src GRecipe
 function drawing.open_recipe_selection(g, product, src)
 end
-
 
 return drawing

@@ -110,7 +110,7 @@ tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
         colors.recompute_colors(g)
-        drawing.update_drawing(player)
+        drawing.redraw_selection(player)
     end)
 
 tools.on_named_event(np("add"), defines.events.on_gui_click,

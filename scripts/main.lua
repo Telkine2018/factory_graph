@@ -79,7 +79,7 @@ function main.enter(player)
         local recipes = player.force.recipes
         graph.update_recipes(g, recipes, excluded_categories)
         graph.do_layout(g)
-        graph.draw(g)
+        graph.create_recipe_objects(g)
     end
     command.open(player)
 end
@@ -285,8 +285,73 @@ tools.on_configuration_changed(function(data)
     end
 end)
 
-tools.on_load(function() 
+tools.on_load(function()
     picker_dolly_install()
 end)
+
+tools.on_event(defines.events.on_research_finished,
+    ---@param e EventData.on_research_finished
+    function(e)
+        local tech = e.research
+        local force_index = tech.force.index
+
+        for _, player in pairs(game.players) do
+            if player.force_index == force_index then
+                local g = gutils.get_graph(player)
+                if g then
+                    local need_refresh
+                    for _, effect in pairs(tech.effects) do
+                        if effect.type == "unlock-recipe" then
+                            local recipe_name = effect.recipe
+                            local grecipe = g.recipes[recipe_name]
+                            if grecipe then
+                                grecipe.enabled = true
+                                if grecipe.visible then
+                                    need_refresh = true
+                                end
+                            end
+                        end
+                    end
+                    if need_refresh then
+                        graph.refresh(player, true)
+                    end
+                end
+            end
+        end
+    end
+)
+
+tools.on_event(defines.events.on_research_reversed,
+    ---@param e EventData.on_research_reversed
+    function(e)
+        local tech = e.research
+        local force_index = tech.force.index
+
+        for _, player in pairs(game.players) do
+            if player.force_index == force_index then
+                local g = gutils.get_graph(player)
+                if g then
+                    local need_refresh
+                    for _, effect in pairs(tech.effects) do
+                        if effect.type == "unlock-recipe" then
+                            local recipe_name = effect.recipe
+                            local grecipe = g.recipes[recipe_name]
+                            if grecipe then
+                                grecipe.enabled = false
+                                if grecipe.visible then
+                                    need_refresh = true
+                                end
+                            end
+                        end
+                    end
+                    if need_refresh then
+                        graph.refresh(player, true)
+                    end
+                end
+            end
+        end
+    end
+)
+
 
 return main

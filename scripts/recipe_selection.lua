@@ -263,9 +263,9 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
             grecipe.visible = true
             graph.insert_recipe(g, grecipe)
         end
-        graph.draw(g)
+        graph.create_recipe_objects(g)
         gutils.select_current_recipe(g, g.rs_recipe)
-        drawing.update_drawing(player)
+        drawing.redraw_selection(player)
     end)
 
 ---@param player_index integer
