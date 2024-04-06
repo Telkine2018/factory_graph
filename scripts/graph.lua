@@ -210,7 +210,7 @@ function graph.remove_unused(g)
             to_remove[product.name] = true
             g.iovalues[product.name] = nil
             g.product_outputs[product.name] = nil
-            g.product_effective[product.name] = nil
+            g.product_inputs[product.name] = nil
         else
             product.used = nil
         end

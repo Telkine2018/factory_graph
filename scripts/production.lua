@@ -35,7 +35,16 @@ local function get_product_amount(machine, product)
     return craft_per_s * amount
 end
 
+---@param machine ProductionMachine
+---@param ingredient Ingredient
+---@return number
+local function get_ingredient_amout(machine, ingredient)
+    local amount = ingredient.amount * machine.craft_per_s / (1 + machine.productivity)
+    return amount
+end
+
 production.get_product_amount = get_product_amount
+production.get_ingredient_amout = get_ingredient_amout
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -142,6 +151,10 @@ function production.compute(g)
     local machines = {}
 
     local enabled_cache = {}
+
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.machine = nil
+    end
 
     ---@type {[string]:GRecipe}
     local connected_recipes
@@ -345,6 +358,7 @@ function production.compute(g)
     local count = #equation_list
     local main_var
     local product_outputs = {}
+    local product_inputs = {}
     local product_effective = {}
 
     ---@param recipe_name any
@@ -352,34 +366,7 @@ function production.compute(g)
     ---@return { [string]: ProductionMachine }
     local function compensate(recipe_name, machine_count)
         --- compensate < 0
-        machine_counts[recipe_name] = 0
-        local machine = machines[recipe_name]
-        for _, ingredient in pairs(machine.recipe.ingredients) do
-            local pname = ingredient.type .. "/" .. ingredient.name
-            local coef = product_outputs[pname]
-            if not coef then
-                coef = 0
-            end
-
-            local total = ingredient.amount * machine.craft_per_s * -machine_count
-            if abs(total) >= math_precision then
-                product_outputs[pname] = coef + total
-                product_effective[pname] = (product_effective[pname] or 0) + total
-            end
-        end
-
-        for _, product in pairs(machine.recipe.products) do
-            local pname = product.type .. "/" .. product.name
-            local coef = product_outputs[pname]
-            if not coef then
-                coef = 0
-            end
-            local total = get_product_amount(machine, product)
-            if abs(total) >= math_precision then
-                product_outputs[pname] = coef + total
-                product_effective[pname] = (product_effective[pname] or 0) + total
-            end
-        end
+        machine_counts[recipe_name] = machine_count
     end
 
     if table_size(free_recipes) > 1 then
@@ -457,7 +444,7 @@ function production.compute(g)
             end
             machine_counts[recipe_name] = machine_count
             if machine_count < 0 then
-                failed = commons.production_failures.no_soluce
+                failed = { "factory_graph-product-panel.failure_no_soluce1", translations.get_recipe_name(g.player.index, recipe_name) }
                 compensate(recipe_name, machine_count)
             end
         end
@@ -467,18 +454,20 @@ function production.compute(g)
     for _, machine in pairs(machines) do
         local recipe_name = machine.name
         local machine_count = machine_counts[recipe_name]
-        if machine_count and machine_count > 0 then
+        if machine_count then
             machine.count = machine_count
             local craft_per_s = machine.craft_per_s
             for _, ingredient in pairs(machine.recipe.ingredients) do
                 local iname = ingredient.type .. "/" .. ingredient.name
-                local coef = product_outputs[iname]
+                local coef = product_inputs[iname]
                 if not coef then
                     coef = 0
                 end
                 local total = ingredient.amount * craft_per_s * machine_count / (machine.productivity + 1)
                 if abs(total) >= math_precision then
-                    product_outputs[iname] = coef - total
+                    if machine.count > 0 then
+                        product_inputs[iname] = coef + total
+                    end
                 end
             end
 
@@ -497,15 +486,17 @@ function production.compute(g)
                 else
                     local total = amount * machine_count
                     if abs(total) >= math_precision then
-                        product_outputs[pname] = coef + total
-                        product_effective[pname] = (product_effective[pname] or 0) + total
+                        if machine.count > 0 then
+                            product_outputs[pname] = coef + total
+                        end
                     end
                 end
             end
         end
     end
+
     g.product_outputs = product_outputs
-    g.product_effective = product_effective
+    g.product_inputs = product_inputs
     g.production_failed = failed
     return machines
 end

@@ -52,8 +52,6 @@ local excluded_module_groups = {
     ["ee-tools"] = true
 }
 
-
-
 function machinedb.initialize()
     if machinedb.initialized then
         return
@@ -92,17 +90,36 @@ function machinedb.initialize()
     end
 end
 
+---@param force LuaForce
+---@param machine_name string
+---@return boolean
+function machinedb.is_machine_enabled(force, machine_name)
+    local entity = game.entity_prototypes[machine_name]
+    local item = entity.items_to_place_this[1]
+    local machine_recipes = game.get_filtered_recipe_prototypes {
+        { filter = "has-product-item",
+            elem_filters = { { filter = "name", name = item } } } }
+    for _, mr in pairs(machine_recipes) do
+        if force.recipes[mr.name].enabled then
+            return true
+        end
+    end
+    return false
+end
+
+local is_machine_enabled = machinedb.is_machine_enabled
+
 ---@param g Graph
 ---@param recipe_name string
 ---@param enabled_cache {[string]:boolean}
 ---@return ProductionConfig?
 function machinedb.get_default_config(g, recipe_name, enabled_cache)
-    local force = g.player.force
+    local force = g.player.force --[[@as LuaForce]]
     local recipe = game.recipe_prototypes[recipe_name]
     if not recipe then
         return nil
     end
-    
+
     machinedb.initialize()
     local machines           = machinedb.category_to_machines[recipe.category]
 
@@ -131,14 +148,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         local machine_name = machine.name
         local enabled = enabled_cache[machine_name]
         if enabled == nil then
-            enabled = false
-            local machine_recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item", elem_filters = { { filter = "name", name = machine_name } } } }
-            for _, mr in pairs(machine_recipes) do
-                if force.recipes[mr.name] then
-                    enabled = true
-                    break
-                end
-            end
+            enabled = is_machine_enabled(force, machine_name)
             enabled_cache[machine_name] = enabled
         end
         if enabled then

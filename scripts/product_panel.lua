@@ -59,10 +59,12 @@ end
 
 ---@param g Graph
 local function get_production_title(g)
-    if not g.production_failed or type(g.production_failed) ~= "string" then
+    if not g.production_failed then
         return { np("title") }
-    else
+    elseif type(g.production_failed) == "string" then
         return { "", { np("failed-title") }, { np("failure_" .. g.production_failed) } }
+    else
+        return { "", { np("failed-title") }, g.production_failed }
     end
 end
 
@@ -88,8 +90,7 @@ function product_panel.create(player_index)
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
-        title_menu_func = function(flow)
-
+        title_menu_func      = function(flow)
             local b = flow.add {
                 type = "sprite-button",
                 tooltip = np("mini_tooltip"),
@@ -136,7 +137,7 @@ function product_panel.create(player_index)
         frame.force_auto_center()
     end
     if is_mini then
-        product_frame.visible = false 
+        product_frame.visible = false
     end
 end
 
@@ -159,19 +160,36 @@ local function set_output_value(g, product_name, qtlabel)
             mark = "*"
         end
 
+        local input, output
         local is_computed
-        if not value and g.product_outputs then
-            value = g.product_outputs[product_name]
-            is_computed = true
+        if not value then
+            if g.product_outputs then
+                output = g.product_outputs[product_name] or 0
+                is_computed = true
+                input = g.product_inputs[product_name] or 0
+
+                output = fround(output)
+                input = fround(input)
+                if output >= input then
+                    value = output
+                else
+                    value = -input
+                end
+            end
         end
 
-        ---@cast value number
         if value and math.abs(value) > math_precision then
             value = fround(value)
-            if value < 0 and is_computed then
-                caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
-            elseif is_computed then
+            if is_computed and value > 0 then
                 caption = mark .. "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"
+                if input ~= output then
+                    caption = caption .. "[color=red]?[/color]"
+                end
+            elseif is_computed then
+                caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
+                if input ~= output then
+                    caption = caption .. "[color=red]?[/color]"
+                end
             else
                 caption = luautil.format_number(value, true)
             end
@@ -188,32 +206,6 @@ local function set_output_value(g, product_name, qtlabel)
     end
 end
 
----@param g Graph
----@param product_name string
----@param qtlabel LuaGuiElement
----@return number?
-function set_effective_value(g, product_name, qtlabel)
-    local product_effective = g.product_effective
-    if not qtlabel or not product_effective then
-        return nil
-    end
-
-    local value = product_effective[product_name]
-    local caption
-
-    ---@cast value number
-    if value and math.abs(value) > math_precision then
-        value = fround(value)
-        caption = "x [color=yellow]" .. luautil.format_number(value, true) .. "[/color]"
-    end
-    if caption then
-        qtlabel.caption = caption
-        return value
-    else
-        qtlabel.caption = ""
-        return nil
-    end
-end
 
 function product_panel.create_product_tables(player)
     local frame = player.gui.screen[product_panel_name]
@@ -254,13 +246,11 @@ function product_panel.create_product_tables(player)
             local pline = product_table.add { type = "flow", direction = "horizontal" }
 
             local b = gutils.create_product_button(pline, product_name, "product_button")
-            b.tooltip = product_button_tooltip
-
-            tools.set_name_handler(b, np("product"), { product_name = product_name })
+            b.raise_hover_events = true
+            tools.set_name_handler(b, np("product"), { product_name = product_name, label = product.label })
 
             local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
             local value = set_output_value(g, product_name, qtlabel)
-
 
             b.style.size = 36
             b.style.vertical_align = "top"
@@ -268,16 +258,10 @@ function product_panel.create_product_tables(player)
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
 
-            local elabel = pline.add { type = "label", name = "elabel" }
-            elabel.style.width = 50
-            elabel.style.horizontal_align = "right"
-            elabel.style.right_margin = 10
-            local evalue = set_effective_value(g, product_name, elabel)
-
             if g.iovalues[product_name] then
                 b.style = red_button
             else
-                value = value or evalue
+                value = value
                 if value then
                     if value < 0 then
                         b.style = ingredient_button_style
@@ -318,11 +302,9 @@ local function update_products(g)
                 local b = line.product_button
                 local product_name = b.tags.product_name --[[@as string]]
                 local value = set_output_value(g, product_name, b.label)
-                local evalue = set_effective_value(g, product_name, line.elabel)
                 if g.iovalues[product_name] then
                     b.style = red_button
                 else
-                    value = value or evalue
                     if value then
                         if value < 0 then
                             b.style = ingredient_button_style
@@ -400,6 +382,72 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
         gutils.fire_production_data_change(g)
     end)
 
+tools.on_named_event(np("product"), defines.events.on_gui_hover,
+    ---@param e EventData.on_gui_hover
+    function(e)
+        if not e.element.valid then return end
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        local tags = e.element.tags
+        local product_name = tags.product_name --[[@as string]]
+
+        local input = g.product_inputs[product_name] or 0
+        local output = g.product_outputs[product_name] or 0
+        output = fround(output)
+        input = fround(input)
+
+        ---@type LocalisedString
+        local output_label = ""
+        ---@type LocalisedString
+        local input_label = ""
+        if math.abs(output) > math_precision or math.abs(input) > math_precision then
+            output_label = { np("product_produced"), tostring(output) }
+
+            if output ~= input then
+                input_label = { np("product_consumed"), tostring(input) }
+            else
+                input_label = { np("product_all_consumed") }
+            end
+        end
+
+        local gproduct = g.products[product_name]
+        local pline = {}
+        local set = {}
+
+        ---@param recipes any
+        local function scan_list(recipes)
+            for _, grecipe in pairs(recipes) do
+                local machine = grecipe.machine
+                if machine and machine.count and not set[grecipe.name] and machine.count ~= 0 then
+                    set[grecipe.name] = true
+                    table.insert(pline, "\n")
+                    table.insert(pline, "[recipe=" .. grecipe.name .. "] : ")
+
+                    for _, ingredient in pairs(machine.recipe.ingredients) do
+                        local amount = production.get_ingredient_amout(machine, ingredient) * machine.count
+                        table.insert(pline, fround(amount))
+                        table.insert(pline, " x ")
+                        table.insert(pline, " [" .. ingredient.type .. "=" .. ingredient.name .. "]")
+                    end
+
+                    table.insert(pline, "[img=factory_graph_arrow]")
+                    for _, product in pairs(machine.recipe.products) do
+                        local amount = production.get_product_amount(machine, product) * machine.count
+                        table.insert(pline, fround(amount))
+                        table.insert(pline, " x ")
+                        table.insert(pline, " [" .. product.type .. "=" .. product.name .. "]")
+                    end
+                end
+            end
+        end
+        scan_list(gproduct.ingredient_of)
+        scan_list(gproduct.product_of)
+
+        local recipe_str = table.concat(pline)
+        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label, output_label, input_label, recipe_str }
+    end)
+
 tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
     ---@param e EventData.on_gui_text_changed
     function(e)
@@ -457,7 +505,6 @@ tools.register_user_event(commons.production_compute_event, function(data)
         product_panel.close(player)
         product_panel.create(player.index)
     end
-    
 end)
 
 local get_product_amount = production.get_product_amount
@@ -491,10 +538,11 @@ function product_panel.update_machine_panel(g, container)
             caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
         end
 
-        local b = col1.add { type = "choose-elem-button", elem_type = "entity", 
-            entity = machine.machine.name, style = green_button, tooltip={np("machine-tooltip")} }
+        local b = col1.add { type = "choose-elem-button", elem_type = "entity",
+            entity = machine.machine.name, style = green_button, tooltip = { np("machine-tooltip") } }
         b.locked = true
         tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
+        b.raise_hover_events = true
         index = index + 1
         local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
 
@@ -528,7 +576,7 @@ function product_panel.update_machine_panel(g, container)
             tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
 
             local amount = get_product_amount(machine, product)
-            
+
             amount = amount * machine.count
             amount = fround(amount)
             b.add { type = "label", style = default_button_label_style,
@@ -566,7 +614,7 @@ tools.on_named_event(np("goto_recipe"), defines.events.on_gui_click,
             local g = gutils.get_graph(player)
             drawing.draw_target(g, g.recipes[recipe_name])
         elseif e.control then
-            
+
         end
     end)
 
@@ -589,6 +637,25 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
         end
     end)
 
+
+tools.on_named_event(np("machine"), defines.events.on_gui_hover,
+    ---@param e EventData.on_gui_hover
+    function(e)
+        local element = e.element
+        if not element or not element.valid then return end
+
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        if not recipe_name then return end
+
+        local grecipe = g.recipes[recipe_name]
+        local machine = grecipe.machine
+
+        e.element.tooltip = { np("machine-tooltip"), machine and machine.machine.localised_name }
+    end)
+
 tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
     ---@param e EventData.on_gui_click
@@ -607,7 +674,6 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
         local grecipe = g.recipes[recipe_name]
 
         if e.control then
-
             local machine = grecipe.machine
             if not machine then return end
 
@@ -633,7 +699,6 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             cursor_stack.set_blueprint_entities { bp_entity }
             player.cursor_stack_temporary = true
         elseif not e.shift then
-
             msettings_panel.create(e.player_index, grecipe)
         end
     end)
@@ -646,8 +711,8 @@ tools.register_user_event(commons.production_compute_event, function(data)
 end)
 
 tools.on_named_event(np("mini_maxi"), defines.events.on_gui_click,
----@param e EventData.on_gui_click
-    function(e) 
+    ---@param e EventData.on_gui_click
+    function(e)
         local player = game.players[e.player_index]
         local frame = player.gui.screen[product_panel_name]
         if not frame then return end

@@ -27,8 +27,8 @@ local tools = require("scripts.tools")
 ---@field selector_id integer?                      @ selector rectangle id
 ---@field selector_product_name_id integer?         @ selector text id
 ---@field product_outputs {[string]:number}
----@field product_effective {[string]:number}
----@field production_failed string?
+---@field product_inputs {[string]:number}
+---@field production_failed LocalisedString?
 ---@field recipe_order integer
 ---@field player_position MapPosition
 ---@field module_limitations {[string]:({[string]:true})}

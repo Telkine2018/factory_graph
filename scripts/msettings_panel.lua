@@ -19,6 +19,7 @@ tools.add_panel_name(panel_name)
 
 local msettings = {}
 
+
 ---@param container LuaGuiElement
 ---@param config ProductionConfig
 local function install_modules(container, config)
@@ -164,9 +165,21 @@ function msettings.create(player_index, grecipe)
 
     local recipe = game.recipe_prototypes[grecipe.name]
     local category = recipe.category
+    machinedb.initialize()
+    local machines = machinedb.category_to_machines[category]
+    local machine_names = {}
+    if machines then
+        local force = player.force --[[@as LuaForce]]
+        for _, m in pairs(machines) do
+            if not g.show_only_researched or machinedb.is_machine_enabled(force, m.name) then
+                table.insert(machine_names, m.name)
+            end
+        end
+    end
+
     field_table.add { type = "label", caption = { np("machine") } }
     b = field_table.add { type = "choose-elem-button", elem_type = "entity", entity = config.machine_name, name = "machine",
-        elem_filters = { { filter = "crafting-category", crafting_category = category } } }
+        elem_filters = { { filter = "name", name = machine_names } } }
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
@@ -276,6 +289,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         msettings.save(player)
     end
 )
+
 
 tools.on_named_event(np("beacon"), defines.events.on_gui_elem_changed,
     ---@param e EventData.on_gui_checked_state_changed
