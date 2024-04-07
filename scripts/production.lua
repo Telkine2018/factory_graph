@@ -4,6 +4,7 @@ local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 
 local machinedb = require("scripts.machinedb")
+local graph = require("scripts.graph")
 
 local production = {}
 
@@ -213,6 +214,9 @@ function production.compute_matrix(g)
     else
         connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
     end
+
+    graph.sort_recipes(connected_recipes)
+
 
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
@@ -546,9 +550,59 @@ end
 ---@param g Graph
 ---@param machines {[string]:ProductionMachine}
 function production.compute_linear(g, machines)
+    ---@type ProductionMachine[]
+    local machine_table = {}
+    for _, machine in pairs(machines) do
+        table.insert(machine_table, machine)
+    end
+    table.sort(machine_table,
+        ---@param m1 ProductionMachine
+        ---@param m2 ProductionMachine
+        function(m1, m2)
+            return m1.grecipe.sort_level < m2.grecipe.sort_level
+        end)
 
+    local requested = {}
+    local free = {}
+    for name, value in pairs(g.iovalues) do
+        if value == true then
+            free[name] = true
+        else
+            requested[name] = value
+        end
+    end
 
+    for i = #machine_table, 1, -1 do
+        local machine = machine_table[i]
+        local grecipe = machine.grecipe
 
+        local max_count
+        local max_index
+        for iproduct, gproduct in pairs(grecipe.products) do
+            local vreq = requested[gproduct.name]
+            if vreq and vreq > 0 then
+                local new_count = vreq / production.get_product_amount(machine, machine.recipe.products[iproduct])
+                if not max_count or new_count > max_count then
+                    max_count = new_count
+                    max_index = iproduct
+                end
+            end
+        end
+
+        if not max_index then
+            machine.count = 0
+        else
+            machine.count = max_count
+            for iproduct, gproduct in pairs(grecipe.products) do
+                local amount = max_count * production.get_product_amount(machine, machine.recipe.products[iproduct])
+                requested[gproduct.name] = (requested[gproduct.name] or 0) - amount
+            end
+            for index, ingredient in pairs(grecipe.ingredients) do
+                local amount = max_count * production.get_ingredient_amout(machine, machine.recipe.ingredients[index])
+                requested[ingredient.name] = (requested[ingredient.name] or 0) + amount
+            end
+        end
+    end
 end
 
 ---@param g Graph

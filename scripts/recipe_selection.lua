@@ -101,19 +101,19 @@ function recipe_selection.open(g, product, recipe, only_product)
 
         local label = flow1.add { type = "label", caption = { np("choose_recipe") } }
         label.style.top_padding = 7
-        local b = flow1.add { type = "choose-elem-button", elem_type = "recipe" }
+        local b = flow1.add { type = "choose-elem-button", elem_type = "recipe", name = "choose_recipe" }
         tools.set_name_handler(b, np("choose_recipe"))
 
-        label = flow1.add { type = "label", caption = { np("choose_item") } }
+        label = flow1.add { type = "label", caption = { np("choose_item")} }
         label.style.top_padding = 7
-        b = flow1.add { type = "choose-elem-button", elem_type = "item" }
+        b = flow1.add { type = "choose-elem-button", elem_type = "item", name = "choose_item"  }
         label.style.left_margin = 10
         flow1.style.bottom_margin = 10
         tools.set_name_handler(b, np("choose_item"))
 
         label = flow1.add { type = "label", caption = { np("choose_fluid") } }
         label.style.top_padding = 7
-        b = flow1.add { type = "choose-elem-button", elem_type = "fluid" }
+        b = flow1.add { type = "choose-elem-button", elem_type = "fluid", name = "choose_fluid" }
         label.style.left_margin = 10
         flow1.style.bottom_margin = 10
         tools.set_name_handler(b, np("choose_fluid"))
@@ -124,10 +124,12 @@ function recipe_selection.open(g, product, recipe, only_product)
         search_text_flow.style.bottom_margin = 10
         search_text.style.width = 100
 
-        search_text_flow.add { type = "drop-down", items =
+        local selector = search_text_flow.add { type = "drop-down", items =
         { { np("action_in_list") }, { np("action_add_all") }, { np("action_in_selection") } },
             selected_index = 1,
             name = np("action") }
+        tools.set_name_handler(selector, np("action_in_list"))
+        
         b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
     end
 
@@ -514,6 +516,9 @@ tools.on_named_event(np("choose_recipe"), defines.events.on_gui_elem_changed,
         local player = game.players[e.player_index]
         if not e.element.valid then return end
 
+        e.element.parent.choose_item.elem_value = nil
+        e.element.parent.choose_fluid.elem_value = nil
+
         local name = e.element.elem_value
         ---@cast name string
         if not name then
@@ -588,6 +593,9 @@ tools.on_named_event(np("choose_item"), defines.events.on_gui_elem_changed,
         local player = game.players[e.player_index]
         if not e.element.valid then return end
 
+        e.element.parent.choose_recipe.elem_value = nil
+        e.element.parent.choose_fluid.elem_value = nil
+
         local name = e.element.elem_value
         ---@cast name string
         if not name then
@@ -604,6 +612,9 @@ tools.on_named_event(np("choose_fluid"), defines.events.on_gui_elem_changed,
     function(e)
         local player = game.players[e.player_index]
         if not e.element.valid then return end
+
+        e.element.parent.choose_recipe.elem_value = nil
+        e.element.parent.choose_item.elem_value = nil
 
         local name = e.element.elem_value
         ---@cast name string
@@ -639,6 +650,32 @@ tools.on_gui_click(np("select-all"),
         graph.refresh(player)
         gutils.fire_selection_change(g)
     end)
+
+
+tools.on_named_event(np("action_in_list"), defines.events.on_gui_selection_state_changed, 
+---@param e EventData.on_gui_selection_state_changed
+function(e)
+    if not e.element.valid then return end
+
+    local player = game.players[e.player_index]
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local choose_item = tools.get_child(frame, "choose_item")
+    local choose_fluid = tools.get_child(frame, "choose_fluid")
+    local name
+    if not choose_item or not choose_fluid then return end
+    local item = choose_item.elem_value
+    local fluid = choose_fluid.elem_value
+    if item then
+        name = "item/" .. item
+    elseif fluid then
+        name = "fluid/" .. fluid
+    else
+        return
+    end
+    recipe_selection.process_query(player, name)
+end)
 
 
 drawing.open_recipe_selection = recipe_selection.open

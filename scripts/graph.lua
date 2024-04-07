@@ -723,7 +723,7 @@ function graph.do_layout(g)
     graph.equalize_recipes(g)
     graph.reverse_equalize_recipes(g)
 
-    graph.sort_selection(g, g.selection)
+    graph.sort_recipes(g.selection)
 end
 
 ---@param g Graph
@@ -961,7 +961,7 @@ function graph.load_saving(g, data)
         drawing.redraw_selection(g.player)
         gutils.recenter(g)
     else
-        graph.refresh(g)
+        graph.refresh(g.player)
     end
     gutils.fire_selection_change(g)
 end
@@ -1008,10 +1008,8 @@ local function next_sort_node(node, set)
 end
 
 
----@param g Graph
 ---@param set {[string]:GRecipe}
----@return GRecipe[]
-function graph.sort_selection(g, set)
+function graph.sort_recipes(set)
     local path = {}
 
     ---@type {[string]:GRecipe}
@@ -1064,7 +1062,7 @@ function graph.sort_selection(g, set)
             table.remove(path, #path)
             node.in_path = nil
         elseif not next_in_path.in_path then
-            local next_level = node.sort_level + 1  
+            local next_level = node.sort_level + 1
             if not next_in_path.sort_level or next_in_path.sort_level < next_level then
                 next_in_path.sort_level = next_level
                 next_in_path.in_path = true
@@ -1075,7 +1073,10 @@ function graph.sort_selection(g, set)
             end
         end
     end
+end
 
+---@param set {[string]:GRecipe}
+function graph.create_sorted_recipe_table(set)
     local sort_table = {}
     for _, grecipe in pairs(set) do
         table.insert(sort_table, grecipe)

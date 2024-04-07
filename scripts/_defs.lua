@@ -38,6 +38,7 @@ local tools = require("scripts.tools")
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
 ---@field unrestricted_production boolean?
+---@field move_recipe GRecipe?
 
 ---@class GraphConfig
 ---@field visibility integer?

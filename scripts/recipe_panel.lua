@@ -106,7 +106,7 @@ function recipe_panel.create(player_index, grecipe)
             if machine and machine.count > 0 then
                 caption = { np("ingredient"),
                     tools.fround(production.get_ingredient_amout(machine, p) * machine.count),
-                    "[" .. p.type .. "=" .. p.name .."]",
+                    "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name)
                 }
             else
@@ -128,9 +128,9 @@ function recipe_panel.create(player_index, grecipe)
             if machine and machine.count > 0 then
                 caption = { np("product"),
                     tools.fround(production.get_product_amount(machine, p) * machine.count),
-                    "[" .. p.type .. "=" .. p.name .."]",
+                    "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name),
-                    
+
                 }
             else
                 caption = get_product_label(player_index, p)
@@ -192,5 +192,15 @@ function recipe_panel.close(player)
         select_panel.destroy()
     end
 end
+
+tools.register_user_event(commons.graph_selection_change_event,
+    ---@param data {g:Graph, grecipe:GRecipe}
+    function(data)
+        recipe_panel.close(data.g.player)
+        if data.grecipe then
+            recipe_panel.create(data.g.player.index, data.grecipe)
+        end
+    end
+)
 
 return recipe_panel

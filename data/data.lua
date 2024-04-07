@@ -204,6 +204,34 @@ sprite = {
 }
 add(sprite)
 
+add {
+  type = "custom-input",
+  name = prefix .. "-up",
+  key_sequence = "UP"
+}
+
+add {
+  type = "custom-input",
+  name = prefix .. "-left",
+  key_sequence = "LEFT"
+}
+
+add {
+  type = "custom-input",
+  name = prefix .. "-down",
+  key_sequence = "DOWN"
+}
+
+add {
+  type = "custom-input",
+  name = prefix .. "-right",
+  key_sequence = "RIGHT"
+}
+
+add {
+  type = "custom-input",
+  name = prefix .. "-del",
+  key_sequence = "DELETE"
+}
 
 data:extend(declarations)
-

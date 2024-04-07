@@ -3,8 +3,6 @@ local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local colors = require("scripts.colors")
-local recipe_panel = require("scripts.recipe_panel")
-
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -1026,32 +1024,30 @@ local function on_selected_entity_changed(e)
     end
 
     drawing.clear_selection(g)
-    recipe_panel.close(player)
-
-    local frame = g.player.gui.left[commons.recipe_panel_name]
-    if frame then
-        frame.destroy()
-    end
-
     g.selected_recipe = nil
     g.selected_recipe_entity = nil
-    if not entity then
-        return
-    end
 
-    ---@cast entity LuaEntity
-    if recipe_entity_names[entity.name] then
-        ---@type GRecipe
-        local grecipe = g.entity_map[entity.unit_number]
-        if grecipe then
-            if not grecipe.is_product then
-                recipe_panel.create(player_index, grecipe)
+    local has_recipe
+    if entity then
+        ---@cast entity LuaEntity
+        if recipe_entity_names[entity.name] then
+            ---@type GRecipe
+            local grecipe = g.entity_map[entity.unit_number]
+            if grecipe then
+                if not grecipe.is_product then
+                    tools.fire_user_event(commons.graph_selection_change_event, { g = g, grecipe = grecipe })
+                    has_recipe = true
+                end
+                g.selected_recipe = grecipe
+                g.selected_recipe_entity = entity
+                g.move_recipe = nil
+                draw_selected_entity(player, entity, grecipe)
+                dash_lines(g, grecipe, true)
             end
-            g.selected_recipe = grecipe
-            g.selected_recipe_entity = entity
-            draw_selected_entity(player, entity, grecipe)
-            dash_lines(g, grecipe, true)
         end
+    end
+    if not has_recipe then
+        tools.fire_user_event(commons.graph_selection_change_event, { g = g })
     end
 end
 tools.on_event(defines.events.on_selected_entity_changed, on_selected_entity_changed)

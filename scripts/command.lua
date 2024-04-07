@@ -50,13 +50,13 @@ function command.open(player)
 
     command.close(player)
 
-    
+
     ---@type Params.create_standard_panel
     local params = {
-        panel_name = command_frame_name,
-        title  = {np("title")},
-        is_draggable = false,
-        container=player.gui.left,
+        panel_name         = command_frame_name,
+        title              = { np("title") },
+        is_draggable       = false,
+        container          = player.gui.left,
         create_inner_frame = true
     }
     local frame, inner_frame = tools.create_standard_panel(player, params)
@@ -77,10 +77,16 @@ function command.open(player)
     if not visibility then visibility = commons.visibility_all end
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "label", caption = { np("visibility_label") } }
-    hflow.add { type = "drop-down", caption = { "visibility_mode" }, items = visibility_items, selected_index = visibility, name = np("visibility") }
+    hflow.add { type = "drop-down", caption = { "visibility_mode" },
+        items = visibility_items,
+        selected_index = visibility,
+        name = np("visibility"),
+        tooltip = { np("visibility_tooltip") }
+    }
     hflow.add {
         type = "sprite-button",
         name = np("refresh"),
+        tooltip = { np("refresh_tooltip") },
         style = "frame_action_button",
         mouse_button_filter = { "left" },
         sprite = prefix .. "_refresh_white",
@@ -89,20 +95,19 @@ function command.open(player)
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("add") }, name = np("add") }
-    hflow.add { type = "button", caption = { np("production") }, name = np("production") }
+    hflow.add { type = "button", caption = { np("add") }, name = np("add"), tooltip = { np("add_tooltip") } }
+    hflow.add { type = "button", caption = { np("production") }, name = np("production"), tooltip = { np("production_tooltip") } }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("settings") }, name = np("settings") }
-    hflow.add { type = "button", caption = { np("save") }, name = np("save") }
+    hflow.add { type = "button", caption = { np("settings") }, name = np("settings"), tooltip= {np("settings_tooltip")} }
+    hflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip= {np("save_tooltip")} }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") }
+    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") , tooltip= {np("unselect_tooltip")} }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
     hflow.style.bottom_margin = 5
-
 end
 
 tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,

@@ -30,9 +30,10 @@ local commons = {
     visibility_selection = 2,
     add_debug_info = false,
 
-    selection_change_event = "selection_change_event",        
-    production_compute_event = "production_compute_event",
-    production_data_change_event = "production_data_change_event",
+    selection_change_event = "selection_change",        
+    production_compute_event = "production_compute",
+    production_data_change_event = "production_data_change",
+    graph_selection_change_event = "graph_selection_change",
 
     math_precision = 0.000001,
     production_failures = {

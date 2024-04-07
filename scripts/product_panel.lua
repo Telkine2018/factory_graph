@@ -266,11 +266,11 @@ function product_panel.create_product_tables(player)
         end
     end
 
-    add_line({ np("inputs") })
-    create_product_table(inputs, "inputs")
-
     add_line({ np("outputs") })
     create_product_table(outputs, "outputs")
+
+    add_line({ np("inputs") })
+    create_product_table(inputs, "inputs")
 
     add_line({ np("intermediates") })
     create_product_table(intermediates, "intermediates")
@@ -515,6 +515,8 @@ function product_panel.update_machine_panel(g, container)
     container.clear()
     if not g.selection then return end
 
+    if g.production_failed then return end
+
     ---@type ProductionMachine[]
     local machines = {}
     for _, grecipe in pairs(g.selection) do
@@ -525,7 +527,7 @@ function product_panel.update_machine_panel(g, container)
     end
     if #machines == 0 then return end
 
-    table.sort(machines, function(m1, m2) return m1.grecipe.order < m2.grecipe.order end)
+    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
     local index = 1
     for _, machine in pairs(machines) do
