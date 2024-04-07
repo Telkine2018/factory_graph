@@ -3,6 +3,7 @@ local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local colors = require("scripts.colors")
+local production = require("scripts.production")
 
 local add_debug_info = commons.add_debug_info
 local prefix = commons.prefix
@@ -21,35 +22,27 @@ tools.add_panel_name(recipe_panel_name)
 ---@param player_index integer
 ---@param product Product|Ingredient
 ---@return LocalisedString
----@return integer
 local function get_product_label(player_index, product)
-    local size = 0
     local caption = { "" }
     table.insert(caption, "[" .. product.type .. "=" .. product.name .. "] ")
-    size = 0
 
     local s
     if product.amount then
         s = tostring(product.amount)
-        size = size + #s
         table.insert(caption, s)
     elseif product.amount_min then
         s = tostring(product.amount_min)
         table.insert(caption, s)
-        size = size + #s + 1
         table.insert(caption, "-")
         s = tostring(product.amount_max)
         table.insert(caption, s)
-        size = size + #s
     end
     if product.probability and product.probability ~= 1 then
         s = " " .. tostring(product.probability * 100) .. "%"
         table.insert(caption, s)
-        size = size + #s
     end
 
     table.insert(caption, " x ")
-    size = size + 3
 
     local lname
     if product.type == "item" then
@@ -61,9 +54,8 @@ local function get_product_label(player_index, product)
         lname = product.name
     end
     table.insert(caption, " " .. lname)
-    size = size + #lname + 1
 
-    return caption, size
+    return caption
 end
 
 ---@param player_index integer
@@ -83,29 +75,45 @@ function recipe_panel.create(player_index, grecipe)
     end
 
     ---@type Params.create_standard_panel
-    local params = {
-        panel_name = recipe_panel_name,
-        title  = name,
+    local params  = {
+        panel_name         = recipe_panel_name,
+        title              = name,
         create_inner_frame = true,
-        container = player.gui.left
+        container          = player.gui.left
     }
-    local _, flow  = tools.create_standard_panel(player, params)
+    local _, flow = tools.create_standard_panel(player, params)
 
     ---@param title LocalisedString?
     local function add_line(title)
         gutils.add_line(flow, title)
     end
 
-    local max = 0
+    local machine = grecipe.machine
+    if machine then
+        if machine.count and machine.count > 0 then
+            local label = flow.add { type = "label", caption = { np("machine-normal"), tools.fround(machine.count), machine.machine.localised_name } }
+            label.style.bottom_margin = 3
+        else
+            local label = flow.add { type = "label", caption = { np("machine-error"), machine.machine.localised_name } }
+            label.style.bottom_margin = 3
+        end
+    end
+
     if recipe.ingredients and #recipe.ingredients > 0 then
         add_line({ np("ingredients") })
         for _, p in pairs(recipe.ingredients) do
-            local caption, size = get_product_label(player_index, p)
-            if size > max then
-                max = size
-            end
-            if add_debug_info then
-                caption = { "", caption, " [", p.name, "]" }
+            local caption
+            if machine and machine.count > 0 then
+                caption = { np("ingredient"),
+                    tools.fround(production.get_ingredient_amout(machine, p) * machine.count),
+                    "[" .. p.type .. "=" .. p.name .."]",
+                    gutils.get_product_name(player, p.type .. "/" .. p.name)
+                }
+            else
+                caption = get_product_label(player_index, p)
+                if add_debug_info then
+                    caption = { "", caption, " [", p.name, "]" }
+                end
             end
             local label = flow.add { type = "label", caption = caption }
             label.style.bottom_margin = 3
@@ -115,12 +123,20 @@ function recipe_panel.create(player_index, grecipe)
     if recipe.products and #recipe.products > 0 then
         add_line({ np("products") })
         for _, p in pairs(recipe.products) do
-            local caption, size = get_product_label(player_index, p)
-            if size > max then
-                max = size
-            end
-            if add_debug_info then
-                caption = { "", caption, " [", p.name, "]" }
+            local caption
+
+            if machine and machine.count > 0 then
+                caption = { np("product"),
+                    tools.fround(production.get_product_amount(machine, p) * machine.count),
+                    "[" .. p.type .. "=" .. p.name .."]",
+                    gutils.get_product_name(player, p.type .. "/" .. p.name),
+                    
+                }
+            else
+                caption = get_product_label(player_index, p)
+                if add_debug_info then
+                    caption = { "", caption, " [", p.name, "]" }
+                end
             end
             local label = flow.add { type = "label", caption = caption }
             label.style.bottom_margin = 3

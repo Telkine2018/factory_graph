@@ -1032,4 +1032,21 @@ function tools.create_standard_panel(player, params)
     return frame, inner_frame
 end
 
+local abs = math.abs
+local math_precision = 0.000001
+local round_digit = 2
+
+---@param value number
+---@return number
+local function fround(value)
+    if abs(value) <= math_precision then
+        return 0
+    end
+    local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - round_digit)
+    value = math.floor(value / precision) * precision
+    return value
+end
+
+tools.fround = fround
+
 return tools

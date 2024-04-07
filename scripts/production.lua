@@ -142,7 +142,57 @@ end
 local compute_machine = production.compute_machine
 
 ---@param g Graph
-function production.compute(g)
+---@param machines {[string]:ProductionMachine}
+function production.compute_products(g, machines)
+    ---@type table<string, number>
+    local product_inputs = {}
+    ---@type table<string, number>
+    local product_outputs = {}
+
+    g.product_inputs = product_inputs
+    g.product_outputs = product_outputs
+
+    --- compute products
+    for _, machine in pairs(machines) do
+        local machine_count = machine.count
+        if machine_count then
+            if machine_count > 0 then
+                machine.count = machine_count
+                for _, ingredient in pairs(machine.recipe.ingredients) do
+                    local iname = ingredient.type .. "/" .. ingredient.name
+                    local coef = product_inputs[iname]
+                    if not coef then
+                        coef = 0
+                    end
+
+                    local amount = get_ingredient_amout(machine, ingredient)
+                    if abs(amount) >= math_precision then
+                        local total = amount * machine_count
+                        product_inputs[iname] = coef + total
+                    end
+                end
+                for _, product in pairs(machine.recipe.products) do
+                    local pname = product.type .. "/" .. product.name
+                    local coef = product_outputs[pname]
+                    if not coef then
+                        coef = 0
+                    end
+
+                    local amount = get_product_amount(machine, product)
+                    if abs(amount) <= math_precision then
+                        amount = 0
+                    else
+                        local total = amount * machine_count
+                        product_outputs[pname] = coef + total
+                    end
+                end
+            end
+        end
+    end
+end
+
+---@param g Graph
+function production.compute_matrix(g)
     machinedb.initialize()
 
     local failed = nil
@@ -354,26 +404,55 @@ function production.compute(g)
     end
 
     -- Compute end values
+    ---@type table<string, number>
     machine_counts = {}
     local count = #equation_list
     local main_var
-    local product_outputs = {}
-    local product_inputs = {}
-    local product_effective = {}
 
     ---@param recipe_name any
     ---@param machine_count any
-    ---@return { [string]: ProductionMachine }
     local function compensate(recipe_name, machine_count)
         --- compensate < 0
         machine_counts[recipe_name] = machine_count
     end
 
     if table_size(free_recipes) > 1 then
+        local free_values = {}
         for name, _ in pairs(free_recipes) do
-            machine_counts[name] = 0
+            free_values[name] = 0
         end
-        failed = commons.production_failures.too_many_free_variables
+
+        local change = true
+        local iter = 1
+        while change and iter < 4 do
+            change = false
+            iter = iter + 1
+            for i = 1, #equation_list do
+                local eq = equation_list[i]
+                local c = constant_list[i]
+
+                local max_var_name, min_value
+                for eqname, eqvalue in pairs(eq) do
+                    local free_value = free_values[eqname]
+                    if free_value then
+                        c = c - free_value * eqvalue
+                        if not min_value or min_value > free_value then
+                            min_value = eqvalue
+                            max_var_name = eqname
+                        end
+                    end
+                end
+                if c < 0 and min_value and min_value > 0 then
+                    local delta = -c / min_value
+                    free_values[max_var_name] = free_values[max_var_name] + delta
+                    change = true
+                end
+            end
+        end
+
+        for name, value in pairs(free_values) do
+            machine_counts[name] = value
+        end
     else
         main_var = next(free_recipes)
         if main_var then
@@ -450,55 +529,26 @@ function production.compute(g)
         end
     end
 
-    --- compute products
-    for _, machine in pairs(machines) do
-        local recipe_name = machine.name
-        local machine_count = machine_counts[recipe_name]
-        if machine_count then
-            machine.count = machine_count
-            local craft_per_s = machine.craft_per_s
-            for _, ingredient in pairs(machine.recipe.ingredients) do
-                local iname = ingredient.type .. "/" .. ingredient.name
-                local coef = product_inputs[iname]
-                if not coef then
-                    coef = 0
-                end
-                local total = ingredient.amount * craft_per_s * machine_count / (machine.productivity + 1)
-                if abs(total) >= math_precision then
-                    if machine.count > 0 then
-                        product_inputs[iname] = coef + total
-                    end
-                end
-            end
-
-            for _, product in pairs(machine.recipe.products) do
-                local pname = product.type .. "/" .. product.name
-                local coef = product_outputs[pname]
-                if not coef then
-                    coef = 0
-                end
-
-                local amount = get_product_amount(machine, product)
-
-                ---@cast amount -nil
-                if abs(amount) <= math_precision then
-                    amount = 0
-                else
-                    local total = amount * machine_count
-                    if abs(total) >= math_precision then
-                        if machine.count > 0 then
-                            product_outputs[pname] = coef + total
-                        end
-                    end
-                end
-            end
+    for name, count in pairs(machine_counts) do
+        local machine = machines[name]
+        if machine then
+            machine.count = count
         end
     end
 
-    g.product_outputs = product_outputs
-    g.product_inputs = product_inputs
+    --- compute products
+    production.compute_products(g, machines)
+
     g.production_failed = failed
     return machines
+end
+
+---@param g Graph
+---@param machines {[string]:ProductionMachine}
+function production.compute_linear(g, machines)
+
+
+
 end
 
 ---@param g Graph
@@ -518,6 +568,18 @@ function production.push(g, structure_change)
     end
 end
 
+---@param g Graph
+function production.clear(g)
+    g.iovalues = {}
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.machine = nil
+    end
+    g.product_inputs = nil
+    g.product_outputs = nil
+    g.production_failed = nil
+    gutils.fire_production_data_change(g)
+end
+
 tools.on_nth_tick(30, function()
     local production_queue = global.production_queue
     if not production_queue then
@@ -525,7 +587,7 @@ tools.on_nth_tick(30, function()
     end
     global.production_queue = nil
     for _, data in pairs(production_queue) do
-        production.compute(data.g)
+        production.compute_matrix(data.g)
         tools.fire_user_event(commons.production_compute_event, { g = data.g, structure_change = data.structure_change })
     end
 end)

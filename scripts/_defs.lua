@@ -41,7 +41,7 @@ local tools = require("scripts.tools")
 
 ---@class GraphConfig
 ---@field visibility integer?
----@field selection {[string]:GElement}?
+---@field selection {[string]:GRecipe}?
 ---@field preferred_machines string[]
 ---@field preferred_modules string[]
 ---@field preferred_beacon string?
@@ -64,7 +64,7 @@ local tools = require("scripts.tools")
 ---@field color Color
 ---@field ids integer[]?
 
----@class GRecipe : GElement, GRecipeConfig
+---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
 ---@field enabled boolean?
@@ -75,6 +75,12 @@ local tools = require("scripts.tools")
 ---@field order integer?
 ---@field visible boolean?
 ---@field is_void boolean?
+
+---@class GSortNode
+---@field sort_level integer?
+---@field in_path boolean?
+---@field sort_product_current integer?
+---@field sort_recipe_current string?
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?

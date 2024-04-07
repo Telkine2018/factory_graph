@@ -722,6 +722,8 @@ function graph.do_layout(g)
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
     graph.reverse_equalize_recipes(g)
+
+    graph.sort_selection(g, g.selection)
 end
 
 ---@param g Graph
@@ -975,6 +977,111 @@ function graph.import_saving(g, data)
     end
     graph.refresh(g.player)
     gutils.fire_selection_change(g)
+end
+
+---@param node GRecipe
+---@param set {[string]:GRecipe}
+---@return GRecipe?
+local function next_sort_node(node, set)
+    local grecipe, gproduct
+
+    local sort_recipe_current = node.sort_recipe_current
+    local sort_product_current = node.sort_product_current
+    while true do
+        if sort_product_current then
+            repeat
+                sort_recipe_current, grecipe = next(node.products[sort_product_current].ingredient_of, sort_recipe_current)
+                if grecipe and set[grecipe.name] then
+                    node.sort_recipe_current = sort_recipe_current
+                    node.sort_product_current = sort_product_current
+                    return grecipe
+                end
+            until sort_recipe_current == nil
+        end
+
+        sort_product_current, gproduct = next(node.products, sort_product_current)
+        sort_recipe_current            = nil
+        if not gproduct then
+            return nil
+        end
+    end
+end
+
+
+---@param g Graph
+---@param set {[string]:GRecipe}
+---@return GRecipe[]
+function graph.sort_selection(g, set)
+    local path = {}
+
+    ---@type {[string]:GRecipe}
+    local remaining = {}
+    ---@type {[string]:GRecipe}
+    local roots = {}
+
+    --- reset
+    for _, grecipe in pairs(set) do
+        grecipe.sort_level = nil
+        grecipe.sort_product_current = nil
+        grecipe.sort_recipe_current = nil
+        remaining[grecipe.name] = grecipe
+        for _, ingredient in pairs(grecipe.ingredients) do
+            for _, prev_recipe in pairs(ingredient.product_of) do
+                if set[prev_recipe.name] then
+                    goto not_a_root
+                end
+            end
+        end
+        roots[grecipe.name] = grecipe
+        ::not_a_root::
+    end
+
+    local start_level = 1
+    for _, grecipe in pairs(roots) do
+        table.insert(path, grecipe)
+        grecipe.in_path = true
+        grecipe.sort_level = start_level
+        start_level = start_level + 1000
+        remaining[grecipe.name] = nil
+    end
+
+    while true do
+        if #path == 0 then
+            local recipe_name, grecipe = next(remaining)
+            if not recipe_name then
+                break
+            end
+            remaining[recipe_name] = nil
+            table.insert(path, grecipe)
+            grecipe.in_path = true
+            grecipe.sort_level = start_level
+            start_level = start_level + 1000
+        end
+
+        local node = path[#path]
+        local next_in_path = next_sort_node(node, set)
+        if not next_in_path then
+            table.remove(path, #path)
+            node.in_path = nil
+        elseif not next_in_path.in_path then
+            local next_level = node.sort_level + 1  
+            if not next_in_path.sort_level or next_in_path.sort_level < next_level then
+                next_in_path.sort_level = next_level
+                next_in_path.in_path = true
+                next_in_path.sort_product_current = nil
+                next_in_path.sort_recipe_current = nil
+                table.insert(path, next_in_path)
+                remaining[next_in_path.name] = nil
+            end
+        end
+    end
+
+    local sort_table = {}
+    for _, grecipe in pairs(set) do
+        table.insert(sort_table, grecipe)
+    end
+    table.sort(sort_table, function(r1, r2) return r1.sort_level < r2.sort_level end)
+    return sort_table
 end
 
 return graph

@@ -5,6 +5,7 @@ local gutils = require("scripts.gutils")
 
 local drawing = require("scripts.drawing")
 local graph = require("scripts.graph")
+local production = require("scripts.production")
 
 local debug = tools.debug
 local prefix = commons.prefix
@@ -288,6 +289,7 @@ function recipe_selection.display(player, recipes, recipe_table)
     ---@cast player_index integer
     local g = gutils.get_graph(player)
 
+    ---@type {grecipe:GRecipe, recipe:LuaRecipePrototype?, localized:string}[]
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = game.recipe_prototypes[grecipe.name]
@@ -327,6 +329,28 @@ function recipe_selection.display(player, recipes, recipe_table)
             local start = true
             local i_table = {}
             local p_table = {}
+            local machine = recipe_element.grecipe.machine
+            if machine and not machine.count then machine = nil end
+
+            if machine then
+                local machine_label = translations.get_recipe_name(player_index, machine.machine.name)
+                if machine.count > 0 then
+                    table.insert(tooltip_builder, "[font=heading-2][color=#42ff4b]")
+                    table.insert(tooltip_builder, tools.fround(machine.count) .. " x " .. machine_label)
+                    table.insert(tooltip_builder, "[/color][/font]\n");
+                else
+                    table.insert(tooltip_builder, "[font=heading-2][color=red]")
+                    table.insert(tooltip_builder, machine_label)
+                    table.insert(tooltip_builder, "[/color][/font]\n");
+                end
+            end
+
+            if machine and machine.count < 0 then
+                table.insert(tooltip_builder, "[color=red]")
+            else
+                table.insert(tooltip_builder, "[color=cyan]")
+            end
+
             for _, i in pairs(recipe.ingredients) do
                 if start then
                     start = false
@@ -337,45 +361,59 @@ function recipe_selection.display(player, recipes, recipe_table)
                 if i.type == "item" then
                     name = "item/" .. i.name
                     label = translations.get_item_name(player_index, i.name)
-                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(i.amount) .. " x " .. label)
                 else
                     name = "fluid/" .. i.name
                     label = translations.get_fluid_name(player_index, i.name)
-                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(i.amount) .. " x " .. label)
                 end
+                local amount
+                if machine then
+                    amount = tools.fround(production.get_ingredient_amout(machine, i) * machine.count)
+                else
+                    amount = i.amount
+                end
+                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(amount) .. " x " .. label)
                 table.insert(i_table, { name = name, tooltip = label })
             end
             table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
 
+            if not machine or machine.count >= 0 then
+                table.insert(tooltip_builder, "[/color][color=orange]")
+            end
+
             start = true
             for _, p in pairs(recipe.products) do
+                local name
+                local label
+                if p.type == "item" then
+                    name = "item/" .. p.name
+                    label = translations.get_item_name(player_index, p.name)
+                else
+                    name = "fluid/" .. p.name
+                    label = translations.get_fluid_name(player_index, p.name)
+                end
+
                 if start then
                     start = false
                 else
                     table.insert(tooltip_builder, "\n")
                 end
                 local amount = ""
-                if p.amount then
-                    amount = tostring(p.amount)
-                elseif p.amount_min and p.amount_max then
-                    amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
-                end
-                if p.probability and p.probability < 1 then
-                    amount = amount .. "(" .. tostring(p.probability * 100) .. "%)"
-                end
-                local name
-                local label
-                if p.type == "item" then
-                    name = "item/" .. p.name
-                    label = translations.get_item_name(player_index, p.name)
-                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
+                if machine then
+                    amount = tostring(tools.fround(production.get_product_amount(machine, p) * machine.count))
                 else
-                    name = "fluid/" .. p.name
-                    label = translations.get_fluid_name(player_index, p.name)
-                    table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
+                    if p.amount then
+                        amount = tostring(p.amount)
+                    elseif p.amount_min and p.amount_max then
+                        amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
+                    end
+                    if p.probability and p.probability < 1 then
+                        amount = amount .. "(" .. tostring(p.probability * 100) .. "%)"
+                    end
                 end
+                table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
                 table.insert(p_table, { name = name, tooltip = label })
             end
+            table.insert(tooltip_builder, "[/color]")
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
             local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
@@ -539,7 +577,7 @@ function recipe_selection.process_query(player, name)
         end
         recipe_selection.show_recipes(player, recipes)
     elseif action == 3 then
-        local recipes = gutils.get_connected_recipes(g, {[name]=g.products[name]})
+        local recipes = gutils.get_connected_recipes(g, { [name] = g.products[name] })
         recipe_selection.show_recipes(player, recipes)
     end
 end

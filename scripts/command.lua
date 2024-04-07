@@ -147,6 +147,11 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
 
 tools.on_named_event(np("production"), defines.events.on_gui_click,
     function(e)
+        if e.control then
+            local player = game.players[e.player_index]
+            local g = gutils.get_graph(player)
+            production.clear(g)
+        end
         product_panel.create(e.player_index)
     end)
 

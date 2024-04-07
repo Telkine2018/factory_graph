@@ -44,18 +44,7 @@ local location_name = np("location")
 local min_name = np("mini")
 -- tools.add_panel_name(product_panel_name)
 
-local round_digit = 2
-
----@param value number
-local function fround(value)
-    if abs(value) <= math_precision then
-        return 0
-    end
-    local precision = math.pow(10, math.floor(0.5 + math.log(math.abs(value), 10)) - round_digit)
-    value = math.floor(value / precision) * precision
-    return value
-end
-
+local fround = tools.fround
 
 ---@param g Graph
 local function get_production_title(g)
@@ -424,6 +413,12 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                     table.insert(pline, "\n")
                     table.insert(pline, "[recipe=" .. grecipe.name .. "] : ")
 
+                    if machine.count > 0 then
+                        table.insert(pline, "[color=cyan]")
+                    else
+                        table.insert(pline, "[color=red]")
+                    end
+
                     for _, ingredient in pairs(machine.recipe.ingredients) do
                         local amount = production.get_ingredient_amout(machine, ingredient) * machine.count
                         table.insert(pline, fround(amount))
@@ -431,13 +426,18 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                         table.insert(pline, " [" .. ingredient.type .. "=" .. ingredient.name .. "]")
                     end
 
-                    table.insert(pline, "[img=factory_graph_arrow]")
+                    if machine.count > 0 then
+                        table.insert(pline, "[/color][color=orange]")
+                    end
+
+                    table.insert(pline, " [img=factory_graph_arrow-white] ")
                     for _, product in pairs(machine.recipe.products) do
                         local amount = production.get_product_amount(machine, product) * machine.count
                         table.insert(pline, fround(amount))
                         table.insert(pline, " x ")
                         table.insert(pline, " [" .. product.type .. "=" .. product.name .. "]")
                     end
+                    table.insert(pline, "[/color]")
                 end
             end
         end
@@ -519,7 +519,7 @@ function product_panel.update_machine_panel(g, container)
     local machines = {}
     for _, grecipe in pairs(g.selection) do
         local machine = grecipe.machine
-        if machine and machine.count and abs(machine.count) > math_precision then
+        if machine and machine.count and machine.count > math_precision then
             table.insert(machines, machine)
         end
     end
@@ -653,7 +653,12 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         local grecipe = g.recipes[recipe_name]
         local machine = grecipe.machine
 
-        e.element.tooltip = { np("machine-tooltip"), machine and machine.machine.localised_name }
+        if machine then
+            e.element.tooltip = { np("machine-tooltip"),
+                { "", tools.fround(machine.count), " x ", machine.machine.localised_name } }
+        else
+            e.element.tooltip = { np("machine-tooltip"), "" }
+        end
     end)
 
 tools.on_named_event(np("machine"), defines.events.on_gui_click,
