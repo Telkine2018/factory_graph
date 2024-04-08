@@ -24,7 +24,6 @@ local function prepare(player)
 
     g.move_recipe = grecipe
     drawing.clear_selection(g)
-
     return g, grecipe
 end
 
@@ -33,29 +32,8 @@ end
 ---@param col  integer
 ---@param line integer
 local function move_recipe(g, grecipe, col, line)
-    local gcol = g.gcols[grecipe.col]
-    gcol.line_set[grecipe.line] = nil
 
-
-    gcol = g.gcols[col]
-    if not gcol then
-        gcol = {
-            col = col,
-            line_set = {}
-        }
-        g.gcols[col] = gcol
-    end
-    grecipe.line = line
-    grecipe.col = col
-    gcol.line_set[line] = grecipe
-
-    if not gcol.min_line or line < gcol.min_line then
-        gcol.min_line = line
-    end
-    if not gcol.max_line or line > gcol.max_line then
-        gcol.max_line = line
-    end
-
+    gutils.set_colline(g, grecipe, col, line)
     local x, y = gutils.get_position(g, col, line)
     grecipe.entity.teleport { x, y }
     drawing.redraw_selection(g.player)
@@ -142,7 +120,7 @@ end)
 script.on_event(prefix .. "-del", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe then return end
+    if not grecipe or not grecipe.entity or not grecipe.entity.valid then return end
 
     grecipe.visible = false
     g.selection[grecipe.name] = nil
@@ -150,6 +128,6 @@ script.on_event(prefix .. "-del", function(e)
     grecipe.entity = nil
     g.selected_recipe = nil
     g.selected_recipe_entity = nil
-    
     drawing.redraw_selection(g.player)
+    gutils.fire_selection_change(g)
 end)

@@ -424,6 +424,7 @@ function recipe_selection.display(player, recipes, recipe_table)
             b_recipe.style = recipe_button_style
             b_recipe.locked = true
             b_recipe.style.size = 28
+            tools.set_name_handler(b_recipe, np("recipe"), {recipe_name=recipe_name})
 
             local cb = recipe_line.add {
                 type = "checkbox",
@@ -676,6 +677,16 @@ function(e)
     end
     recipe_selection.process_query(player, name)
 end)
+
+tools.on_named_event(np("recipe"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        ---@type LuaPlayer
+        local player = game.players[e.player_index]
+        local recipe_name = e.element.tags.recipe_name --[[@as string]]
+
+        gutils.set_cursor_stack(player, recipe_name)
+    end)
 
 
 drawing.open_recipe_selection = recipe_selection.open

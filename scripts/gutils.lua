@@ -80,6 +80,19 @@ function gutils.get_position(g, col, line)
 end
 
 ---@param g Graph
+---@param x number
+---@param y number
+---@return number
+---@return number
+function gutils.get_colline(g, x, y)
+    local grid_size = g.grid_size
+    local col = math.floor((x - 0.5 + grid_size / 2) / grid_size)
+    local line = math.floor((y - 0.5 + grid_size / 2) / grid_size )
+    return col,line
+end
+
+
+---@param g Graph
 ---@param recipe GRecipe
 function gutils.get_recipe_position(g, recipe)
     local x, y = gutils.get_position(g, recipe.col, recipe.line)
@@ -529,5 +542,41 @@ function gutils.get_connected_recipes(g, products)
     return connected_recipes
 end
 
+---@param g Graph
+---@param grecipe GRecipe
+---@param col integer
+---@param line integer
+function gutils.set_colline(g, grecipe, col, line)
+
+    local gcol = g.gcols[grecipe.col]
+    gcol.line_set[grecipe.line] = nil
+
+    gcol = g.gcols[col]
+    if not gcol then
+        gcol = {
+            col = col,
+            line_set = {}
+        }
+        g.gcols[col] = gcol
+    end
+    grecipe.line = line
+    grecipe.col = col
+    gcol.line_set[line] = grecipe
+
+    if not gcol.min_line or line < gcol.min_line then
+        gcol.min_line = line
+    end
+    if not gcol.max_line or line > gcol.max_line then
+        gcol.max_line = line
+    end
+end
+
+---@param player LuaPlayer
+---@param recipe_name string
+function gutils.set_cursor_stack(player, recipe_name)
+    player.cursor_stack.clear()
+    player.cursor_stack.set_stack{name=commons.recipe_symbol_name, count=1}
+    player.cursor_stack.tags = { recipe_name = recipe_name}
+end
 
 return gutils

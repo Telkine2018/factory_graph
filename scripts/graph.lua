@@ -428,7 +428,6 @@ local layout_recipe = graph.layout_recipe
 ---@param grecipe GRecipe
 function graph.insert_recipe(g, grecipe)
     local center_line, center_col, count = 0, 0, 0
-    local gcols = g.gcols
 
     for _, ingredient in pairs(grecipe.ingredients) do
         local col1, line1, count1 = gutils.compute_sum(ingredient.product_of)
@@ -448,25 +447,33 @@ function graph.insert_recipe(g, grecipe)
     end
     center_col = floor(center_col / count)
     center_line = floor(center_line / count)
+    graph.insert_recipe_at_position(g, grecipe, center_col, center_line)
+end
 
+---@param g Graph
+---@param grecipe GRecipe
+---@param start_col integer
+---@param start_line integer
+function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
     local min_d
     local min_col
     local min_line
+    local gcols = g.gcols
 
     ---@param col integer
     ---@param line integer
     local function process_position(col, line)
         local gcol = gcols[col]
         if gcol then
-            if gcol.line_set[line] then
+            if gcol.line_set[line] and gcols[col] ~= grecipe then
                 return
             end
         end
         if col <= 1 then
             return
         end
-        local dcol = col - center_col
-        local dline = line - center_line
+        local dcol = col - start_col
+        local dline = line - start_line
         local d = dcol * dcol + dline * dline
         if not min_d or d < min_d then
             min_col = col
@@ -478,13 +485,13 @@ function graph.insert_recipe(g, grecipe)
     local radius = 0
     while (true) do
         min_d = nil
-        for col = center_col - radius, center_col + radius do
-            process_position(col, center_line + radius)
-            process_position(col, center_line - radius)
+        for col = start_col - radius, start_col + radius do
+            process_position(col, start_line + radius)
+            process_position(col, start_line - radius)
         end
-        for line = center_line - radius + 1, center_line + radius - 1 do
-            process_position(center_col + radius, line)
-            process_position(center_col - radius, line)
+        for line = start_line - radius + 1, start_line + radius - 1 do
+            process_position(start_col + radius, line)
+            process_position(start_col - radius, line)
         end
         if min_d then
             break
@@ -886,7 +893,9 @@ local function create_recipe_object(g, grecipe)
     rendering.draw_sprite { surface = surface, sprite = sprite_name, target = e_recipe, x_scale = scale, y_scale = scale }
     grecipe.entity = e_recipe
     g.entity_map[e_recipe.unit_number] = grecipe
+    return e_recipe
 end
+graph.create_recipe_object = create_recipe_object
 
 ---@param g Graph
 function graph.create_recipe_objects(g)

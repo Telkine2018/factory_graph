@@ -1114,8 +1114,11 @@ function drawing.redraw_selection(player)
 
     drawing.clear_selection(g)
     redraw_connections(g)
-    if g.selected_recipe and g.selected_recipe_entity then
+    if g.selected_recipe and g.selected_recipe_entity and  g.selected_recipe_entity.valid then
         draw_selected_entity(player, g.selected_recipe_entity, g.selected_recipe)
+    else
+        g.selected_recipe = nil
+        g.selected_recipe_entity = nil
     end
 end
 
