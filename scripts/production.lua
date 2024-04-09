@@ -379,7 +379,7 @@ function production.compute_matrix(g)
 
             -- check linear depencies
             if not next(eq_line) and abs(constant_list[j]) > math_precision then
-                failed = commons.production_failures.linear_dependecy
+                failed = commons.production_failures.too_many_constraints
             end
         end
 
@@ -501,7 +501,7 @@ function production.compute_matrix(g)
                 main_value = maxv
             end
             if not main_value then
-                failed = commons.production_failures.no_soluce
+                failed = commons.production_failures.too_many_constraints
             else
                 machine_counts[main_var] = main_value
             end
@@ -527,7 +527,7 @@ function production.compute_matrix(g)
             end
             machine_counts[recipe_name] = machine_count
             if machine_count < 0 then
-                failed = { "factory_graph-product-panel.failure_no_soluce1", translations.get_recipe_name(g.player.index, recipe_name) }
+                failed = commons.production_failures.too_many_constraints
                 compensate(recipe_name, machine_count)
             end
         end

@@ -76,6 +76,7 @@ local tools = require("scripts.tools")
 ---@field order integer?
 ---@field visible boolean?
 ---@field is_void boolean?
+---@field is_recursive boolean?
 
 ---@class GSortNode
 ---@field sort_level integer?

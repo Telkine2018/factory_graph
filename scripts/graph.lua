@@ -728,7 +728,7 @@ function graph.do_layout(g)
     log("------- End layout ----------")
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
-    graph.reverse_equalize_recipes(g)
+--    graph.reverse_equalize_recipes(g)
 
     graph.sort_recipes(g.selection)
 end
@@ -1080,6 +1080,8 @@ function graph.sort_recipes(set)
                 table.insert(path, next_in_path)
                 remaining[next_in_path.name] = nil
             end
+        else
+            next_in_path.is_recursive = true
         end
     end
 end
