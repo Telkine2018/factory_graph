@@ -108,7 +108,9 @@ function drawing.clear_selection(g)
     g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
     if g.select_product_positions then
         for _, p in pairs(g.select_product_positions) do
-            p.recipe.selector_positions[p.product_name] = nil
+            if p.recipe.selector_positions then
+                p.recipe.selector_positions[p.product_name] = nil
+            end
         end
         g.select_product_positions = nil
     end

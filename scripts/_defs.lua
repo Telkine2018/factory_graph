@@ -29,6 +29,8 @@ local tools = require("scripts.tools")
 ---@field product_outputs {[string]:number}
 ---@field product_inputs {[string]:number}
 ---@field production_failed LocalisedString?
+---@field production_recipes_failed {[string]:boolean}
+---@field bound_products {[string]:boolean}
 ---@field recipe_order integer
 ---@field player_position MapPosition
 ---@field module_limitations {[string]:({[string]:true})}

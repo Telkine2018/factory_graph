@@ -6,6 +6,7 @@ local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local drawing = require("scripts.drawing")
+local graph = require("scripts.graph")
 
 local recipe_selection = require("scripts.recipe_selection")
 local production = require("scripts.production")
@@ -80,9 +81,18 @@ function product_panel.create(player_index)
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
         title_menu_func      = function(flow)
-            local b = flow.add {
+
+            local b
+            b = flow.add {
+                type = "button",
+                tooltip = {np("unselect_tooltip")},
+                caption = {np("unselect")},
+            }
+            tools.set_name_handler(b, np("unselect"))
+            
+            b = flow.add {
                 type = "sprite-button",
-                tooltip = np("mini_tooltip"),
+                tooltip = {np("mini_tooltip")},
                 name = "mini_maxi",
                 style = "frame_action_button",
                 mouse_button_filter = { "left" },
@@ -115,6 +125,7 @@ function product_panel.create(player_index)
     }
     machine_frame.style.minimal_width = 200
     machine_frame.style.vertically_stretchable = true
+    machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
     local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
     local machine_flow = machine_scroll.add { type = "table", column_count = 2, name = "machine_container" }
     product_panel.update_machine_panel(g, machine_flow)
@@ -515,7 +526,105 @@ function product_panel.update_machine_panel(g, container)
     container.clear()
     if not g.selection then return end
 
-    if g.production_failed then return end
+    local error_panel = container.parent.parent.error_panel
+    if error_panel then
+        error_panel.clear()
+    end
+
+    if g.production_failed then
+        if not error_panel or not g.production_recipes_failed then
+            return
+        end
+
+        ---@type ProductionMachine[]
+        local failed_machines = {}
+        for name in pairs(g.production_recipes_failed) do
+            local machine = g.recipes[name].machine
+            if machine then
+                table.insert(failed_machines, machine)
+            end
+        end
+        if #failed_machines == 0 then
+            return
+        end
+        error_panel.add { type = "label", caption = { np("error_title") } }
+
+        for _, machine in pairs(failed_machines) do
+            local line = error_panel.add { type = "flow", direction = "horizontal" }
+
+            local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
+            b.locked = true
+            tools.set_name_handler(b, np("goto_recipe"), { recipe_name = machine.name })
+
+            local flow = line.add { type = "flow", direction = "vertical" }
+            flow.add { type = "label", caption = { np("error_recipe_lanel"),
+                translations.get_recipe_name(error_panel.player_index, machine.name) } }
+
+            local line1 = flow.add { type = "flow", direction = "horizontal" }
+
+            local current = machine.grecipe
+            while true do
+                ---@param products GProduct[]
+                ---@return integer, GProduct?
+                local function unbound_count(products)
+                    local count = 0
+                    local found
+                    for _, gproduct in pairs(products) do
+                        if g.bound_products[gproduct.name] then
+                            count = count + 1
+                            found = gproduct
+                        end
+                        if count > 1 then
+                            return count, nil
+                        end
+                    end
+                    return count, found
+                end
+                local count_product = unbound_count(current.products)
+                if count_product > 1 then break end
+
+                local _, ingredient = unbound_count(current.ingredients)
+                if not ingredient then break end
+
+                local irecipes = {}
+                for _, irecipe in pairs(ingredient.product_of) do
+                    if g.selection[irecipe.name] then
+                        table.insert(irecipes, irecipe)
+                    end
+                end
+
+                if #irecipes ~= 1 then
+                    break
+                end
+                current = irecipes[1]
+                if current == machine.grecipe then
+                    break
+                end
+            end
+
+            line1.add { type = "label", caption = { np("error_recipe_constraints") } }
+            for _, product in pairs(current.products) do
+                if not g.iovalues[product.name] then
+                    local signal = tools.sprite_to_signal(product.name)
+                    local b
+                    ---@cast signal -nil
+                    if signal.type == "item" then
+                        b = line1.add { type = "choose-elem-button", elem_type = "item", item = signal.name }
+                    else
+                        b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
+                    end
+
+                    local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+                    set_output_value(g, product.name, qtlabel)
+
+                    tools.set_name_handler(b, np("unlock-product"), { product_name = product.name })
+                    b.style.size = 30
+                    b.locked = true
+                end
+            end
+        end
+        return
+    end
 
     ---@type ProductionMachine[]
     local machines = {}
@@ -746,5 +855,41 @@ tools.on_named_event(np("mini_maxi"), defines.events.on_gui_click,
         vars[min_name] = is_mini
     end
 )
+
+tools.on_named_event(np("unlock-product"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[product_panel_name]
+        if not frame then return end
+
+        local g = gutils.get_graph(player)
+        local product_name = e.element.tags.product_name --[[@as string]]
+
+        if g.iovalues[product_name] == true then
+            g.iovalues[product_name] = nil
+        else
+            g.iovalues[product_name] = true
+        end
+        gutils.fire_production_data_change(g)
+    end)
+
+tools.on_named_event(np("unselect"), defines.events.on_gui_click,
+---@param e EventData.on_gui_click
+function(e)
+    local player = game.players[e.player_index]
+    local frame = player.gui.screen[product_panel_name]
+    if not frame then return end
+
+    local g = gutils.get_graph(player)
+    for _, grecipe in pairs(g.recipes) do
+        if not grecipe.machine or grecipe.machine.count == 0 then
+            g.selection[grecipe.name] = nil
+        end
+    end
+    graph.refresh(g.player)
+    gutils.fire_selection_change(g)
+end)
+
 
 return product_panel

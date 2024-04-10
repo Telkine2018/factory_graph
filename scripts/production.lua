@@ -306,6 +306,9 @@ function production.compute_matrix(g)
     for name, value in pairs(iovalues) do
         eq_values[name] = value
     end
+
+    ---@type {[string]:boolean}
+    local bound_products = {}
     for product_name, eq in pairs(equations) do
         if is_input[product_name] and is_output[product_name] then
             if not is_free[product_name] then
@@ -316,8 +319,10 @@ function production.compute_matrix(g)
         end
         if eq_values[product_name] then
             to_solve[product_name] = eq
+            bound_products[product_name] = true
         end
     end
+    g.bound_products = bound_products
 
     local equation_list = {}
     local constant_list = {}
@@ -337,6 +342,7 @@ function production.compute_matrix(g)
     local machine_counts
     local name_map = {}
     local var_list = {}
+    local failed_recipes = {}
 
     free_recipes = tools.table_dup(all_recipes)
 
@@ -379,6 +385,7 @@ function production.compute_matrix(g)
 
             -- check linear depencies
             if not next(eq_line) and abs(constant_list[j]) > math_precision then
+                failed_recipes[pivot_var] = true
                 failed = commons.production_failures.too_many_constraints
             end
         end
@@ -470,6 +477,7 @@ function production.compute_matrix(g)
                     if abs(coef) < math_precision then
                         if abs(cst) > math_precision then
                             failed = commons.production_failures.linear_dependecy
+                            failed_recipes[main_var] = true
                         end
                     else
                         local limit = cst / coef
@@ -493,6 +501,7 @@ function production.compute_matrix(g)
                     main_value = math.min(maxv, minv)
                     if minv > maxv then
                         failed = commons.production_failures.too_many_constraints
+                        failed_recipes[main_var] = true
                     end
                 else
                     main_value = minv
@@ -502,6 +511,7 @@ function production.compute_matrix(g)
             end
             if not main_value then
                 failed = commons.production_failures.too_many_constraints
+                failed_recipes[main_var] = true
             else
                 machine_counts[main_var] = main_value
             end
@@ -528,6 +538,7 @@ function production.compute_matrix(g)
             machine_counts[recipe_name] = machine_count
             if machine_count < 0 then
                 failed = commons.production_failures.too_many_constraints
+                failed_recipes[recipe_name] = true
                 compensate(recipe_name, machine_count)
             end
         end
@@ -544,6 +555,7 @@ function production.compute_matrix(g)
     production.compute_products(g, machines)
 
     g.production_failed = failed
+    g.production_recipes_failed = failed_recipes
     return machines
 end
 
