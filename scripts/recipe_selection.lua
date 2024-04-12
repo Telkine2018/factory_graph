@@ -35,7 +35,6 @@ local sprite_button_size = 30
 ---@param only_product boolean?
 ---@return table<string, GRecipe>?
 function load_initial_recipes(g, product, recipe, only_product)
-
     local recipes = {}
     if product and recipe then
         if product.product_of[recipe.name] then
@@ -69,7 +68,7 @@ function load_initial_recipes(g, product, recipe, only_product)
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
     elseif recipe then
-        recipes = {recipe}
+        recipes = { recipe }
     end
     return recipes
 end
@@ -117,7 +116,7 @@ function recipe_selection.open(g, product, recipe, only_product)
     local b                                    = flow1.add { type = "choose-elem-button", elem_type = "recipe", name = "choose_recipe" }
     tools.set_name_handler(b, np("choose_recipe"))
 
-    local signal 
+    local signal
     if (product) then
         signal = tools.sprite_to_signal(product.name)
     end
@@ -148,12 +147,12 @@ function recipe_selection.open(g, product, recipe, only_product)
     search_text.style.width = 100
 
     local action_list = {}
-    local tooltip_list = {""}
+    local tooltip_list = { "" }
     for i = 1, 5 do
-        table.insert(action_list, {np("action-"..i)})
-        table.insert(tooltip_list, {np("action-"..i.."-tooltip")})
+        table.insert(action_list, { np("action-" .. i) })
+        table.insert(tooltip_list, { np("action-" .. i .. "-tooltip") })
     end
-    local selector = search_text_flow.add { type = "drop-down", items = action_list, tooltip=tooltip_list, selected_index = 1, name = np("action") }
+    local selector = search_text_flow.add { type = "drop-down", items = action_list, tooltip = tooltip_list, selected_index = 1, name = np("action") }
     tools.set_name_handler(selector, np("action_in_list"))
 
     b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
@@ -296,7 +295,7 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
         drawing.redraw_selection(player)
     end)
 
----@param player_index integer
+---@param player_index integer|uint32
 function recipe_selection.close(player_index)
     local player = game.players[player_index]
 
@@ -338,7 +337,7 @@ function recipe_selection.display(player, recipes, recipe_table)
         recipe_line.tags = { recipe_name = recipe_name }
         local state = g.selection[recipe_name] ~= nil
 
-        local recipe = recipe_element.recipe
+        local grecipe = recipe_element.recipe
 
         local b = recipe_line.add {
             type = "sprite-button",
@@ -351,7 +350,7 @@ function recipe_selection.display(player, recipes, recipe_table)
         b.style.right_margin = 3
         b.style.top_margin = 6
 
-        if recipe then
+        if grecipe then
             local tooltip_builder = {}
             local start = true
             local i_table = {}
@@ -363,7 +362,7 @@ function recipe_selection.display(player, recipes, recipe_table)
                 local machine_label = translations.get_recipe_name(player_index, machine.machine.name)
                 if machine.count > 0 then
                     table.insert(tooltip_builder, "[font=heading-2][color=#42ff4b]")
-                    table.insert(tooltip_builder, tools.fround(machine.count) .. " x " .. (machine_label or machine.name) )
+                    table.insert(tooltip_builder, tools.fround(machine.count) .. " x " .. (machine_label or machine.name))
                     table.insert(tooltip_builder, "[/color][/font]\n");
                 else
                     table.insert(tooltip_builder, "[font=heading-2][color=red]")
@@ -378,7 +377,7 @@ function recipe_selection.display(player, recipes, recipe_table)
                 table.insert(tooltip_builder, "[color=cyan]")
             end
 
-            for _, i in pairs(recipe.ingredients) do
+            for _, i in pairs(grecipe.ingredients) do
                 if start then
                     start = false
                 else
@@ -408,7 +407,7 @@ function recipe_selection.display(player, recipes, recipe_table)
             end
 
             start = true
-            for _, p in pairs(recipe.products) do
+            for _, p in pairs(grecipe.products) do
                 local name
                 local label
                 if p.type == "item" then
@@ -443,7 +442,7 @@ function recipe_selection.display(player, recipes, recipe_table)
             table.insert(tooltip_builder, "[/color]")
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
-            local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
+            local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(grecipe.energy), "s " }
 
             local b_recipe = recipe_line.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
             b_recipe.style = recipe_button_style
@@ -456,7 +455,8 @@ function recipe_selection.display(player, recipes, recipe_table)
                 state = state,
                 name = cb_name,
                 tooltip = tooltip,
-                caption = recipe_element.localised,
+                caption = recipe_element.grecipe.enabled and recipe_element.localised
+                    or ("[color=orange]" .. recipe_element.localised .. "[/color]"),
                 tags = { recipe_name = recipe_name }
             }
             cb.style.top_margin = 6
@@ -555,6 +555,7 @@ tools.on_named_event(np("choose_recipe"), defines.events.on_gui_elem_changed,
         local grecipe = g.recipes[name]
         recipe_selection.show_recipes(player, { grecipe })
         gutils.set_cursor_stack(player, name)
+        recipe_selection.close(player.index)
     end)
 
 ---@param player LuaPlayer
@@ -727,6 +728,7 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
         local recipe_name = e.element.tags.recipe_name --[[@as string]]
 
         gutils.set_cursor_stack(player, recipe_name)
+        recipe_selection.close(player.index)
     end)
 
 

@@ -464,6 +464,23 @@ end
 
 ---@param g Graph
 ---@param grecipe GRecipe
+function graph.remove_recipe_visibility(g, grecipe)
+
+    if grecipe.line then
+        local gcols = g.gcols[grecipe.col]
+        if gcols then
+            gcols.line_set[grecipe.line] = nil
+        end
+    end
+    grecipe.visible = false
+    g.selection[grecipe.name] = nil
+    g.selected_recipe = nil
+    g.selected_recipe_entity = nil
+    grecipe.entity = nil
+end
+
+---@param g Graph
+---@param grecipe GRecipe
 ---@param start_col integer
 ---@param start_line integer
 function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
@@ -480,9 +497,6 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
             if gcol.line_set[line] and gcols[col] ~= grecipe then
                 return
             end
-        end
-        if col <= 1 then
-            return
         end
         local dcol = col - start_col
         local dline = line - start_line
@@ -513,7 +527,7 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
 
     local gcol = gcols[min_col]
     if not gcol then
-        gcol = { col = g.current_col, line_set = {} }
+        gcol = { col = min_col, line_set = {} }
         gcols[min_col] = gcol
     end
 

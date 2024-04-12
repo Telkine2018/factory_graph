@@ -1,11 +1,11 @@
 local luautil = require("__core__/lualib/util")
 
-
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local drawing = require("scripts.drawing")
+local graph = require("scripts.graph")
 
 local prefix = commons.prefix
 
@@ -122,12 +122,8 @@ script.on_event(prefix .. "-del", function(e)
     local g, grecipe = prepare(player)
     if not grecipe or not grecipe.entity or not grecipe.entity.valid or not grecipe.visible then return end
 
-    grecipe.visible = false
-    g.selection[grecipe.name] = nil
     grecipe.entity.destroy()
-    grecipe.entity = nil
-    g.selected_recipe = nil
-    g.selected_recipe_entity = nil
+    graph.remove_recipe_visibility(g, grecipe)
     drawing.redraw_selection(g.player)
     g.gcols[grecipe.col].line_set[grecipe.line] = nil
     gutils.fire_selection_change(g)

@@ -67,7 +67,7 @@ local function create_symbol(name, filename)
     count = 1
   }
   entity.next_upgrade = nil
-  entity.flags = {"not-blueprintable", "not-in-made-in"}
+  entity.flags = {"not-in-made-in", "player-creation"}
   
   entity.name = name
   add(entity)
