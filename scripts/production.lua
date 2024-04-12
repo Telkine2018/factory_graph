@@ -15,32 +15,29 @@ local math_precision = commons.math_precision
 ---@param product Product
 ---@return number
 local function get_product_amount(machine, product)
-    local amount
-    local probability = product.probability
-    if not probability then
-        probability = 1
-    end
+    local probability = (product.probability or 1)
+    local amount = product.amount or ((product.amount_max + product.amount_min) / 2)
 
-    if product.amount_min then
-        amount = (product.amount_max + product.amount_min) / 2 * probability
+    local catalyst_amount = product.catalyst_amount or 0
+    local total
+    if catalyst_amount > 0 then
+        total = (amount * machine.limited_craft_s +
+            math.max(0, amount - catalyst_amount) * machine.productivity * machine.theorical_craft_s
+        ) * probability
     else
-        amount = product.amount * probability
+        total = (amount * machine.limited_craft_s + amount *
+            machine.productivity * machine.theorical_craft_s) * probability
     end
-
-    local catalyst_amount = product.catalyst_amount
-    local craft_per_s = machine.craft_per_s
-    if catalyst_amount and catalyst_amount > 0 then
-        local productivity = (1 + machine.productivity)
-        craft_per_s = craft_per_s * ((amount - catalyst_amount) + catalyst_amount / productivity) / amount
-    end
-    return craft_per_s * amount
+    amount = total
+    
+    return amount
 end
 
 ---@param machine ProductionMachine
 ---@param ingredient Ingredient
 ---@return number
 local function get_ingredient_amout(machine, ingredient)
-    local amount = ingredient.amount * machine.craft_per_s / (1 + machine.productivity)
+    local amount = ingredient.amount * machine.limited_craft_s
     return amount
 end
 
@@ -129,12 +126,17 @@ function production.compute_machine(g, grecipe, config)
                 ::skip::
             end
         end
+        if speed < -0.8 then
+            speed = -0.8
+        end
         machine.name = recipe_name
         machine.speed = speed
         machine.productivity = productivity
         machine.consumption = consumption
         machine.pollution = pollution
-        machine.craft_per_s = (1 + speed) * (1 + productivity) * machine.machine.crafting_speed / recipe.energy
+        machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
+        machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
+        machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
     end
     ::skip::
     return machine
@@ -260,8 +262,6 @@ function production.compute_matrix(g)
     local all_recipes = {}
 
     for _, machine in pairs(machines) do
-        local craft_per_s = machine.craft_per_s
-
         local recipe_name = machine.name
         for _, ingredient in pairs(machine.recipe.ingredients) do
             local iname = ingredient.type .. "/" .. ingredient.name
@@ -275,7 +275,7 @@ function production.compute_matrix(g)
             if not coef then
                 coef = 0
             end
-            coef = coef - ingredient.amount * craft_per_s / (1 + machine.productivity)
+            coef = coef - ingredient.amount * machine.limited_craft_s
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
         end
@@ -335,10 +335,6 @@ function production.compute_matrix(g)
 
     local function trim(v) return abs(v) > math_precision and v or nil end
 
-    --[[
-    local saved_equations = tools.table_deep_copy(equation_list)
-    local saved_const = tools.table_deep_copy(constant_list)
-    ]]
     local machine_counts
     local name_map = {}
     local var_list = {}

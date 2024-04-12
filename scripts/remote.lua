@@ -19,15 +19,14 @@ local function add_recipes(player_index, remoteConfig)
     end
 
     local g = gutils.get_graph(player)
-
     for name, recipe in pairs(remoteConfig.recipes) do
         local grecipe = g.recipes[name]
         if grecipe then
             g.selection[name] = grecipe
         end
     end
-
     graph.refresh(player)
+    gutils.fire_selection_change(g)
 end
 
 remote.add_interface(prefix, {

@@ -332,6 +332,18 @@ function graph.layout_recipe(g, grecipe)
                 end
             end
         end
+        -- no ingredient or products
+        if count == 0 then
+            col = initial_col
+            local gcol = g.gcols[col]
+            if gcol and gcol.max_line then
+                line = gcol.max_line + 1
+            else
+                line = 0
+            end
+            count = 1
+            max_col = col
+        end
     end
     if count == 0 then
         for _, ingredient in pairs(grecipe.ingredients) do
@@ -728,7 +740,7 @@ function graph.do_layout(g)
     log("------- End layout ----------")
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
---    graph.reverse_equalize_recipes(g)
+    --    graph.reverse_equalize_recipes(g)
 
     graph.sort_recipes(g.selection)
 end
@@ -915,7 +927,7 @@ function graph.refresh(player, keep_location)
     end
     graph.create_recipe_objects(g)
     drawing.redraw_selection(player)
-    if not keep_location then
+    if not keep_location and player.surface_index == g.surface.index then
         gutils.recenter(g)
     end
 end

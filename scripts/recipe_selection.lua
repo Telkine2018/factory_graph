@@ -68,6 +68,8 @@ function load_initial_recipes(g, product, recipe, only_product)
         end
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
+    elseif recipe then
+        recipes = {recipe}
     end
     return recipes
 end
@@ -163,7 +165,7 @@ function recipe_selection.open(g, product, recipe, only_product)
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
     recipe_table.style.horizontally_stretchable = true
 
-    if product ~= nil then
+    if recipes and table_size(recipes) > 0 then
         recipe_selection.display(player, recipes, recipe_table)
     end
 
@@ -361,7 +363,7 @@ function recipe_selection.display(player, recipes, recipe_table)
                 local machine_label = translations.get_recipe_name(player_index, machine.machine.name)
                 if machine.count > 0 then
                     table.insert(tooltip_builder, "[font=heading-2][color=#42ff4b]")
-                    table.insert(tooltip_builder, tools.fround(machine.count) .. " x " .. machine_label)
+                    table.insert(tooltip_builder, tools.fround(machine.count) .. " x " .. (machine_label or machine.name) )
                     table.insert(tooltip_builder, "[/color][/font]\n");
                 else
                     table.insert(tooltip_builder, "[font=heading-2][color=red]")

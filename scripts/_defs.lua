@@ -140,7 +140,9 @@ local tools = require("scripts.tools")
 ---@field productivity number
 ---@field consumption number
 ---@field pollution number
----@field craft_per_s number
+---@field theorical_craft_s number      @ without productivity
+---@field limited_craft_s number        @ without productivity
+---@field produced_craft_s number
 ---@field count number
 
 ---@class GraphSelectionChangeEvent

@@ -19,6 +19,11 @@ local recipe_symbol_name = prefix .. "-recipe-symbol"
 
 local switch_button_name = prefix .. "-switch"
 
+local function np(name)
+    return prefix .. "-main." .. name
+end
+
+
 local excluded_categories = {
 
     stacking = true,
@@ -100,7 +105,22 @@ local function on_switch_surface(e)
 end
 
 script.on_event(prefix .. "-alt_k", on_switch_surface)
-tools.on_gui_click(switch_button_name, on_switch_surface)
+
+---@param e EventData.on_gui_click
+function on_switch_click(e)
+
+    if e.button == defines.mouse_button_type.left then
+        local player = game.players[e.player_index]
+        if not e.control and not e.shift then
+            switch_surface(player)
+        else
+            player.cursor_stack.clear()
+            player.cursor_stack.set_stack(prefix .. "-selection_tool")
+        end
+    end
+end
+tools.on_gui_click(prefix .. "_switch", on_switch_click)
+
 
 ---@param e EventData.on_lua_shortcut
 local function test_click(e)
@@ -110,8 +130,6 @@ local function test_click(e)
     if string.sub(surface.name, 1, #surface_prefix) ~= surface_prefix then
         return
     end
-
-    -- player.print("test_click:" .. game.tick)
 end
 script.on_event(prefix .. "-click", test_click)
 
@@ -170,6 +188,7 @@ function main.enter_surface(player)
     local character = player.character
     vars.character = character
     vars.surface = surface
+    vars.extern_position = player.position
     ---@cast character -nil
     player.disassociate_character(character)
     local controller_type
@@ -195,8 +214,12 @@ function main.exit(player)
 
     if character then
         local g = gutils.get_graph(player)
+        local extern_position = vars.extern_position
+        if not extern_position then
+            extern_position = character.position
+        end
         g.player_position = player.position
-        player.teleport(character.position, character.surface, true)
+        player.teleport(extern_position, character.surface, true)
     end
 end
 
@@ -234,22 +257,13 @@ local function create_player_button(player)
         local button = button_flow.add {
             type = "sprite-button",
             name = button_name,
-            sprite = prefix .. "_switch"
+            sprite = prefix .. "_switch",
+            tooltip = {np("switch_tooltip")}
         }
         button.style.width = 40
         button.style.height = 40
     end
 end
-
-tools.on_gui_click(prefix .. "_switch",
-    ---@param e EventData.on_gui_click
-    function(e)
-        if not e.shift and not e.alt and not e.control then
-            switch_surface(game.players[e.player_index])
-        elseif e.control then
-            product_panel.create(e.player_index)
-        end
-    end)
 
 local function picker_dolly_install()
     if remote.interfaces["PickerDollies"] then
@@ -276,6 +290,7 @@ tools.on_configuration_changed(function(data)
             end
             local has_command = player.gui.left[command.frame_name] ~= nil
             tools.close_panels(player)
+            tools.close_panel(player, prefix .. "-product-panel.frame")
             if has_command then
                 command.open(player)
             end
@@ -352,6 +367,52 @@ tools.on_event(defines.events.on_research_reversed,
         end
     end
 )
+
+---@param e EventData.on_player_selected_area
+local function import_entities(e, clear)
+
+    local player = game.players[e.player_index]
+    if string.find(player.surface.name, commons.surface_prefix_filter) then
+        return
+    end
+
+    if e.item ~= prefix .. "-selection_tool" then return end
+
+    local g = gutils.get_graph(player)
+    if clear then
+        g.selection = {}
+        g.iovalues = {}
+    end
+    for _,entity in pairs(e.entities) do
+        ---@cast entity LuaEntity
+        local recipe = entity.get_recipe()
+        if not recipe and entity.type == "furnace" then
+            recipe = entity.previous_recipe 
+        end
+        if recipe then
+            g.selection[recipe.name] = g.recipes[recipe.name]
+        end
+    end
+    graph.refresh(player)
+    gutils.fire_selection_change(g)
+    player.cursor_stack.clear();
+    switch_surface(player)
+end
+
+---@param e EventData.on_player_selected_area
+local function on_player_selected_area(e)
+    import_entities(e, true)
+end
+
+---@param e EventData.on_player_selected_area
+local function on_player_alt_selected_area(e)
+    import_entities(e, false)
+end
+
+tools.on_event(defines.events.on_player_selected_area, on_player_selected_area)
+
+tools.on_event(defines.events.on_player_alt_selected_area,
+    on_player_alt_selected_area)
 
 
 return main

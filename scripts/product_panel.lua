@@ -81,18 +81,17 @@ function product_panel.create(player_index)
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
         title_menu_func      = function(flow)
-
             local b
             b = flow.add {
                 type = "button",
-                tooltip = {np("unselect_tooltip")},
-                caption = {np("unselect")},
+                tooltip = { np("unselect_tooltip") },
+                caption = { np("unselect") },
             }
             tools.set_name_handler(b, np("unselect"))
-            
+
             b = flow.add {
                 type = "sprite-button",
-                tooltip = {np("mini_tooltip")},
+                tooltip = { np("mini_tooltip") },
                 name = "mini_maxi",
                 style = "frame_action_button",
                 mouse_button_filter = { "left" },
@@ -392,6 +391,10 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         local tags = e.element.tags
         local product_name = tags.product_name --[[@as string]]
 
+        if not g.product_inputs then
+            return
+        end
+
         local input = g.product_inputs[product_name] or 0
         local output = g.product_outputs[product_name] or 0
         output = fround(output)
@@ -554,7 +557,7 @@ function product_panel.update_machine_panel(g, container)
 
             local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
             b.locked = true
-            tools.set_name_handler(b, np("goto_recipe"), { recipe_name = machine.name })
+            tools.set_name_handler(b, np("recipe_detail"), { recipe_name = machine.name })
 
             local flow = line.add { type = "flow", direction = "vertical" }
             flow.add { type = "label", caption = { np("error_recipe_lanel"),
@@ -660,7 +663,7 @@ function product_panel.update_machine_panel(g, container)
         local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
         frecipe.style.right_margin = 5
         frecipe.locked = true
-        tools.set_name_handler(frecipe, np("goto_recipe"), { recipe_name = machine.name })
+        tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
         for _, ingredient in pairs(machine.recipe.ingredients) do
             local type = ingredient.type
@@ -668,7 +671,7 @@ function product_panel.update_machine_panel(g, container)
             b.locked = true
             tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
 
-            local amount = ingredient.amount * machine.craft_per_s * machine.count / (1 + machine.productivity)
+            local amount = ingredient.amount * machine.limited_craft_s * machine.count 
             amount = fround(amount)
             b.add { type = "label", style = default_button_label_style,
                 caption = tostring(amount), ignored_by_interaction = true }
@@ -708,24 +711,31 @@ local function update_machines(g)
     end
 end
 
-tools.on_named_event(np("goto_recipe"), defines.events.on_gui_click,
+tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
-        if not e.shift and not e.control then
-            local element = e.element
+        if e.button == defines.mouse_button_type.left then
+            if not e.shift and not e.control then
+                local element = e.element
+                local player = game.players[e.player_index]
+                if not element or not element.valid then return end
+
+                local recipe_name = element.tags.recipe_name --[[@as string]]
+                if not recipe_name then return end
+                gutils.move_to_recipe(player, recipe_name, e.control)
+
+                local g = gutils.get_graph(player)
+                drawing.draw_target(g, g.recipes[recipe_name])
+            end
+        elseif e.button == defines.mouse_button_type.right then
             local player = game.players[e.player_index]
-            if not element or not element.valid then return end
+            local element = e.element
+            if not element.valid then return end
 
             local recipe_name = element.tags.recipe_name --[[@as string]]
-            if not recipe_name then return end
-            product_panel.close(player)
-            gutils.move_to_recipe(player, recipe_name, e.control)
-
             local g = gutils.get_graph(player)
-            drawing.draw_target(g, g.recipes[recipe_name])
-        elseif e.control then
-
+            recipe_selection.open(g, nil, g.recipes[recipe_name])
         end
     end)
 
@@ -875,21 +885,21 @@ tools.on_named_event(np("unlock-product"), defines.events.on_gui_click,
     end)
 
 tools.on_named_event(np("unselect"), defines.events.on_gui_click,
----@param e EventData.on_gui_click
-function(e)
-    local player = game.players[e.player_index]
-    local frame = player.gui.screen[product_panel_name]
-    if not frame then return end
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[product_panel_name]
+        if not frame then return end
 
-    local g = gutils.get_graph(player)
-    for _, grecipe in pairs(g.recipes) do
-        if not grecipe.machine or grecipe.machine.count == 0 then
-            g.selection[grecipe.name] = nil
+        local g = gutils.get_graph(player)
+        for _, grecipe in pairs(g.recipes) do
+            if not grecipe.machine or grecipe.machine.count == 0 then
+                g.selection[grecipe.name] = nil
+            end
         end
-    end
-    graph.refresh(g.player)
-    gutils.fire_selection_change(g)
-end)
+        graph.refresh(g.player)
+        gutils.fire_selection_change(g)
+    end)
 
 
 return product_panel

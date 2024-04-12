@@ -120,7 +120,7 @@ end)
 script.on_event(prefix .. "-del", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe or not grecipe.entity or not grecipe.entity.valid then return end
+    if not grecipe or not grecipe.entity or not grecipe.entity.valid or not grecipe.visible then return end
 
     grecipe.visible = false
     g.selection[grecipe.name] = nil
@@ -129,5 +129,7 @@ script.on_event(prefix .. "-del", function(e)
     g.selected_recipe = nil
     g.selected_recipe_entity = nil
     drawing.redraw_selection(g.player)
+    g.gcols[grecipe.col].line_set[grecipe.line] = nil
     gutils.fire_selection_change(g)
+    gutils.set_cursor_stack(player, grecipe.name)
 end)

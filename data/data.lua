@@ -212,25 +212,25 @@ add(sprite)
 add {
   type = "custom-input",
   name = prefix .. "-up",
-  key_sequence = "UP"
+  key_sequence = "SHIFT + UP"
 }
 
 add {
   type = "custom-input",
   name = prefix .. "-left",
-  key_sequence = "LEFT"
+  key_sequence = "SHIFT + LEFT"
 }
 
 add {
   type = "custom-input",
   name = prefix .. "-down",
-  key_sequence = "DOWN"
+  key_sequence = "SHIFT + DOWN"
 }
 
 add {
   type = "custom-input",
   name = prefix .. "-right",
-  key_sequence = "RIGHT"
+  key_sequence = "SHIFT + RIGHT"
 }
 
 add {
@@ -247,6 +247,27 @@ add {
   icon_size = 32,
   place_result = commons.recipe_symbol_name,
   flags = {"hidden","not-stackable", "only-in-cursor"}
+}
+
+add {
+
+  type = "selection-tool",
+  name = prefix .. "-selection_tool",
+  icon = png("icon32"),
+  icon_size = 32,
+  selection_color = {r = 0, g = 0, b = 1},
+  alt_selection_color = {r = 1, g = 0, b = 0},
+  selection_mode = {"same-force", "any-entity"},
+  alt_selection_mode = {"same-force", "any-entity"},
+  selection_cursor_box_type = "entity",
+  alt_selection_cursor_box_type = "entity",
+  flags = {"hidden", "not-stackable", "only-in-cursor", "spawnable"},
+  subgroup = "other",
+  stack_size = 1,
+  stackable = false,
+  show_in_library = false,
+  entity_type_filters = {"assembling-machine", "furnace"},
+  alt_entity_type_filters = {"assembling-machine", "furnace"}
 }
 
 data:extend(declarations)

@@ -37,7 +37,10 @@ function tools.set_tracing(trace) tracing = trace end
 function tools.is_tracing() return tracing end
 
 ---@param o any
-function tools.strip(o) return string.gsub(serpent.block(o), "%s", "") end
+function tools.strip(o) 
+    local s = string.gsub(serpent.block(o), "%s", "") 
+    return s
+end
 
 local strip = tools.strip
 
