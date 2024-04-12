@@ -61,7 +61,7 @@ function saving.create(player_index)
     bnew2.style.size                         = button_size
     local newlabel                           = newflow.add { type = "textfield", name = "label" }
     newlabel.style.horizontally_stretchable  = true
-    local bsave                              = newflow.add { type = "button", caption = { np("save") }, name = np("save") }
+    local bsave                              = newflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip = { np("save-tooltip") } }
 
     local scroll                             = inner_frame.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", vertical_scroll_policy = "auto-and-reserve-space" }
@@ -77,7 +77,7 @@ function saving.create(player_index)
     end
 
     ---@type Saving[]
-    local saves                              = vars.saves
+    local saves = vars.saves
     if not saves then
         saves = {}
     end
@@ -118,13 +118,13 @@ function saving.update(player, container)
         ftext.style.horizontally_stretchable     = true
 
 
-        local bload = line.add { type = "button", caption = { np("load") } }
+        local bload = line.add { type = "button", caption = { np("load") }, tooltip = { np("load-tooltip") } } 
         tools.set_name_handler(bload, np("load"))
 
-        local bimport = line.add { type = "button", caption = { np("import") } }
+        local bimport = line.add { type = "button", caption = { np("import") }, tooltip = { np("import-tooltip") } }
         tools.set_name_handler(bimport, np("import"))
 
-        local bdelete = line.add { type = "button", caption = { np("delete") } }
+        local bdelete = line.add { type = "button", caption = { np("delete") }, tooltip = { np("delete-tooltip") } }
         tools.set_name_handler(bdelete, np("delete"))
     end
 end
@@ -233,7 +233,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local line = e.element.parent
         if not line then return end
         local index = line.get_index_in_parent()
-        
+
         ---@type Saving[]
         local saves = vars.saves
 
@@ -242,7 +242,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local data = game.json_to_table(json) --[[@as SavingData]]
 
         local new_flow = tools.get_child(frame, "new_flow")
-        if new_flow then 
+        if new_flow then
             load_current(new_flow, save)
         end
         vars.current_save = save

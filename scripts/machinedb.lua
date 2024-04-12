@@ -151,7 +151,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             enabled = is_machine_enabled(force, machine_name)
             enabled_cache[machine_name] = enabled
         end
-        if enabled then
+        if enabled or machine_set[machine_name] then
             local new_order = machine_set[machine_name]
             if new_order then
                 if not found_order or (found_order and new_order < found_order) then
@@ -164,7 +164,19 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
     end
     if not found_index then
-        return nil
+        if not g.show_only_researched then
+            for i = 1, #machines do
+                if machine_set[machines[i].name] then
+                    found_index = i
+                    break
+                end
+            end
+            if not found_index then
+                found_index = 1
+            end
+        else
+            return nil
+        end
     end
     local found_machine = machines[found_index]
     local found_machine_module

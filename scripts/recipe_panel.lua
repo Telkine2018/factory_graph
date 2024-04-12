@@ -103,7 +103,7 @@ function recipe_panel.create(player_index, grecipe)
         add_line({ np("ingredients") })
         for _, p in pairs(recipe.ingredients) do
             local caption
-            if machine and machine.count > 0 then
+            if machine and machine.count and machine.count > 0 then
                 caption = { np("ingredient"),
                     tools.fround(production.get_ingredient_amout(machine, p) * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
@@ -125,7 +125,7 @@ function recipe_panel.create(player_index, grecipe)
         for _, p in pairs(recipe.products) do
             local caption
 
-            if machine and machine.count > 0 then
+            if machine and machine.count and machine.count > 0 then
                 caption = { np("product"),
                     tools.fround(production.get_product_amount(machine, p) * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",

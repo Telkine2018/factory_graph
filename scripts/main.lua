@@ -122,6 +122,7 @@ end
 tools.on_gui_click(prefix .. "_switch", on_switch_click)
 
 
+--[[
 ---@param e EventData.on_lua_shortcut
 local function test_click(e)
     local player = game.players[e.player_index]
@@ -132,6 +133,7 @@ local function test_click(e)
     end
 end
 script.on_event(prefix .. "-click", test_click)
+]]
 
 local tile_name = commons.tile_name
 
@@ -274,6 +276,17 @@ local function picker_dolly_install()
     end
 end
 
+tools.on_init(function() 
+    picker_dolly_install()
+end)
+
+tools.on_event(defines.events.on_player_created, 
+---@param e EventData.on_player_created
+function(e)
+    local player = game.players[e.player_index]
+    create_player_button(player)
+end)
+
 tools.on_configuration_changed(function(data)
     picker_dolly_install()
     for _, player in pairs(game.players) do
@@ -379,6 +392,11 @@ local function import_entities(e, clear)
     if e.item ~= prefix .. "-selection_tool" then return end
 
     local g = gutils.get_graph(player)
+
+    if g.visibility == commons.visibility_all then
+        g.visibility = commons.visibility_selection
+    end
+    
     if clear then
         g.selection = {}
         g.iovalues = {}

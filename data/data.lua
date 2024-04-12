@@ -22,6 +22,7 @@ add({
   consuming = "none"
 })
 
+--[[
 add({
   type = "custom-input",
   name = modname .. "-alt_l",
@@ -34,6 +35,7 @@ add({
   key_sequence = "mouse-button-1",
   name = prefix .. "-click"
 })
+--]]
 
 ---------------------------------------------
 local function create_symbol(name, filename)

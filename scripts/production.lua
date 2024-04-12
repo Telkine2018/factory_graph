@@ -29,7 +29,7 @@ local function get_product_amount(machine, product)
             machine.productivity * machine.theorical_craft_s) * probability
     end
     amount = total
-    
+
     return amount
 end
 
@@ -223,15 +223,19 @@ function production.compute_matrix(g)
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
 
-        local config = grecipe.production_config
-        if not config then
-            config = machinedb.get_default_config(g, recipe_name, enabled_cache)
-        end
-        if config then
-            local machine = compute_machine(g, grecipe, config)
-            grecipe.machine = machine
-            if machine then
-                machines[recipe_name] = machine
+        if not grecipe.is_product then
+            local config = grecipe.production_config
+            if not config then
+                config = machinedb.get_default_config(g, recipe_name, enabled_cache)
+            end
+            if config then
+                local machine = compute_machine(g, grecipe, config)
+                grecipe.machine = machine
+                if machine then
+                    machines[recipe_name] = machine
+                end
+            else
+                return
             end
         end
     end
