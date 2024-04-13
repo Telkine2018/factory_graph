@@ -1,48 +1,95 @@
-
 local tools = require("scripts.tools")
 
 ---@class GContext
 
----@class Graph
+---@class GraphRuntime
 ---@field surface LuaSurface
+---@field player LuaPlayer
 ---@field recipes {[string]:GRecipe}
 ---@field products {[string]:GProduct}
 ---@field entity_map {[integer]:(GRecipe|GProduct)}
----@field player LuaPlayer
 ---@field gcols GCol[]
----@field root_products {[string]:GProduct}
----@field excluded_categories {[string]:boolean}?
----@field selection {[string]:GElement}?
+---@field current_col integer
+---@field product_line integer
 ---@field graph_ids integer[]?
 ---@field x_routing RoutingSet
 ---@field y_routing RoutingSet
----@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
----@field product_selectors {[string]:LuaEntity}
----@field grid_size integer
----@field color_index integer
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
 ---@field graph_select_ids integer[]?
+---@field highlighted_recipes_ids integer[]?
+---@field selected_recipe GRecipe?
+---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
+---@field selector_product_name string?             @ selected product
+---@field product_selectors {[string]:LuaEntity}    @ product name => entity
+---@field rs_recipe GRecipe?                        @ recipe for product selection
+---@field rs_product GProduct?                      @ product for product selection
+---@field rs_location GuiLocation?
+---@field selector_id integer?                      @ selector rectangle id
+---@field selector_product_name_id integer?         @ selector text id
+---@field product_outputs {[string]:number}
+---@field product_inputs {[string]:number}
+---@field production_failed LocalisedString?
+---@field production_recipes_failed {[string]:boolean}
+---@field bound_products {[string]:boolean}
+---@field recipe_order integer
+---@field player_position MapPosition
+---@field module_limitations {[string]:({[string]:true})}
+---@field excluded_categories {[string]:boolean}?
+---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
+---@field grid_size integer
+---@field show_hidden boolean?
+---@field show_only_researched boolean?
+---@field unrestricted_production boolean?
+---@field move_recipe GRecipe?
+
+---@class GraphConfig
+---@field visibility integer?
+---@field selection {[string]:GRecipe}?
+---@field preferred_machines string[]
+---@field preferred_modules string[]
+---@field preferred_beacon string?
+---@field preferred_beacon_count integer
+---@field iovalues {[string]:number|boolean}
+---@field color_index integer
+
+---@class Graph : GraphRuntime, GraphConfig
 
 ---@class GElement
 ---@field name string     @ name of product or recipe
----@field unit_number integer
----@field x integer
----@field y integer
----@field graph_symbol_id integer
----@field line integer?
----@field col integer?
 ---@field entity LuaEntity?
+---@field used boolean?
 
 ---@class GProduct : GElement
 ---@field ingredient_of {[string]:GRecipe}
 ---@field product_of {[string]:GRecipe}
----@field is_root boolean
+---@field is_root boolean?
+---@field root_recipe GRecipe?
 ---@field color Color
+---@field ids integer[]?
 
----@class GRecipe : GElement
+---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
+---@field enabled boolean?
 ---@field selector_positions {[string]:MapPosition}
+---@field is_product boolean?
+---@field craft_per_s number?
+---@field machine ProductionMachine?
+---@field order integer?
+---@field visible boolean?
+---@field is_void boolean?
+---@field is_recursive boolean?
+
+---@class GSortNode
+---@field sort_level integer?
+---@field in_path boolean?
+---@field sort_product_current integer?
+---@field sort_recipe_current string?
+
+---@class GRecipeConfig
+---@field production_config ProductionConfig?
+---@field line integer?
+---@field col integer?
 
 ---@class GCol
 ---@field col integer
@@ -74,3 +121,46 @@ local tools = require("scripts.tools")
 ---@class GRecipeProductPosition
 ---@field product_name string
 ---@field recipe GRecipe
+
+---@class ProductionConfig
+---@field machine_name string
+---@field machine_modules string[]
+---@field beacon_name string?
+---@field beacon_modules string[]?
+---@field beacon_count integer?
+
+---@class ProductionMachine
+---@field name string
+---@field grecipe GRecipe
+---@field config ProductionConfig
+---@field recipe LuaRecipePrototype
+---@field machine LuaEntityPrototype
+---@field modules LuaItemPrototype[]
+---@field speed number
+---@field productivity number
+---@field consumption number
+---@field pollution number
+---@field theorical_craft_s number      @ without productivity
+---@field limited_craft_s number        @ without productivity
+---@field produced_craft_s number
+---@field count number
+
+---@class GraphSelectionChangeEvent
+---@field g Graph
+
+---@class Saving
+---@field icon1 string?
+---@field icon2 string?
+---@field label string
+---@field json string 
+
+---@class SavingData
+---@field config GraphConfig
+---@field selection GRecipeConfig[]
+---@field colors {[string]:Color}?
+
+---@class RemoteRecipe : ProductionConfig
+---@field name string
+
+---@class RemoteConfig
+---@field recipes {[string]:RemoteRecipe}

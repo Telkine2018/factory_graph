@@ -22,7 +22,7 @@ end
 
 ---@param type string
 ---@param prototypes {[string]:any}
-local function load_translations(type, prototypes)
+local function load_names_and_descriptions(type, prototypes)
 
     local dic_name = type .. "_name"
     local dic_description = type .. "_description"
@@ -35,23 +35,38 @@ local function load_translations(type, prototypes)
     end
 end
 
-local function load_prototypes()
-    load_translations("fluid", game.fluid_prototypes)
-    load_translations("item", game.item_prototypes)
+---@param type string
+---@param prototypes {[string]:any}
+local function load_names(type, prototypes)
 
-    load_translations("recipe_category", game.recipe_category_prototypes)
-    load_translations("recipe", game.recipe_prototypes)
+    local dic_name = type .. "_name"
+    dictionary.new(dic_name)
+
+    for name, proto in pairs(prototypes) do
+        add(dic_name, name, proto.localised_name)
+    end
+end
+
+
+local function load_translations()
+    load_names_and_descriptions("fluid", game.fluid_prototypes)
+    load_names_and_descriptions("item", game.item_prototypes)
+
+    load_names_and_descriptions("recipe_category", game.recipe_category_prototypes)
+    load_names_and_descriptions("recipe", game.recipe_prototypes)
+
+    load_names("entity", game.entity_prototypes)
+    load_names("technology", game.technology_prototypes)
 end
 
 tools.on_init(function()
     dictionary.on_init()
-    load_prototypes()
-end
-)
+    load_translations()
+end)
 
 tools.on_configuration_changed(function(data)
     dictionary.on_configuration_changed()
-    load_prototypes()
+    load_translations()
 end)
 
 for event, handler in pairs(dictionary.events) do
@@ -116,6 +131,27 @@ end
 ---@return string?
 function translations.get_item_description(player_index, name)
     return translations.get_translation(player_index, "item_description", name)
+end
+
+---@param player_index integer
+---@param name string
+---@return string?
+function translations.get_entity_name(player_index, name)
+    return translations.get_translation(player_index, "entity_name", name)
+end
+
+---@param player_index integer
+---@param name string
+---@return string?
+function translations.get_technology_name(player_index, name)
+    return translations.get_translation(player_index, "technology_name", name)
+end
+
+---@param player_index integer
+---@param dic_name string
+---@return table<string, string>
+function translations.get_all(player_index, dic_name)
+    return dictionary.get_all(player_index)[dic_name]
 end
 
 script.on_event(dictionary.on_player_dictionaries_ready, function(e)
