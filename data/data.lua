@@ -63,7 +63,7 @@ local function create_symbol(name, filename)
   }
   entity.minable = {
     mining_time = 0.1,
-    result = commons.recipe_symbol_name,
+    result = name,
     count = 1
   }
   entity.next_upgrade = nil
@@ -248,6 +248,26 @@ add {
   icon = png("item/recipe-symbol"),
   icon_size = 32,
   place_result = commons.recipe_symbol_name,
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
+}
+
+add {
+  name = commons.product_symbol_name,
+  type = "item-with-tags",
+  stack_size = 1,
+  icon = png("item/product-symbol"),
+  icon_size = 32,
+  place_result = commons.product_symbol_name,
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
+}
+
+add {
+  name = commons.unresearched_symbol_name,
+  type = "item-with-tags",
+  stack_size = 1,
+  icon = png("item/unresearched-symbol"),
+  icon_size = 32,
+  place_result = commons.unresearched_symbol_name,
   flags = { "hidden", "not-stackable", "only-in-cursor" }
 }
 

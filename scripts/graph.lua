@@ -68,10 +68,12 @@ end
 ---@param g Graph
 ---@param recipes table<string, LuaRecipe>
 ---@param excluded_categories {[string]:boolean}?
+---@return boolean
 function graph.update_recipes(g, recipes, excluded_categories)
     if not excluded_categories then
         excluded_categories = {}
     end
+    local changed
     g.excluded_categories = excluded_categories
 
     for _, gproduct in pairs(g.products) do
@@ -92,6 +94,28 @@ function graph.update_recipes(g, recipes, excluded_categories)
                         order = 1
                     }
                     g.recipes[name] = grecipe
+                    changed = true
+                else
+                    grecipe.machine = nil
+                    local pconfig = grecipe.production_config
+                    if pconfig then
+                        ---@type boolean?
+                        local failed = pconfig.machine_name and not game.entity_prototypes[pconfig.machine_name]
+                        failed = failed or (pconfig.beacon_name and not game.entity_prototypes[pconfig.beacon_name])
+                        if pconfig.machine_modules then
+                            for _, module in pairs(pconfig.machine_modules) do
+                                failed = failed or (module and not game.item_prototypes[module])
+                            end
+                        end
+                        if pconfig.beacon_modules then
+                            for _, module in pairs(pconfig.beacon_modules) do
+                                failed = failed or (module and not game.item_prototypes[module])
+                            end
+                        end
+                        if failed then
+                            grecipe.production_config = nil
+                        end
+                    end
                 end
                 grecipe.used = true
                 if recipe.enabled then
@@ -150,7 +174,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
     end
 
     for _, product in pairs(g.products) do
-        if product.is_root then
+        if product.used and product.is_root then
             local name = product.name
             local grecipe = product.root_recipe
             if not grecipe then
@@ -172,7 +196,8 @@ function graph.update_recipes(g, recipes, excluded_categories)
         end
     end
 
-    graph.remove_unused(g)
+    changed = graph.remove_unused(g) or changed
+    return changed
 end
 
 ---@param g Graph
@@ -190,24 +215,28 @@ function graph.remove_unused(g)
         g.selected_recipe = nil
     end
 
-    local to_remove = {}
-    for _, recipe in pairs(g.recipes) do
-        if not recipe.used then
-            to_remove[recipe.name] = true
+    ---@type table<string, GRecipe>
+    local to_remove_recipes = {}
+    for _, grecipe in pairs(g.recipes) do
+        if not grecipe.used then
+            to_remove_recipes[grecipe.name] = grecipe
         else
-            recipe.used = nil
+            grecipe.used = nil
         end
     end
-    for name in pairs(to_remove) do
+    for name, grecipe in pairs(to_remove_recipes) do
+        if grecipe.entity and grecipe.entity.valid then
+            grecipe.entity.destroy()
+        end
         g.recipes[name] = nil
         g.selection[name] = nil
         changed = true
     end
 
-    to_remove = {}
+    local to_remove_products = {}
     for _, product in pairs(g.products) do
         if not product.used then
-            to_remove[product.name] = true
+            to_remove_products[product.name] = product
             g.iovalues[product.name] = nil
             g.product_outputs[product.name] = nil
             g.product_inputs[product.name] = nil
@@ -215,7 +244,7 @@ function graph.remove_unused(g)
             product.used = nil
         end
     end
-    for name in pairs(to_remove) do
+    for name in pairs(to_remove_products) do
         g.products[name] = nil
         changed = true
     end
@@ -465,7 +494,6 @@ end
 ---@param g Graph
 ---@param grecipe GRecipe
 function graph.remove_recipe_visibility(g, grecipe)
-
     if grecipe.line then
         local gcols = g.gcols[grecipe.col]
         if gcols then
@@ -945,6 +973,34 @@ function graph.refresh(player, keep_location)
         gutils.recenter(g)
     end
 end
+
+---@param player LuaPlayer
+---@param selection_changed boolean
+function graph.deferred_redraw(player, selection_changed)
+    local redraw_queue = global.redraw_queue
+    if not redraw_queue then
+        redraw_queue = {}
+        global.redraw_queue = redraw_queue
+    end
+    redraw_queue[player.index] = selection_changed
+end
+
+tools.on_event(defines.events.on_tick,
+    function(e)
+        local redraw_queue = global.redraw_queue
+        if not redraw_queue then
+            return
+        end
+        global.redraw_queue = nil
+        for player_index, selection_changed in pairs(redraw_queue) do
+            drawing.redraw_selection(game.players[player_index])
+            if selection_changed then
+                local g = gutils.get_graph(game.players[player_index])
+                gutils.fire_selection_change(g)
+            end
+        end
+    end
+)
 
 ---@param player LuaPlayer
 function graph.unselect(player)

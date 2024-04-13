@@ -8,6 +8,7 @@ local prefix = commons.prefix
 
 local gutils = require("scripts.gutils")
 local graph = require("scripts.graph")
+local drawing = require("scripts.drawing")
 local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
 local product_panel = require("scripts.product_panel")
@@ -108,7 +109,6 @@ script.on_event(prefix .. "-alt_k", on_switch_surface)
 
 ---@param e EventData.on_gui_click
 function on_switch_click(e)
-
     if e.button == defines.mouse_button_type.left then
         local player = game.players[e.player_index]
         if not e.control and not e.shift then
@@ -119,6 +119,7 @@ function on_switch_click(e)
         end
     end
 end
+
 tools.on_gui_click(prefix .. "_switch", on_switch_click)
 
 
@@ -247,7 +248,7 @@ local function create_player_button(player)
             type = "sprite-button",
             name = button_name,
             sprite = prefix .. "_switch",
-            tooltip = {np("switch_tooltip")}
+            tooltip = { np("switch_tooltip") }
         }
         button.style.width = 40
         button.style.height = 40
@@ -263,16 +264,16 @@ local function picker_dolly_install()
     end
 end
 
-tools.on_init(function() 
+tools.on_init(function()
     picker_dolly_install()
 end)
 
-tools.on_event(defines.events.on_player_created, 
----@param e EventData.on_player_created
-function(e)
-    local player = game.players[e.player_index]
-    create_player_button(player)
-end)
+tools.on_event(defines.events.on_player_created,
+    ---@param e EventData.on_player_created
+    function(e)
+        local player = game.players[e.player_index]
+        create_player_button(player)
+    end)
 
 tools.on_configuration_changed(function(data)
     picker_dolly_install()
@@ -296,6 +297,23 @@ tools.on_configuration_changed(function(data)
             end
             local recipes = player.force.recipes
             graph.update_recipes(g, recipes, g.excluded_categories)
+
+            local need_refresh
+            for _, grecipe in pairs(g.recipes) do
+                if grecipe.visible and (not grecipe.line and not grecipe.col) then
+                    need_refresh = true
+                    break
+                end
+            end
+
+            if need_refresh then
+                gutils.compute_visibility(g)
+                drawing.delete_content(g)
+                graph.do_layout(g)
+                graph.create_recipe_objects(g)
+            end
+
+            drawing.redraw_selection(player)
         end
     end
 end)
@@ -370,7 +388,6 @@ tools.on_event(defines.events.on_research_reversed,
 
 ---@param e EventData.on_player_selected_area
 local function import_entities(e, clear)
-
     local player = game.players[e.player_index]
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         return
@@ -383,16 +400,16 @@ local function import_entities(e, clear)
     if g.visibility == commons.visibility_all then
         g.visibility = commons.visibility_selection
     end
-    
+
     if clear then
         g.selection = {}
         g.iovalues = {}
     end
-    for _,entity in pairs(e.entities) do
+    for _, entity in pairs(e.entities) do
         ---@cast entity LuaEntity
         local recipe = entity.get_recipe()
         if not recipe and entity.type == "furnace" then
-            recipe = entity.previous_recipe 
+            recipe = entity.previous_recipe
         end
         if recipe then
             g.selection[recipe.name] = g.recipes[recipe.name]
