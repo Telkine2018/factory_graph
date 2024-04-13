@@ -158,7 +158,8 @@ function recipe_selection.open(g, product, recipe, only_product)
     b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
 
     local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
-    scroll.style.maximal_height = 700
+    scroll.style.height = 400
+    scroll.style.minimal_width = 500
     scroll.style.horizontally_stretchable = true
 
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };

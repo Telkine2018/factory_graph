@@ -209,14 +209,24 @@ function production.compute_matrix(g)
         grecipe.machine = nil
     end
 
+    local has_neg_value
+    if g.iovalues then
+        for _, v in pairs(g.iovalues) do
+            if type(v) == "number" and v < 0 then
+                has_neg_value = true
+            end
+        end
+    else
+        return
+    end
+
     ---@type {[string]:GRecipe}
     local connected_recipes
-    if g.unrestricted_production then
+    if g.unrestricted_production or has_neg_value then
         connected_recipes = g.selection --[[@as {[string]:GRecipe}]]
     else
         connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
     end
-
     graph.sort_recipes(connected_recipes)
 
 

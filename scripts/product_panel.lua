@@ -126,7 +126,7 @@ function product_panel.create(player_index)
     machine_frame.style.vertically_stretchable = true
     machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
     local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
-    local machine_flow = machine_scroll.add { type = "table", column_count = 2, name = "machine_container" }
+    local machine_flow = machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
     product_panel.update_machine_panel(g, machine_flow)
 
     local location = vars[location_name]
@@ -677,7 +677,8 @@ function product_panel.update_machine_panel(g, container)
                 caption = tostring(amount), ignored_by_interaction = true }
         end
 
-        local col2 = container.add { type = "flow", direction = "horizontal" }
+        -- local col2 = container.add { type = "flow", direction = "horizontal" }
+        local col2 = col1
         local sep = col2.add { type = "sprite", sprite = arrow_sprite }
         sep.style.left_margin = 5
         sep.style.top_margin = 10

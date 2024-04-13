@@ -415,6 +415,7 @@ local function import_entities(e, clear)
     gutils.fire_selection_change(g)
     player.cursor_stack.clear();
     switch_surface(player)
+    gutils.recenter(g)
 end
 
 ---@param e EventData.on_player_selected_area

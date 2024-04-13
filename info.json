@@ -1,11 +1,11 @@
 {
   "name": "factory_graph",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "title": "Factory graph",
   "author": "Telkine2018",
   "contact": "",
   "homepage": "",
-  "description": "Factory graph.",
+  "description": "A tool to build a graph of recipes and products. It can be also compute a default setup of machines and its throughput.",
   "factorio_version": "1.1",
   "dependencies": [
 		"base >= 1.1",
