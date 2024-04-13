@@ -25,11 +25,11 @@ local msettings = {}
 local function install_modules(container, config)
     container.clear()
 
-    local machine = game.entity_prototypes[config.machine_name]
-    if not machine then
+    local assembly_machine = game.entity_prototypes[config.machine_name]
+    if not assembly_machine then
         return
     end
-    local count = machine.module_inventory_size
+    local count = assembly_machine.module_inventory_size
     if count == 0 then
         return
     end
@@ -44,7 +44,7 @@ local function install_modules(container, config)
                 local module = game.item_prototypes[module_name]
                 if module then
                     for effect in pairs(module.module_effects) do
-                        if not machine.allowed_effects[effect] then
+                        if not assembly_machine.allowed_effects[effect] then
                             goto skip
                         end
                     end
@@ -136,24 +136,44 @@ function msettings.create(player_index, grecipe)
         msettings.close(player)
     end
 
-    if not grecipe.machine then return end
+    local config = grecipe.production_config
+    if not config then
+        config = machinedb.get_default_config(g, grecipe.name, {}) or {}
+    end
+
+    local recipe = game.recipe_prototypes[grecipe.name]
 
     ---@type Params.create_standard_panel
     local params = {
         panel_name           = panel_name,
-        title                = { np("title") },
+        title                = { np("title"), recipe and "[recipe=" .. grecipe.name .. "]" or "", recipe and recipe.localised_name or "" },
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
         create_inner_frame   = true
     }
-    local frame, inner_frame = tools.create_standard_panel(player, params)
-    local field_table = inner_frame.add { type = "table", column_count = 2, name = "field_table" }
+    local frame, recipe_frame = tools.create_standard_panel(player, params)
 
-    if not grecipe.machine then
-        return
+    recipe_frame.tags = { recipe_name = grecipe.name }
+    recipe_frame.name = "recipe_frame"
+
+    local machine = grecipe.machine
+    if not machine then
+        machine = production.compute_machine(g, grecipe, config) or {}
+        machine.count = 1
     end
-    local config = grecipe.machine.config
+    msettings.create_product_line(recipe_frame, machine)
+
+    local config_frame = frame.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding"
+    }
+    config_frame.style.vertically_stretchable = true
+    config_frame.style.horizontally_stretchable = true
+
+    local field_table = config_frame.add { type = "table", column_count = 2, name = "field_table" }
+
     config = tools.table_dup(config)
 
     local is_default = grecipe.production_config == nil
@@ -279,9 +299,6 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         local recipe_name = e.element.tags.recipe_name --[[@as string]]
         if not recipe_name then return end
 
-        local machine = g.recipes[recipe_name].machine
-        if not machine then return end
-
         local vars = tools.get_vars(player)
         local config = vars.msettings_config
         config.machine_name = e.element.elem_value --[[@as string]]
@@ -289,7 +306,6 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         msettings.save(player)
     end
 )
-
 
 tools.on_named_event(np("beacon"), defines.events.on_gui_elem_changed,
     ---@param e EventData.on_gui_checked_state_changed
@@ -305,9 +321,6 @@ tools.on_named_event(np("beacon"), defines.events.on_gui_elem_changed,
 
         local recipe_name = e.element.tags.recipe_name --[[@as string]]
         if not recipe_name then return end
-
-        local machine = g.recipes[recipe_name].machine
-        if not machine then return end
 
         local vars = tools.get_vars(player)
         local config = vars.msettings_config
@@ -471,5 +484,57 @@ function msettings.report(player)
     report_value({ np("report_consumption") }, machine.consumption)
     report_value({ np("report_pollution") }, machine.pollution)
 end
+
+---@param e EventData.on_lua_shortcut
+local function on_control_click(e)
+    local player = game.players[e.player_index]
+    local surface = player.surface
+
+    if not string.find(surface.name, commons.surface_prefix_filter) then
+        return
+    end
+    local g = gutils.get_graph(player)
+    if not g.selected_recipe then return end
+
+    msettings.create(player.index, g.selected_recipe)
+end
+
+script.on_event(prefix .. "-control-click", on_control_click)
+
+---@param container LuaGuiElement
+---@param machine ProductionMachine
+function msettings.create_product_line(container, machine)
+end
+
+-- React to production computation
+tools.register_user_event(commons.production_compute_event, function(data)
+    local g = data.g
+    local player = g.player
+    local frame = player.gui.screen[panel_name]
+    if not frame then return end
+
+    local recipe_frame = tools.get_child(frame, "recipe_frame")
+    if not recipe_frame then return end
+
+    local recipe_name = recipe_frame.tags.recipe_name --[[@as string]]
+    if not recipe_name then return end
+
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe then return end
+
+    local config = grecipe.production_config
+    if not config then
+        config = machinedb.get_default_config(g, grecipe.name, {}) or {}
+    end
+
+    local machine = grecipe.machine
+    if not machine then
+        machine = production.compute_machine(g, grecipe, config) or {}
+        machine.count = 1
+    end
+    recipe_frame.clear()
+    msettings.create_product_line(recipe_frame, machine)
+end)
+
 
 return msettings

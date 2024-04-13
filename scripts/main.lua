@@ -122,19 +122,6 @@ end
 tools.on_gui_click(prefix .. "_switch", on_switch_click)
 
 
---[[
----@param e EventData.on_lua_shortcut
-local function test_click(e)
-    local player = game.players[e.player_index]
-    local surface = player.surface
-
-    if string.sub(surface.name, 1, #surface_prefix) ~= surface_prefix then
-        return
-    end
-end
-script.on_event(prefix .. "-click", test_click)
-]]
-
 local tile_name = commons.tile_name
 
 ---@param player LuaPlayer

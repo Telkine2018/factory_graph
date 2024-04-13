@@ -523,6 +523,68 @@ end)
 
 local get_product_amount = production.get_product_amount
 
+---@param container LuaGuiElement
+---@param machine ProductionMachine
+local function create_product_line(container, machine)
+    local col1 = container.add { type = "flow", direction = "horizontal" }
+
+    local caption
+    if machine.count > 1000 then
+        caption = string.format("%.0f", math.ceil(machine.count))
+    else
+        caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
+    end
+
+    local b = col1.add { type = "choose-elem-button", elem_type = "entity",
+        entity = machine.machine.name, style = green_button, tooltip = { np("machine-tooltip") } }
+    b.locked = true
+    tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
+    b.raise_hover_events = true
+    local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
+
+    local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
+    frecipe.style.right_margin = 5
+    frecipe.locked = true
+    tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
+
+    line = col1.add { type = "line", direction = "vertical" }
+    line.style.left_margin = 5
+    line.style.right_margin = 8
+
+    for _, ingredient in pairs(machine.recipe.ingredients) do
+        local type = ingredient.type
+        b = col1.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = ingredient_button_style }
+        b.locked = true
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
+
+        local amount = ingredient.amount * machine.limited_craft_s * machine.count
+        amount = fround(amount)
+        b.add { type = "label", style = default_button_label_style,
+            caption = tostring(amount), ignored_by_interaction = true }
+    end
+
+    -- local col2 = container.add { type = "flow", direction = "horizontal" }
+    local col2 = col1
+    local sep = col2.add { type = "sprite", sprite = arrow_sprite }
+    sep.style.left_margin = 5
+    sep.style.top_margin = 10
+    sep.style.right_margin = 5
+
+    for _, product in pairs(machine.recipe.products) do
+        local type = product.type
+        b = col2.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = product_button_style }
+        b.locked = true
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
+
+        local amount = get_product_amount(machine, product)
+
+        amount = amount * machine.count
+        amount = fround(amount)
+        b.add { type = "label", style = default_button_label_style, caption = tostring(amount), ignored_by_interaction = true }
+    end
+end
+product_panel.create_product_line = create_product_line
+
 ---@param g Graph
 ---@param container LuaGuiElement
 function product_panel.update_machine_panel(g, container)
@@ -641,62 +703,8 @@ function product_panel.update_machine_panel(g, container)
 
     table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
-    local index = 1
     for _, machine in pairs(machines) do
-        local col1 = container.add { type = "flow", direction = "horizontal" }
-
-        local caption
-        if machine.count > 1000 then
-            caption = string.format("%.0f", math.ceil(machine.count))
-        else
-            caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
-        end
-
-        local b = col1.add { type = "choose-elem-button", elem_type = "entity",
-            entity = machine.machine.name, style = green_button, tooltip = { np("machine-tooltip") } }
-        b.locked = true
-        tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
-        b.raise_hover_events = true
-        index = index + 1
-        local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
-
-        local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
-        frecipe.style.right_margin = 5
-        frecipe.locked = true
-        tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
-
-        for _, ingredient in pairs(machine.recipe.ingredients) do
-            local type = ingredient.type
-            b = col1.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = ingredient_button_style }
-            b.locked = true
-            tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
-
-            local amount = ingredient.amount * machine.limited_craft_s * machine.count 
-            amount = fround(amount)
-            b.add { type = "label", style = default_button_label_style,
-                caption = tostring(amount), ignored_by_interaction = true }
-        end
-
-        -- local col2 = container.add { type = "flow", direction = "horizontal" }
-        local col2 = col1
-        local sep = col2.add { type = "sprite", sprite = arrow_sprite }
-        sep.style.left_margin = 5
-        sep.style.top_margin = 10
-        sep.style.right_margin = 5
-
-        for _, product in pairs(machine.recipe.products) do
-            local type = product.type
-            b = col2.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = product_button_style }
-            b.locked = true
-            tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
-
-            local amount = get_product_amount(machine, product)
-
-            amount = amount * machine.count
-            amount = fround(amount)
-            b.add { type = "label", style = default_button_label_style,
-                caption = tostring(amount), ignored_by_interaction = true }
-        end
+        create_product_line(container, machine)
     end
 end
 
@@ -902,5 +910,6 @@ tools.on_named_event(np("unselect"), defines.events.on_gui_click,
         gutils.fire_selection_change(g)
     end)
 
+msettings_panel.create_product_line = create_product_line
 
 return product_panel

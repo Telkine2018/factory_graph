@@ -29,13 +29,13 @@ add({
   key_sequence = "ALT + L",
   consuming = "none"
 })
+--]]
 
 add({
   type = "custom-input",
-  key_sequence = "mouse-button-1",
-  name = prefix .. "-click"
+  key_sequence = "CONTROL + mouse-button-1",
+  name = prefix .. "-control-click"
 })
---]]
 
 ---------------------------------------------
 local function create_symbol(name, filename)
@@ -67,8 +67,8 @@ local function create_symbol(name, filename)
     count = 1
   }
   entity.next_upgrade = nil
-  entity.flags = {"not-in-made-in", "player-creation"}
-  
+  entity.flags = { "not-in-made-in", "player-creation" }
+
   entity.name = name
   add(entity)
   return entity
@@ -248,7 +248,7 @@ add {
   icon = png("item/recipe-symbol"),
   icon_size = 32,
   place_result = commons.recipe_symbol_name,
-  flags = {"hidden","not-stackable", "only-in-cursor"}
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
 }
 
 add {
@@ -257,19 +257,19 @@ add {
   name = prefix .. "-selection_tool",
   icon = png("icon32"),
   icon_size = 32,
-  selection_color = {r = 0, g = 0, b = 1},
-  alt_selection_color = {r = 1, g = 0, b = 0},
-  selection_mode = {"same-force", "any-entity"},
-  alt_selection_mode = {"same-force", "any-entity"},
+  selection_color = { r = 0, g = 0, b = 1 },
+  alt_selection_color = { r = 1, g = 0, b = 0 },
+  selection_mode = { "same-force", "any-entity" },
+  alt_selection_mode = { "same-force", "any-entity" },
   selection_cursor_box_type = "entity",
   alt_selection_cursor_box_type = "entity",
-  flags = {"hidden", "not-stackable", "only-in-cursor", "spawnable"},
+  flags = { "hidden", "not-stackable", "only-in-cursor", "spawnable" },
   subgroup = "other",
   stack_size = 1,
   stackable = false,
   show_in_library = false,
-  entity_type_filters = {"assembling-machine", "furnace"},
-  alt_entity_type_filters = {"assembling-machine", "furnace"}
+  entity_type_filters = { "assembling-machine", "furnace" },
+  alt_entity_type_filters = { "assembling-machine", "furnace" }
 }
 
 data:extend(declarations)
