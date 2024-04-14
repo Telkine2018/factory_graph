@@ -221,6 +221,10 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         ::skip::
     end
 
+    if not found_machine then
+        return nil
+    end
+
     ---@type ProductionConfig
     local config = {
         machine_name = found_machine.name,

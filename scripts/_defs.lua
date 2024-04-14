@@ -41,6 +41,7 @@ local tools = require("scripts.tools")
 ---@field show_only_researched boolean?
 ---@field unrestricted_production boolean?
 ---@field move_recipe GRecipe?
+---@field layout_on_selection boolean?
 
 ---@class GraphConfig
 ---@field visibility integer?
@@ -164,3 +165,10 @@ local tools = require("scripts.tools")
 
 ---@class RemoteConfig
 ---@field recipes {[string]:RemoteRecipe}
+
+---@class RedrawRequest
+---@field selection_changed boolean?
+---@field do_layout boolean?
+---@field center_on_recipe string
+---@field center_on_graph boolean?
+---@field draw_target  boolean?

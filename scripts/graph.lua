@@ -43,7 +43,8 @@ function graph.new(surface)
         iovalues = {},
         show_hidden = false,
         show_only_researched = false,
-        visibility = commons.visibility_all
+        visibility = commons.visibility_all,
+        layout_on_selection = true
     }
 end
 
@@ -975,28 +976,63 @@ function graph.refresh(player, keep_location)
 end
 
 ---@param player LuaPlayer
----@param selection_changed boolean
-function graph.deferred_redraw(player, selection_changed)
+---@param data RedrawRequest?
+function graph.deferred_update(player, data)
     local redraw_queue = global.redraw_queue
     if not redraw_queue then
         redraw_queue = {}
         global.redraw_queue = redraw_queue
     end
-    redraw_queue[player.index] = selection_changed
+    if not data then
+        data = {
+            selection_changed = true
+        }
+    end
+    local previous_data = redraw_queue[player.index]
+    if previous_data then
+        for key, value in pairs(data) do
+            previous_data[key] = data[key]
+        end
+    else
+        redraw_queue[player.index] = data
+    end
 end
 
 tools.on_event(defines.events.on_tick,
     function(e)
+        ---@type {[integer]:RedrawRequest}
         local redraw_queue = global.redraw_queue
         if not redraw_queue then
             return
         end
         global.redraw_queue = nil
-        for player_index, selection_changed in pairs(redraw_queue) do
+        for player_index, data in pairs(redraw_queue) do
+            local g = gutils.get_graph(game.players[player_index])
+            if data.do_layout then
+                drawing.clear_selection(g)
+                gutils.compute_visibility(g)
+                drawing.delete_content(g)
+                graph.do_layout(g)
+                graph.create_recipe_objects(g)
+            end
             drawing.redraw_selection(game.players[player_index])
-            if selection_changed then
-                local g = gutils.get_graph(game.players[player_index])
+            if data.selection_changed then
                 gutils.fire_selection_change(g)
+            end
+            if data.center_on_recipe then
+                if g.player.surface_index == g.surface.index then
+                    gutils.move_to_recipe(g.player, data.center_on_recipe)
+                end
+            elseif data.center_on_graph then
+                if g.player.surface_index == g.surface.index then
+                    gutils.recenter(g)
+                end
+            end
+            if data.draw_target and data.center_on_recipe then
+                local grecipe = g.recipes[data.center_on_recipe]
+                if grecipe then
+                    drawing.draw_target(g, grecipe)
+                end
             end
         end
     end

@@ -53,7 +53,7 @@ local function do_mine(e, to_cursor)
         grecipe.entity = nil
     end
 
-    graph.deferred_redraw(player, true)
+    graph.deferred_update(player)
 
     if e.buffer then
         e.buffer.clear()
@@ -146,7 +146,7 @@ local function on_build(entity, e, revive)
         drawing.clear_selection(g)
         graph.create_recipe_object(g, grecipe)
     end
-    graph.deferred_redraw(player, true)
+    graph.deferred_update(player)
 end
 
 ---@param ev EventData.on_robot_built_entity

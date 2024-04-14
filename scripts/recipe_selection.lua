@@ -270,8 +270,18 @@ function recipe_selection.open(g, product, recipe, only_product, nohistory)
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
     recipe_table.style.horizontally_stretchable = true
 
+    local remaining_frame = frame.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding"
+    }
+    local remaining_pane = remaining_frame.add { type = "table", column_count = 14, name = "remaining_pane" }
+    remaining_pane.style.horizontally_stretchable = true
+    remaining_pane.style.minimal_height = 30
+    recipe_selection.display_remaining(g, remaining_pane)
+
     if recipes and table_size(recipes) > 0 then
-        recipe_selection.display(player, recipes, recipe_table)
+        recipe_selection.display_recipes(player, recipes, recipe_table)
     end
 
     if g.rs_location then
@@ -324,7 +334,7 @@ function recipe_selection.show_recipes(player, recipes)
     if not recipe_table then return end
 
     recipe_table.clear()
-    recipe_selection.display(player, recipes, recipe_table)
+    recipe_selection.display_recipes(player, recipes, recipe_table)
 end
 
 tools.on_named_event(np("search_button"), defines.events.on_gui_click,
@@ -379,7 +389,6 @@ local function set_recipes_to_selection(player)
             else
                 g.selection[name] = nil
             end
-            gutils.fire_selection_change(g)
         end
     end
     return recipes, not_visible
@@ -391,14 +400,22 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
         local g = gutils.get_graph(player)
 
         local _, not_visible = set_recipes_to_selection(player)
-
         for _, grecipe in pairs(not_visible) do
             grecipe.visible = true
             graph.insert_recipe(g, grecipe)
         end
         graph.create_recipe_objects(g)
         gutils.select_current_recipe(g, g.rs_recipe)
-        drawing.redraw_selection(player)
+        local recipe_name
+        if e.element.state then
+            recipe_name = e.element.tags.recipe_name --[[@as string]]
+        end
+        graph.deferred_update(player, {
+            selection_changed = true,
+            do_layout = g.layout_on_selection,
+            center_on_recipe = recipe_name,
+            draw_target = true
+        })
     end)
 
 ---@param player_index integer|uint32
@@ -413,10 +430,24 @@ function recipe_selection.close(player_index)
     end
 end
 
+---@param g Graph
+---@param remaining_pane LuaGuiElement
+function recipe_selection.display_remaining(g, remaining_pane)
+    remaining_pane.clear()
+    local inputs = gutils.get_product_flow(g)
+    for _, gproduct in pairs(inputs) do
+        if not gproduct.is_root then
+            local b = gutils.create_product_button(remaining_pane, gproduct.name)
+            b.style.size = sprite_button_size
+            tools.set_name_handler(b, np("remaining"), { product_name = gproduct.name })
+        end
+    end
+end
+
 ---@param player LuaPlayer
 ---@param recipes table<string, GRecipe>
 ---@param recipe_table LuaGuiElement
-function recipe_selection.display(player, recipes, recipe_table)
+function recipe_selection.display_recipes(player, recipes, recipe_table)
     local player_index = player.index
     ---@cast player_index integer
     local g = gutils.get_graph(player)
@@ -796,8 +827,7 @@ tools.on_gui_click(np("select-all"),
                 cb.state = true
             end
         end
-        graph.refresh(player)
-        gutils.fire_selection_change(g)
+        graph.deferred_update(player, { do_layout = true, center_on_graph = true })
     end)
 
 
@@ -848,6 +878,33 @@ tools.on_named_event(np("forward"), defines.events.on_gui_click,
     function(e)
         forward_history(game.players[e.player_index])
     end)
+
+tools.on_named_event(np("remaining"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        local product_name = e.element.tags.product_name --[[@as string]]
+        if not product_name then return end
+        local gproduct = g.products[product_name]
+        if not gproduct then return end
+        recipe_selection.open(g, gproduct, nil, true)
+    end)
+
+
+tools.register_user_event(commons.selection_change_event, function(data)
+    ---@type Graph
+    local g = data.g
+    local player = g.player
+
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local remaining_pane = tools.get_child(frame, "remaining_pane")
+    if not remaining_pane then return end
+
+    recipe_selection.display_remaining(g, remaining_pane)
+end)
 
 drawing.open_recipe_selection = recipe_selection.open
 return recipe_selection

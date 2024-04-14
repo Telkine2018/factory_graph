@@ -87,10 +87,9 @@ end
 function gutils.get_colline(g, x, y)
     local grid_size = g.grid_size
     local col = math.floor((x - 0.5 + grid_size / 2) / grid_size)
-    local line = math.floor((y - 0.5 + grid_size / 2) / grid_size )
-    return col,line
+    local line = math.floor((y - 0.5 + grid_size / 2) / grid_size)
+    return col, line
 end
-
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -185,7 +184,6 @@ function gutils.select_current_recipe(g, recipe)
     if not recipe then return false end
     if g.selection[recipe.name] then return false end
     g.selection[recipe.name] = recipe
-    gutils.fire_selection_change(g)
     return true
 end
 
@@ -327,24 +325,33 @@ function gutils.get_product_flow(g, all)
     local selection = g.selection
     if not selection then selection = {} end
     local recipe_count = 0
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
-            for _, ingredient in pairs(recipe.ingredients) do
-                local name = ingredient.name
-                inputs[name] = ingredient
-            end
-        end
-        recipe_count = recipe_count + 1
+    ---@type {[string]:GRecipe}
+    local recipes
+    if all then
+        recipes = g.recipes
+    else
+        recipes = g.selection
     end
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
-            for _, product in pairs(recipe.products) do
-                local name = product.name
-                if inputs[name] then
-                    intermediates[name] = product
-                    inputs[name] = nil
-                elseif not intermediates[name] then
-                    outputs[name] = product
+    if recipes then
+        for _, recipe in pairs(recipes) do
+            if recipe.visible and not recipe.is_product then
+                for _, ingredient in pairs(recipe.ingredients) do
+                    local name = ingredient.name
+                    inputs[name] = ingredient
+                end
+            end
+            recipe_count = recipe_count + 1
+        end
+        for _, recipe in pairs(recipes) do
+            if recipe.visible and not recipe.is_product then
+                for _, product in pairs(recipe.products) do
+                    local name = product.name
+                    if inputs[name] then
+                        intermediates[name] = product
+                        inputs[name] = nil
+                    elseif not intermediates[name] then
+                        outputs[name] = product
+                    end
                 end
             end
         end
@@ -507,7 +514,6 @@ end
 ---@param products {[string]:any}
 ---@return {[string]:GRecipe}
 function gutils.get_connected_recipes(g, products)
-
     ---@type {[string]:GProduct}
     local to_scan = {}
     local done_scan = {}
@@ -547,7 +553,6 @@ end
 ---@param col integer
 ---@param line integer
 function gutils.set_colline(g, grecipe, col, line)
-
     local gcol = g.gcols[grecipe.col]
     gcol.line_set[grecipe.line] = nil
 
@@ -575,8 +580,8 @@ end
 ---@param recipe_name string
 function gutils.set_cursor_stack(player, recipe_name)
     player.cursor_stack.clear()
-    player.cursor_stack.set_stack{name=commons.recipe_symbol_name, count=1}
-    player.cursor_stack.tags = { recipe_name = recipe_name}
+    player.cursor_stack.set_stack { name = commons.recipe_symbol_name, count = 1 }
+    player.cursor_stack.tags = { recipe_name = recipe_name }
 end
 
 return gutils

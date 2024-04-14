@@ -21,7 +21,8 @@ local label_style_top = prefix .. "_count_label_top"
 local default_button_style = prefix .. "_button_default"
 local default_button_label_style = prefix .. "_count_label_bottom"
 
-local arrow_sprite = prefix .. "_arrow"
+local arrow_sprite_white = prefix .. "_arrow-white"
+local arrow_sprite_black = prefix .. "_arrow"
 
 local math_precision = commons.math_precision
 local abs = math.abs
@@ -565,10 +566,18 @@ local function create_product_line(container, machine)
 
     -- local col2 = container.add { type = "flow", direction = "horizontal" }
     local col2 = col1
-    local sep = col2.add { type = "sprite", sprite = arrow_sprite }
-    sep.style.left_margin = 5
-    sep.style.top_margin = 10
-    sep.style.right_margin = 5
+
+    local b = col2.add {
+        type = "sprite-button",
+        name = np("goto"),
+        tooltip = { np("goto-tooltip") },
+        mouse_button_filter = { "left" },
+        sprite = arrow_sprite_white,
+        hovered_sprite = arrow_sprite_black,
+        tags = {recipe_name=machine.name}
+    }
+    b.style.size = 24
+    b.style.margin = 5
 
     for _, product in pairs(machine.recipe.products) do
         local type = product.type
@@ -908,6 +917,26 @@ tools.on_named_event(np("unselect"), defines.events.on_gui_click,
         end
         graph.refresh(g.player)
         gutils.fire_selection_change(g)
+    end)
+
+tools.on_gui_click(np("goto"),
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local recipe_name = e.element.tags.recipe_name --[[@as string]]
+        local g = gutils.get_graph(player)
+        local recipe = g.recipes[recipe_name]
+        if not recipe or not recipe.visible then
+            return
+        end
+        local position = gutils.get_recipe_position(g, recipe)
+        drawing.draw_target(g, recipe)
+        if e.control then
+            player.teleport(position, g.surface, false)
+        else
+            gutils.move_view(player, position)
+        end
+        product_panel.close(player)
     end)
 
 msettings_panel.create_product_line = create_product_line
