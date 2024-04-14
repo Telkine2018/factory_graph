@@ -44,7 +44,6 @@ local product_panel_name = np("frame")
 local input_qty_name = np("frame")
 local location_name = np("location")
 local min_name = np("mini")
--- tools.add_panel_name(product_panel_name)
 
 local fround = tools.fround
 
@@ -222,7 +221,11 @@ function product_panel.create_product_tables(player)
     end
 
     local g = gutils.get_graph(player)
-    local inputs, outputs, intermediates = gutils.get_product_flow(g)
+    local recipes = g.recipes
+    if g.use_connected_recipes then
+        recipes = gutils.get_connected_recipes(g, g.iovalues)
+    end
+    local inputs, outputs, intermediates = gutils.get_product_flow(g, recipes)
 
     local column_count = 3
     local column_width = 120
@@ -574,7 +577,7 @@ local function create_product_line(container, machine)
         mouse_button_filter = { "left" },
         sprite = arrow_sprite_white,
         hovered_sprite = arrow_sprite_black,
-        tags = {recipe_name=machine.name}
+        tags = { recipe_name = machine.name }
     }
     b.style.size = 24
     b.style.margin = 5
@@ -842,7 +845,25 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             cursor_stack.set_stack { name = "blueprint", count = 1 }
             cursor_stack.set_blueprint_entities { bp_entity }
             player.cursor_stack_temporary = true
-        elseif not e.shift then
+        elseif e.shift then
+            ---@type ProductionMachine
+            local machine = grecipe.machine
+            if not machine or not machine.machine then return end
+            local item = machine.machine.items_to_place_this[1]
+            local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item", 
+                    elem_filters = { { filter = "name", name=item } } } }
+
+            if string.find(player.surface.name, commons.surface_prefix_filter) then
+                gutils.exit(player)
+            end
+
+            if #recipes > 0 then
+                for name in pairs(recipes) do
+                    player.begin_crafting { recipe = name,  count = 1 }
+                    break
+                end
+            end
+        else
             msettings_panel.create(e.player_index, grecipe)
         end
     end)

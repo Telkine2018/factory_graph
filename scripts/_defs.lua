@@ -26,6 +26,7 @@ local tools = require("scripts.tools")
 ---@field rs_location GuiLocation?
 ---@field selector_id integer?                      @ selector rectangle id
 ---@field selector_product_name_id integer?         @ selector text id
+---@field use_connected_recipes boolean
 ---@field product_outputs {[string]:number}
 ---@field product_inputs {[string]:number}
 ---@field production_failed LocalisedString?
@@ -39,7 +40,7 @@ local tools = require("scripts.tools")
 ---@field grid_size integer
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
----@field unrestricted_production boolean?
+---@field always_use_full_selection boolean?
 ---@field move_recipe GRecipe?
 ---@field layout_on_selection boolean?
 

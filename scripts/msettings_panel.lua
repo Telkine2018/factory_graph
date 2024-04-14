@@ -15,10 +15,7 @@ end
 local panel_name = np("frame")
 commons.msettings_panel_name = panel_name
 
-tools.add_panel_name(panel_name)
-
 local msettings = {}
-
 
 ---@param container LuaGuiElement
 ---@param config ProductionConfig

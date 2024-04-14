@@ -15,7 +15,7 @@ local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
-local log_enabled = true
+local log_enabled = false
 
 local floor = math.floor
 local ceil = math.ceil
@@ -599,7 +599,7 @@ function graph.do_layout(g)
         end
     end
 
-    local inputs, outputs, intermediates, recipe_count = gutils.get_product_flow(g, true)
+    local inputs = gutils.get_product_flow(g, g.recipes)
     local gcol = {
         col = 1,
         line_set = {}

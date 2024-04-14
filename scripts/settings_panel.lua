@@ -73,8 +73,11 @@ function settings_panel.create(player_index)
     flow.add { type = "checkbox", name = "show_only_researched", state = not not g.show_only_researched }
 
     flow.add { type = "label", caption = { np("layout-on-selection") } }
-    flow.add { type = "checkbox", name = "layout-on-selection", state = not not g.layout_on_selection }
+    flow.add { type = "checkbox", name = "layout-on-selection", state = not not g.layout_on_selection, tooltip={np("layout_on_selection_tooltip")} }
 
+    flow.add { type = "label", caption = { np("always_use_full_selection") } }
+    flow.add { type = "checkbox", name = "always_use_full_selection", state = not not g.always_use_full_selection, tooltip={np("always_use_full_selection_tooltip")} }
+    
     flow.add { type = "label", caption = { np("preferred_machines") }}
     local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name="preferred_machines"  }
     if g.preferred_machines then
@@ -205,6 +208,7 @@ local function save(player, frame)
     local show_hidden = field_table.show_hidden.state
     local show_only_researched = field_table.show_only_researched.state
     local layout_on_selection = field_table["layout-on-selection"].state
+    local always_use_full_selection = field_table.always_use_full_selection.state
 
     local preferred_machines = blist_values(field_table.preferred_machines)
 
@@ -215,6 +219,7 @@ local function save(player, frame)
     local preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
 
     g.layout_on_selection = layout_on_selection
+    g.always_use_full_selection = always_use_full_selection
     if show_hidden ~= g.show_hidden or show_only_researched ~= g.show_only_researched then
         g.show_hidden = show_hidden
         g.show_only_researched = show_only_researched

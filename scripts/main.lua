@@ -438,4 +438,7 @@ tools.on_event(defines.events.on_player_alt_selected_area,
     on_player_alt_selected_area)
 
 
+gutils.exit = main.exit
+gutils.enter = main.enter
+
 return main

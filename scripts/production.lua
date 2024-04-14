@@ -222,10 +222,12 @@ function production.compute_matrix(g)
 
     ---@type {[string]:GRecipe}
     local connected_recipes
-    if g.unrestricted_production or has_neg_value then
+    g.use_connected_recipes = false
+    if g.always_use_full_selection or has_neg_value then
         connected_recipes = g.selection --[[@as {[string]:GRecipe}]]
     else
         connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
+        g.use_connected_recipes = true
     end
     graph.sort_recipes(connected_recipes)
 

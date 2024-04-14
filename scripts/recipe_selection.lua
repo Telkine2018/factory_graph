@@ -434,7 +434,7 @@ end
 ---@param remaining_pane LuaGuiElement
 function recipe_selection.display_remaining(g, remaining_pane)
     remaining_pane.clear()
-    local inputs = gutils.get_product_flow(g)
+    local inputs = gutils.get_product_flow(g, g.selection)
     for _, gproduct in pairs(inputs) do
         if not gproduct.is_root then
             local b = gutils.create_product_button(remaining_pane, gproduct.name)

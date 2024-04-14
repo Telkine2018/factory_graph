@@ -306,12 +306,12 @@ function gutils.get_connected_productions(grecipe, result)
 end
 
 ---@param g Graph
----@param all boolean?
+---@param recipes {[string]:GRecipe}?
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return integer
-function gutils.get_product_flow(g, all)
+function gutils.get_product_flow(g, recipes)
     ---@type table<string, GProduct>
     local inputs
     ---@type table<string, GProduct>
@@ -325,13 +325,6 @@ function gutils.get_product_flow(g, all)
     local selection = g.selection
     if not selection then selection = {} end
     local recipe_count = 0
-    ---@type {[string]:GRecipe}
-    local recipes
-    if all then
-        recipes = g.recipes
-    else
-        recipes = g.selection
-    end
     if recipes then
         for _, recipe in pairs(recipes) do
             if recipe.visible and not recipe.is_product then
@@ -583,5 +576,12 @@ function gutils.set_cursor_stack(player, recipe_name)
     player.cursor_stack.set_stack { name = commons.recipe_symbol_name, count = 1 }
     player.cursor_stack.tags = { recipe_name = recipe_name }
 end
+
+---@param player LuaPlayer
+function gutils.exit(player) end
+
+---@param player LuaPlayer
+function gutils.enter(player) end
+
 
 return gutils
