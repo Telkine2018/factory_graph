@@ -36,6 +36,7 @@ local sprite_button_size = 30
 ---@return table<string, GRecipe>?
 function load_initial_recipes(g, product, recipe, only_product)
     local recipes = {}
+
     if product and recipe then
         if product.product_of[recipe.name] then
             for name, i_recipe in pairs(product.ingredient_of) do
@@ -73,14 +74,98 @@ function load_initial_recipes(g, product, recipe, only_product)
     return recipes
 end
 
+---@param player LuaPlayer
+---@param gproduct GProduct?
+---@param grecipe GRecipe?
+local function push_history(player, gproduct, grecipe)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        history = {}
+        vars.recipe_history = history
+        vars.recipe_history_index = 0
+    end
+    local recipe_name = grecipe and grecipe.name
+    local product_name = gproduct and gproduct.name
+
+    local index = vars.recipe_history_index
+    if index > 0 then
+        local top = history[index]
+        if top.recipe_name == recipe_name and top.product_name == product_name then
+            return
+        end
+    end
+
+    --[[
+        history: [h1 h2]
+        index: 1
+    ]]
+    while #history > index do
+        table.remove(history, index + 1)
+    end
+    while #history > 20 do
+        table.remove(history, 1)
+        index = index - 1
+    end
+
+    table.insert(history, { product_name = product_name, recipe_name = recipe_name })
+    index = index + 1
+    vars.recipe_history_index = index
+end
+
+---@param player LuaPlayer
+local function backward_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        return
+    end
+
+    local index = vars.recipe_history_index
+    if index < 2 then return end
+
+    index = index - 1
+    local top = history[index]
+    vars.recipe_history_index = index
+    local g = gutils.get_graph(player)
+    local gproduct = top.product_name and g.products[top.product_name]
+    local grecipe = top.recipe_name and g.recipes[top.recipe_name]
+    recipe_selection.open(g, gproduct, grecipe, false, true)
+end
+
+---@param player LuaPlayer
+local function forward_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        return
+    end
+
+    local index = vars.recipe_history_index
+    if index >= #history then return end
+
+    index = index + 1
+    local top = history[index]
+    vars.recipe_history_index = index
+    local g = gutils.get_graph(player)
+    local gproduct = top.product_name and g.products[top.product_name]
+    local grecipe = top.recipe_name and g.recipes[top.recipe_name]
+    recipe_selection.open(g, gproduct, grecipe)
+end
+
+
 ---@param g Graph
 ---@param product GProduct?
 ---@param recipe GRecipe?
 ---@param only_product boolean?
-function recipe_selection.open(g, product, recipe, only_product)
+---@param nohistory boolean?
+function recipe_selection.open(g, product, recipe, only_product, nohistory)
     local player = g.player
     local player_index = player.index
 
+    if not nohistory then
+        push_history(player, product, recipe)
+    end
     g.rs_product = product
     g.rs_recipe = recipe
 
@@ -102,7 +187,27 @@ function recipe_selection.open(g, product, recipe, only_product)
         create_inner_frame   = true,
         close_button_name    = np("close"),
         close_button_tooltip = { np("close-tooltip") },
-        is_draggable         = true
+        is_draggable         = true,
+        title_menu_func      = function(titleflow)
+            local b = titleflow.add {
+                type = "sprite-button",
+                name = "backward",
+                style = "frame_action_button",
+                mouse_button_filter = { "left" },
+                sprite = prefix .. "_backward-white",
+                hovered_sprite = prefix .. "_backward-black"
+            }
+            tools.set_name_handler(b, np("backward"))
+            local b = titleflow.add {
+                type = "sprite-button",
+                name = "forward",
+                style = "frame_action_button",
+                mouse_button_filter = { "left" },
+                sprite = prefix .. "_forward-white",
+                hovered_sprite = prefix .. "_forward-black"
+            }
+            tools.set_name_handler(b, np("forward"))
+        end
     }
     local frame, inner_frame                   = tools.create_standard_panel(player, params)
 
@@ -732,6 +837,17 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
         recipe_selection.close(player.index)
     end)
 
+tools.on_named_event(np("backward"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        backward_history(game.players[e.player_index])
+    end)
+
+tools.on_named_event(np("forward"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        forward_history(game.players[e.player_index])
+    end)
 
 drawing.open_recipe_selection = recipe_selection.open
 return recipe_selection

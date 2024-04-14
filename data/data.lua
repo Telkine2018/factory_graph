@@ -212,6 +212,38 @@ sprite = {
 add(sprite)
 
 add {
+  type = "sprite",
+  name = prefix .. "_backward-black",
+  filename = png("backward-black"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_backward-white",
+  filename = png("backward-white"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_forward-black",
+  filename = png("forward-black"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_forward-white",
+  filename = png("forward-white"),
+  width = 32,
+  height = 32
+}
+
+add {
   type = "custom-input",
   name = prefix .. "-up",
   key_sequence = "SHIFT + UP"
