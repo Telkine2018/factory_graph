@@ -23,7 +23,7 @@ tools.add_panel_name(settings_panel_name)
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
     local b = container.add { type = "choose-elem-button", elem_type = "entity", entity = machine_name,
-        elem_filters = { { filter = "type", type = "assembling-machine" },  { filter = "type", type = "furnace" } } }
+        elem_filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } } }
     tools.set_name_handler(b, np("preferred_machines"))
     return b
 end
@@ -33,7 +33,7 @@ end
 ---@return LuaGuiElement
 local function add_module_button(container, module_name)
     local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
-        elem_filters = { { filter = "type", type="module" } } }
+        elem_filters = { { filter = "type", type = "module" } } }
     tools.set_name_handler(b, np("preferred_modules"))
     return b
 end
@@ -61,7 +61,7 @@ function settings_panel.create(player_index)
     }
     local frame, inner_frame = tools.create_standard_panel(player, params)
 
-    local flow = inner_frame.add { type = "table", column_count = 2, name="field_table" }
+    local flow = inner_frame.add { type = "table", column_count = 2, name = "field_table" }
 
     flow.add { type = "label", caption = { np("grid-size") } }
     flow.add { type = "textfield", numeric = true, text = tostring(g.grid_size), name = "grid_size" }
@@ -73,13 +73,19 @@ function settings_panel.create(player_index)
     flow.add { type = "checkbox", name = "show_only_researched", state = not not g.show_only_researched }
 
     flow.add { type = "label", caption = { np("layout-on-selection") } }
-    flow.add { type = "checkbox", name = "layout-on-selection", state = not not g.layout_on_selection, tooltip={np("layout_on_selection_tooltip")} }
+    flow.add { type = "checkbox", name = "layout-on-selection", state = not not g.layout_on_selection, tooltip = { np("layout_on_selection_tooltip") } }
 
     flow.add { type = "label", caption = { np("always_use_full_selection") } }
-    flow.add { type = "checkbox", name = "always_use_full_selection", state = not not g.always_use_full_selection, tooltip={np("always_use_full_selection_tooltip")} }
-    
-    flow.add { type = "label", caption = { np("preferred_machines") }}
-    local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name="preferred_machines"  }
+    flow.add { type = "checkbox", name = "always_use_full_selection", state = not not g.always_use_full_selection, tooltip = { np("always_use_full_selection_tooltip") } }
+
+    flow.add { type = "label", caption = { np("graph_zoom_level") } }
+    flow.add { type = "textfield", name = "graph_zoom_level", text = g.graph_zoom_level and tostring(g.graph_zoom_level) or 1, numeric = true, allow_decimal = true }
+
+    flow.add { type = "label", caption = { np("world_zoom_level") } }
+    flow.add { type = "textfield", name = "world_zoom_level", text = g.world_zoom_level and tostring(g.world_zoom_level) or 1, numeric = true, allow_decimal = true }
+
+    flow.add { type = "label", caption = { np("preferred_machines") } }
+    local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_machines" }
     if g.preferred_machines then
         for _, machine_name in pairs(g.preferred_machines) do
             add_machine_button(pmachine_flow, machine_name)
@@ -96,21 +102,21 @@ function settings_panel.create(player_index)
     end
     add_module_button(pmodule_flow)
 
-    flow.add { type = "label", caption = { np("preferred_beacon") }}
-    flow.add { type = "choose-elem-button", elem_type = "entity", elem_filters = { { filter = "type", type = "beacon" } }, 
-            name = "preferred_beacon", entity=g.preferred_beacon }
+    flow.add { type = "label", caption = { np("preferred_beacon") } }
+    flow.add { type = "choose-elem-button", elem_type = "entity", elem_filters = { { filter = "type", type = "beacon" } },
+        name = "preferred_beacon", entity = g.preferred_beacon }
 
     flow.add { type = "label", caption = { np("preferred_beacon_count") } }
-    flow.add { type = "textfield", numeric = true, text = tostring(g.preferred_beacon_count or 0), 
+    flow.add { type = "textfield", numeric = true, text = tostring(g.preferred_beacon_count or 0),
         name = "preferred_beacon_count" }
 
-    local bpanel = frame.add{type="flow", direction="horizontal"}
-    local b = bpanel.add{type="button", caption={np("save")}}
+    local bpanel = frame.add { type = "flow", direction = "horizontal" }
+    local b = bpanel.add { type = "button", caption = { np("save") } }
     tools.set_name_handler(b, np("save"))
 
-    b = bpanel.add{type="button", caption={np("cancel")}}
+    b = bpanel.add { type = "button", caption = { np("cancel") } }
     tools.set_name_handler(b, np("cancel"))
-    
+
     frame.force_auto_center()
 end
 
@@ -193,7 +199,6 @@ tools.on_named_event(np("close"), defines.events.on_gui_click,
 ---@param player LuaPlayer
 ---@param frame LuaGuiElement
 local function save(player, frame)
-
     local field_table = tools.get_child(frame, "field_table")
     if not field_table then return end
 
@@ -201,7 +206,7 @@ local function save(player, frame)
 
     local grid_size_value = tonumber(field_table.grid_size.text)
     if not grid_size_value or grid_size_value < 2 or grid_size_value > 10 then
-        player.print({np("invalid_grid_size")})
+        player.print({ np("invalid_grid_size") })
         return
     end
 
@@ -220,13 +225,11 @@ local function save(player, frame)
 
     g.layout_on_selection = layout_on_selection
     g.always_use_full_selection = always_use_full_selection
-    if show_hidden ~= g.show_hidden or show_only_researched ~= g.show_only_researched then
-        g.show_hidden = show_hidden
-        g.show_only_researched = show_only_researched
-        local recipes = player.force.recipes
-        graph.update_recipes(g, recipes, g.excluded_categories)
-        graph.refresh(player)
-    elseif grid_size_value ~= g.grid_size then
+    g.graph_zoom_level = tonumber(field_table.graph_zoom_level.text)
+    g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
+    g.show_hidden = show_hidden
+    g.show_only_researched = show_only_researched
+    if grid_size_value ~= g.grid_size then
         g.grid_size = grid_size_value
         graph.refresh(player)
     end
@@ -256,7 +259,7 @@ tools.on_named_event(np("cancel"), defines.events.on_gui_click,
     end
 )
 
-tools.on_event(defines.events.on_gui_confirmed, 
+tools.on_event(defines.events.on_gui_confirmed,
     ---@param e EventData.on_gui_confirmed
     function(e)
         if not e.element.valid then return end

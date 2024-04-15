@@ -90,7 +90,9 @@ local function on_build(entity, e, revive)
 
     local surface_name = surface.name
     if not string.find(surface_name, commons.surface_prefix_filter) then
-        entity.destroy()
+        if entity.name ~= "entity-ghost" then
+            entity.destroy()
+        end
         return
     end
 

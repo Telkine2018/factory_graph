@@ -123,10 +123,11 @@ function product_panel.create(player_index)
         style = "inside_shallow_frame_with_padding"
     }
     machine_frame.style.minimal_width = 200
-    machine_frame.style.vertically_stretchable = true
     machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
     local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
     local machine_flow = machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
+    local empty = machine_frame.add {type="empty-widget"}
+    empty.style.vertically_stretchable = true
     product_panel.update_machine_panel(g, machine_flow)
 
     local location = vars[location_name]
@@ -224,6 +225,9 @@ function product_panel.create_product_tables(player)
     local recipes = g.recipes
     if g.use_connected_recipes then
         recipes = gutils.get_connected_recipes(g, g.iovalues)
+        if not next(recipes) then
+            recipes = g.recipes
+        end
     end
     local inputs, outputs, intermediates = gutils.get_product_flow(g, recipes)
 
@@ -823,6 +827,10 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
         if e.control then
             local machine = grecipe.machine
             if not machine then return end
+
+            if string.find(player.surface.name, commons.surface_prefix_filter) then
+                gutils.exit(player)
+            end
 
             local bp_entity = {
 

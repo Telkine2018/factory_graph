@@ -194,6 +194,13 @@ function main.enter_surface(player)
         player_position = g.player_position
     end
     player.teleport(player_position, surface)
+    local zoom = g.graph_zoom_level
+    if zoom then
+        if zoom < 0.2 then zoom = 0.2
+        elseif zoom > 5 then zoom = 5
+        end
+        player.zoom = zoom
+    end
     return surface
 end
 
@@ -210,6 +217,14 @@ function main.exit(player)
         end
         g.player_position = player.position
         player.teleport(extern_position, character.surface, true)
+
+        local zoom = g.world_zoom_level
+        if zoom then
+            if zoom < 0.2 then zoom = 0.2
+            elseif zoom > 5 then zoom = 5
+            end
+            player.zoom = zoom
+        end
     end
 end
 
