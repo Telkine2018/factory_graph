@@ -205,9 +205,6 @@ function gutils.compute_visibility(g, keep_position)
                     grecipe.col = nil
                 end
                 grecipe.visible = true
-                if show_only_researched and not grecipe.enabled then
-                    grecipe.visible = false
-                end
             else
                 grecipe.line = nil
                 grecipe.col = nil

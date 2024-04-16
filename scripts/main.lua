@@ -196,8 +196,10 @@ function main.enter_surface(player)
     player.teleport(player_position, surface)
     local zoom = g.graph_zoom_level
     if zoom then
-        if zoom < 0.2 then zoom = 0.2
-        elseif zoom > 5 then zoom = 5
+        if zoom < 0.2 then
+            zoom = 0.2
+        elseif zoom > 5 then
+            zoom = 5
         end
         player.zoom = zoom
     end
@@ -220,8 +222,10 @@ function main.exit(player)
 
         local zoom = g.world_zoom_level
         if zoom then
-            if zoom < 0.2 then zoom = 0.2
-            elseif zoom > 5 then zoom = 5
+            if zoom < 0.2 then
+                zoom = 0.2
+            elseif zoom > 5 then
+                zoom = 5
             end
             player.zoom = zoom
         end
@@ -295,8 +299,13 @@ tools.on_configuration_changed(function(data)
     for _, player in pairs(game.players) do
         create_player_button(player)
 
+        local vars = tools.get_vars(player)
+        if vars.character_speed then
+            main.set_speed(player, true)
+        end
+
         ---@type Graph
-        local g = tools.get_vars(player).graph
+        local g = vars.graph
         if g then
             if not g.grid_size then
                 g.grid_size = commons.grid_size
@@ -452,6 +461,18 @@ tools.on_event(defines.events.on_player_selected_area, on_player_selected_area)
 tools.on_event(defines.events.on_player_alt_selected_area,
     on_player_alt_selected_area)
 
+
+---@param player LuaPlayer
+---@param value boolean?
+function main.set_speed(player, value)
+    if not value then
+        player.force.character_running_speed_modifier = 0
+        player.force.manual_crafting_speed_modifier   = 0
+    else
+        player.force.character_running_speed_modifier = 3
+        player.force.manual_crafting_speed_modifier   = 3
+    end
+end
 
 gutils.exit = main.exit
 gutils.enter = main.enter

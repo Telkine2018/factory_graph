@@ -27,6 +27,17 @@ local function load_current(flow, save)
     flow.label.text = save.label
 end
 
+---@param player LuaPlayer
+function saving.clear_current(player)
+    local frame = player.gui.screen[panel_name]
+    if not (frame and frame.valid) then return end
+    local flow = tools.get_child(frame, "new_flow")
+    if not flow then return end
+    flow.icon1.elem_value = nil
+    flow.icon2.elem_value = nil
+    flow.label.text = nil
+end
+
 ---@param player_index integer
 function saving.create(player_index)
     local player = game.players[player_index]
@@ -49,8 +60,8 @@ function saving.create(player_index)
         create_inner_frame   = true
     }
     local frame, inner_frame                 = tools.create_standard_panel(player, params)
-    frame.style.width                        = 800
-    frame.style.minimal_height               = 400
+    frame.style.minimal_width                = 400
+    frame.style.height                       = 400
 
     local newflow                            = inner_frame.add { type = "flow", name = "new_flow" }
     newflow.style.horizontally_stretchable   = true
@@ -72,8 +83,8 @@ function saving.create(player_index)
     container.style.horizontally_stretchable = true
     container.style.vertically_stretchable   = true
 
-    if vars.current_save then
-        load_current(newflow, vars.current_save)
+    if vars.saving_current then
+        load_current(newflow, vars.saving_current)
     end
 
     ---@type Saving[]
@@ -83,7 +94,12 @@ function saving.create(player_index)
     end
 
     saving.update(player, container)
-    frame.force_auto_center()
+    local location = vars.saving_location
+    if location then
+        frame.location = location
+    else
+        frame.force_auto_center()
+    end
 end
 
 ---@param player LuaPlayer
@@ -96,20 +112,21 @@ function saving.update(player, container)
     if not saves then
         saves = {}
     end
-
     container.clear()
     for _, save in pairs(saves) do
-        local line                               = container.add { type = "flow", direction = "horizontal" }
+        local line    = container.add { type = "flow", direction = "horizontal" }
 
-        local signal1                            = tools.sprite_to_signal(save.icon1)
-        local b                                  = line.add { type = "choose-elem-button", elem_type = "signal", signal = signal1 }
-        b.locked                                 = true
-        b.style.size                             = button_size
+        local signal1 = tools.sprite_to_signal(save.icon1)
+        local b       = line.add { type = "choose-elem-button", elem_type = "signal", signal = signal1, tooltip = { np("load-tooltip") }, name = "b1" }
+        b.locked      = true
+        b.style.size  = button_size
+        tools.set_name_handler(b, np("load"))
 
-        local signal2                            = tools.sprite_to_signal(save.icon2)
-        b                                        = line.add { type = "choose-elem-button", elem_type = "signal", signal = signal2 }
-        b.locked                                 = true
-        b.style.size                             = button_size
+        local signal2 = tools.sprite_to_signal(save.icon2)
+        b             = line.add { type = "choose-elem-button", elem_type = "signal", signal = signal2, tooltip = { np("load-tooltip") }, name = "b2" }
+        b.locked      = true
+        b.style.size  = button_size
+        tools.set_name_handler(b, np("load"))
 
         local flow_text                          = line.add { type = "flow", direction = "vertical" }
         flow_text.style.horizontally_stretchable = true
@@ -118,14 +135,44 @@ function saving.update(player, container)
         ftext.style.horizontally_stretchable     = true
 
 
-        local bload = line.add { type = "button", caption = { np("load") }, tooltip = { np("load-tooltip") } } 
-        tools.set_name_handler(bload, np("load"))
-
-        local bimport = line.add { type = "button", caption = { np("import") }, tooltip = { np("import-tooltip") } }
-        tools.set_name_handler(bimport, np("import"))
-
         local bdelete = line.add { type = "button", caption = { np("delete") }, tooltip = { np("delete-tooltip") } }
         tools.set_name_handler(bdelete, np("delete"))
+    end
+
+    saving.update_selection(container)
+end
+
+---@param container LuaGuiElement
+function saving.update_selection(container)
+    local player = game.players[container.player_index]
+    local frame = player.gui.screen[panel_name]
+
+    if not (frame and frame.valid) then return end
+    local flow = tools.get_child(frame, "new_flow")
+    if not flow then return end
+
+    local vars  = tools.get_vars(player)
+    local saves = vars.saves
+    if not saves then return end
+
+    local s1 = flow.icon1.elem_value --[[@as SignalID]]
+    local ls1 = tools.signal_to_sprite(s1)
+    local s2 = flow.icon2.elem_value --[[@as SignalID]]
+    local ls2 = tools.signal_to_sprite(s2)
+    local s3 = flow.label.text
+
+    local default_style = prefix .. "_small_slot_button_default"
+    local hstyle = prefix .. "_small_slot_button_yellow"
+    for i = 1, math.min(#container.children, #saves) do
+        local save = saves[i]
+        local line = container.children[i]
+
+        local style = default_style
+        if (save.icon1 == ls1 and save.icon2 == ls2 and save.label == s3) then
+            style = hstyle
+        end
+        line.b1.style = style
+        line.b2.style = style
     end
 end
 
@@ -133,8 +180,75 @@ end
 function saving.close(player)
     local frame = player.gui.screen[panel_name]
     if frame and frame.valid then
+        tools.get_vars(player).saving_location = frame.location
         frame.destroy()
     end
+end
+
+---@param icon string?
+---@return string
+local function get_proto(icon)
+    if not icon then
+        return ""
+    end
+    local s_icon = tools.sprite_to_signal(icon)
+    if not s_icon then return "" end
+    if s_icon.type == "item" then
+        ---@type LuaItemPrototype
+        local proto = game.item_prototypes[s_icon.name]
+        return "A " .. proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+    elseif s_icon.type == "fluid" then
+        ---@type LuaFluidPrototype
+        local proto = game.fluid_prototypes[s_icon.name]
+        return "B " .. proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+    elseif s_icon.type == "virtual" then
+        ---@type LuaVirtualSignalPrototype
+        local proto = game.virtual_signal_prototypes[s_icon.name]
+        return "C " .. proto.subgroup.order .. " " .. proto.order
+    else
+        return ""
+    end
+end
+
+---@param icon1 string?
+---@param icon2 string?
+---@return string
+---@return string
+local function compare_icon(icon1, icon2)
+    local c1 = get_proto(icon1)
+    local c2 = get_proto(icon2)
+    return c1, c2
+end
+
+---@param player LuaPlayer
+function saving.sort(player)
+    local vars = tools.get_vars(player)
+
+    ---@type Saving[]
+    local saves = vars.saves
+    if not saves then
+        return
+    end
+
+    table.sort(saves,
+        ---@param s1 Saving
+        ---@param s2 Saving
+        function(s1, s2)
+            local c1, c2 = compare_icon(s1.icon1, s2.icon1)
+            if c1 ~= c2 then return c1 < c2 end
+            c1, c2 = compare_icon(s1.icon2, s2.icon2)
+            if c1 ~= c2 then return c1 < c2 end
+            return s1.label < s2.label
+        end)
+end
+
+---@param g Graph
+---@param save Saving
+local function update_save(g, save)
+    local data = gutils.create_saving_data(g)
+    local json = game.table_to_json(data)
+    json       = game.encode_string(json) --[[@as string]]
+    save.json  = json
 end
 
 tools.on_named_event(np("save"), defines.events.on_gui_click,
@@ -165,10 +279,7 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
             return
         end
 
-        local data  = gutils.create_saving_data(g)
-        local json  = game.table_to_json(data)
-        json        = game.encode_string(json) --[[@as string]]
-        save.json   = json
+        update_save(g, save)
 
         ---@type Saving[]
         local saves = vars.saves
@@ -180,15 +291,16 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
             if existing.icon1 == save.icon1 and
                 existing.icon2 == save.icon2 and
                 existing.label == save.label then
-                existing.json = json
+                existing.json = save.json
                 save = existing
                 goto done
             end
         end
         table.insert(saves, save)
         ::done::
+        saving.sort(player)
 
-        vars.current_save = save
+        vars.saving_current = save
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
@@ -213,6 +325,9 @@ tools.on_named_event(np("delete"), defines.events.on_gui_click,
         local index = line.get_index_in_parent()
         local saves = vars.saves
 
+        if saves[index] == vars.saving_current then
+            vars.saving_current = nil
+        end
         table.remove(saves, index)
 
         local frame = player.gui.screen[panel_name]
@@ -220,6 +335,8 @@ tools.on_named_event(np("delete"), defines.events.on_gui_click,
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
+        saving.clear_current(player)
+        saving.update_selection(line.parent)
     end)
 
 tools.on_named_event(np("load"), defines.events.on_gui_click,
@@ -229,46 +346,34 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local vars = tools.get_vars(player)
         local g = gutils.get_graph(player)
         local frame = player.gui.screen[panel_name]
+        if not (frame and frame.valid) then return end
 
         local line = e.element.parent
         if not line then return end
-        local index = line.get_index_in_parent()
 
         ---@type Saving[]
         local saves = vars.saves
-
-        local save = saves[index]
-        local json = game.decode_string(save.json) --[[@as string]]
-        local data = game.json_to_table(json) --[[@as SavingData]]
-
-        local new_flow = tools.get_child(frame, "new_flow")
-        if new_flow then
-            load_current(new_flow, save)
-        end
-        vars.current_save = save
-
-        graph.load_saving(g, data)
-        saving.close(player)
-    end)
-
-tools.on_named_event(np("import"), defines.events.on_gui_click,
-    ---@param e EventData.on_gui_click
-    function(e)
-        local player = game.players[e.player_index]
-        local vars = tools.get_vars(player)
-        local g = gutils.get_graph(player)
-
-        local line = e.element.parent
-        if not line then return end
         local index = line.get_index_in_parent()
-        local saves = vars.saves
-
         local save = saves[index]
-        local json = game.decode_string(save.json) --[[@as string]]
-        local data = game.json_to_table(json) --[[@as SavingData]]
 
-        graph.import_saving(g, data)
+        if not (e.button ~= defines.mouse_button_type.left or e.shift or e.alt) then
+            local json = game.decode_string(save.json) --[[@as string]]
+            local data = game.json_to_table(json) --[[@as SavingData]]
+            local new_flow = tools.get_child(frame, "new_flow")
+            if new_flow then
+                load_current(new_flow, save)
+            end
+            if e.control and vars.saving_current then
+                update_save(g, vars.saving_current)
+            end
+            vars.saving_current = save
+            graph.load_saving(g, data)
+            saving.update_selection(line.parent)
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.shift or e.control or e.alt) then
+            local json = game.decode_string(save.json) --[[@as string]]
+            local data = game.json_to_table(json) --[[@as SavingData]]
+            graph.import_saving(g, data)
+        end
     end)
-
 
 return saving
