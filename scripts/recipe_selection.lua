@@ -530,7 +530,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 end
                 local amount
                 if machine then
-                    amount = tools.fround(production.get_ingredient_amout(machine, i) * machine.count)
+                    amount = tools.fround(production.get_ingredient_amount(machine, i) * machine.count)
                 else
                     amount = i.amount
                 end

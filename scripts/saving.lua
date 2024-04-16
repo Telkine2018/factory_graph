@@ -35,7 +35,7 @@ function saving.clear_current(player)
     if not flow then return end
     flow.icon1.elem_value = nil
     flow.icon2.elem_value = nil
-    flow.label.text = nil
+    flow.label.text = ""
 end
 
 ---@param player_index integer
@@ -334,9 +334,10 @@ tools.on_named_event(np("delete"), defines.events.on_gui_click,
         if not (frame and frame.valid) then return end
         local container = tools.get_child(frame, "save_list")
         if not container then return end
+        local parent = line.parent --[[@as LuaGuiElement]]
         saving.update(player, container)
         saving.clear_current(player)
-        saving.update_selection(line.parent)
+        saving.update_selection(parent)
     end)
 
 tools.on_named_event(np("load"), defines.events.on_gui_click,

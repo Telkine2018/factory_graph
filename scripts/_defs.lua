@@ -31,6 +31,7 @@ local tools = require("scripts.tools")
 ---@field product_inputs {[string]:number}
 ---@field production_failed LocalisedString?
 ---@field production_recipes_failed {[string]:boolean}
+---@field total_energy number
 ---@field bound_products {[string]:boolean}
 ---@field recipe_order integer
 ---@field player_position MapPosition

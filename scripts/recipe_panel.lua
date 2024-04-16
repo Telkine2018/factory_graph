@@ -105,7 +105,7 @@ function recipe_panel.create(player_index, grecipe)
             local caption
             if machine and machine.count and machine.count > 0 then
                 caption = { np("ingredient"),
-                    tools.fround(production.get_ingredient_amout(machine, p) * machine.count),
+                    tools.fround(production.get_ingredient_amount(machine, p) * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name)
                 }

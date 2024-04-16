@@ -191,7 +191,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     for _, module_name in pairs(preferred_modules) do
         local module = machinedb.modules[module_name]
-        if module.limitations and not module.limitations[recipe_name] then
+        if not module or (module.limitations and not module.limitations[recipe_name]) then
             goto skip
         end
 

@@ -1,6 +1,5 @@
 local luautil = require("__core__/lualib/util")
 
-
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
@@ -120,15 +119,26 @@ function product_panel.create(player_index)
     local machine_frame = inner_flow.add {
         type = "frame",
         direction = "vertical",
-        style = "inside_shallow_frame_with_padding"
+        style = "inside_shallow_frame_with_padding",
+        name="machine_frame"
     }
     machine_frame.style.minimal_width = 200
     machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
-    local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never" }
-    local machine_flow = machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
-    local empty = machine_frame.add {type="empty-widget"}
+    
+    local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name="machine_scroll"}
+    machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
+    local empty = machine_frame.add { type = "empty-widget" }
     empty.style.vertically_stretchable = true
-    product_panel.update_machine_panel(g, machine_flow)
+    
+    local summary = machine_frame.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding",
+        name = "summary"
+    }
+    summary.add{type="label", caption="Energy 100Mw"}
+
+    product_panel.update_machine_panel(g, machine_frame)
 
     local location = vars[location_name]
     if location then
@@ -442,7 +452,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                     end
 
                     for _, ingredient in pairs(machine.recipe.ingredients) do
-                        local amount = production.get_ingredient_amout(machine, ingredient) * machine.count
+                        local amount = production.get_ingredient_amount(machine, ingredient) * machine.count
                         table.insert(pline, fround(amount))
                         table.insert(pline, " x ")
                         table.insert(pline, " [" .. ingredient.type .. "=" .. ingredient.name .. "]")
@@ -602,8 +612,10 @@ end
 product_panel.create_product_line = create_product_line
 
 ---@param g Graph
----@param container LuaGuiElement
-function product_panel.update_machine_panel(g, container)
+---@param machine_frame LuaGuiElement
+function product_panel.update_machine_panel(g, machine_frame)
+    local container = machine_frame.machine_scroll.machine_container
+
     container.clear()
     if not g.selection then return end
 
@@ -722,6 +734,10 @@ function product_panel.update_machine_panel(g, container)
     for _, machine in pairs(machines) do
         create_product_line(container, machine)
     end
+
+    local summary = machine_frame.summary
+    summary.clear()
+    summary.add{type="label", caption={np("total_energy"), luautil.format_number(g.total_energy, true)}}
 end
 
 ---@param g Graph
@@ -730,9 +746,9 @@ local function update_machines(g)
     local frame = player.gui.screen[product_panel_name]
     if not frame then return end
 
-    local container = tools.get_child(frame, "machine_container")
-    if container then
-        product_panel.update_machine_panel(g, container)
+    local machine_frame = tools.get_child(frame, "machine_frame")
+    if machine_frame then
+        product_panel.update_machine_panel(g, machine_frame)
     end
 end
 
@@ -858,8 +874,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             local machine = grecipe.machine
             if not machine or not machine.machine then return end
             local item = machine.machine.items_to_place_this[1]
-            local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item", 
-                    elem_filters = { { filter = "name", name=item } } } }
+            local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
+                elem_filters = { { filter = "name", name = item } } } }
 
             if string.find(player.surface.name, commons.surface_prefix_filter) then
                 gutils.exit(player)
@@ -867,7 +883,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
             if #recipes > 0 then
                 for name in pairs(recipes) do
-                    player.begin_crafting { recipe = name,  count = 1 }
+                    player.begin_crafting { recipe = name, count = 1 }
                     break
                 end
             end

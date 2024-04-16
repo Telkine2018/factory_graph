@@ -1,3 +1,5 @@
+local luautil = require("__core__/lualib/util")
+
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
@@ -156,7 +158,11 @@ function msettings.create(player_index, grecipe)
 
     local machine = grecipe.machine
     if not machine then
-        machine = production.compute_machine(g, grecipe, config) or {}
+        machine = production.compute_machine(g, grecipe, config)
+        if not machine then
+            frame.destroy()
+            return
+        end
         machine.count = 1
     end
     msettings.create_product_line(recipe_frame, machine)
@@ -217,6 +223,7 @@ function msettings.create(player_index, grecipe)
     tools.set_name_handler(b, np("beacon_count"))
 
     enable_config(field_table, is_default)
+
 
     local report_frame = frame.add {
         type = "frame",
@@ -452,11 +459,22 @@ function msettings.report(player)
     local vars = tools.get_vars(player)
     ---@type string
     local recipe_name = vars.msettings_recipe_name
-    ---@type ProductionConfig
-    local config = vars.msettings_config
 
-    local machine = production.compute_machine(g, g.recipes[recipe_name], config)
-    if not machine then return end
+    local grecipe = g.recipes[recipe_name]
+    local machine
+    if grecipe then
+        machine = grecipe.machine
+    end
+    if machine and machine.count < 0 then
+        machine = nil
+    end
+    if not machine then
+        ---@type ProductionConfig
+        local config = vars.msettings_config
+        machine = production.compute_machine(g, g.recipes[recipe_name], config)
+        if not machine then return end
+        machine.count = 1
+    end
 
     ---@param v number
     local function format(v)
@@ -480,6 +498,23 @@ function msettings.report(player)
     report_value({ np("report_productivity") }, machine.productivity)
     report_value({ np("report_consumption") }, machine.consumption)
     report_value({ np("report_pollution") }, machine.pollution)
+
+    local energy = production.get_energy(machine)
+    label = report_table.add { type = "label", caption = { np("energy") } }
+    label.style.width = 100
+    label = report_table.add { type = "label", caption = "[color=cyan]" .. luautil.format_number(energy, true) .. "W[/color]" }
+    label.style.width = 100
+    label.style.horizontal_align = "right"
+
+    --[[
+    local pollution = production.get_pollution(machine)
+    label = report_table.add { type = "label", caption = { np("pollution") } }
+    label.style.width = 100
+    label = report_table.add { type = "label", caption = "[color=orange]" .. luautil.format_number(pollution, true) .. "[/color]" }
+    label.style.width = 100
+    label.style.horizontal_align = "right"
+]]
+
 end
 
 ---@param e EventData.on_lua_shortcut
@@ -532,6 +567,5 @@ tools.register_user_event(commons.production_compute_event, function(data)
     recipe_frame.clear()
     msettings.create_product_line(recipe_frame, machine)
 end)
-
 
 return msettings

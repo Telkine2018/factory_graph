@@ -36,13 +36,26 @@ end
 ---@param machine ProductionMachine
 ---@param ingredient Ingredient
 ---@return number
-local function get_ingredient_amout(machine, ingredient)
+local function get_ingredient_amount(machine, ingredient)
     local amount = ingredient.amount * machine.limited_craft_s
     return amount
 end
 
+---@param machine ProductionMachine
+---@return number
+local function get_energy(machine)
+    if not machine or not machine.machine then return 0 end
+    local percent = machine.consumption
+    if percent < -0.8 then
+        percent = -0.8
+    end
+    local energy = machine.machine.max_energy_usage * machine.count * (1 + percent) * 60
+    return energy
+end
+
 production.get_product_amount = get_product_amount
-production.get_ingredient_amout = get_ingredient_amout
+production.get_ingredient_amount = get_ingredient_amount
+production.get_energy = get_energy
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -154,6 +167,7 @@ function production.compute_products(g, machines)
 
     g.product_inputs = product_inputs
     g.product_outputs = product_outputs
+    g.total_energy = 0
 
     --- compute products
     for _, machine in pairs(machines) do
@@ -168,7 +182,7 @@ function production.compute_products(g, machines)
                         coef = 0
                     end
 
-                    local amount = get_ingredient_amout(machine, ingredient)
+                    local amount = get_ingredient_amount(machine, ingredient)
                     if abs(amount) >= math_precision then
                         local total = amount * machine_count
                         product_inputs[iname] = coef + total
@@ -189,6 +203,8 @@ function production.compute_products(g, machines)
                         product_outputs[pname] = coef + total
                     end
                 end
+
+                g.total_energy = g.total_energy + get_energy(machine)
             end
         end
     end
@@ -622,7 +638,7 @@ function production.compute_linear(g, machines)
                 requested[gproduct.name] = (requested[gproduct.name] or 0) - amount
             end
             for index, ingredient in pairs(grecipe.ingredients) do
-                local amount = max_count * production.get_ingredient_amout(machine, machine.recipe.ingredients[index])
+                local amount = max_count * production.get_ingredient_amount(machine, machine.recipe.ingredients[index])
                 requested[ingredient.name] = (requested[ingredient.name] or 0) + amount
             end
         end
