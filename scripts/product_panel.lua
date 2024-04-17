@@ -233,12 +233,13 @@ function product_panel.create_product_tables(player)
 
     local g = gutils.get_graph(player)
     local recipes = g.recipes
-    if g.use_connected_recipes then
+    if g.use_connected_recipes and not g.require_full_selection then
         recipes = gutils.get_connected_recipes(g, g.iovalues)
         if not next(recipes) then
             recipes = g.recipes
         end
     end
+    g.require_full_selection  = nil
     local inputs, outputs, intermediates = gutils.get_product_flow(g, recipes)
 
     local column_count = 3
@@ -523,16 +524,22 @@ tools.on_event(defines.events.on_gui_confirmed,
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
-    local player = data.g.player
+    ---@type Graph
+    local g = data.g
+    local player = g.player
+    if data.structure_change then
+        g.require_full_selection = true
+    end
+
     if not player.gui.screen[product_panel_name] then return end
 
-    if not data.g.selection or not next(data.g.selection) then
+    if not g.selection or not next(g.selection) then
         product_panel.close(player)
         return
     end
 
     if not data.structure_change then
-        update_products(data.g)
+        update_products(g)
     else
         product_panel.close(player)
         product_panel.create(player.index)
@@ -737,7 +744,7 @@ function product_panel.update_machine_panel(g, machine_frame)
 
     local summary = machine_frame.summary
     summary.clear()
-    summary.add{type="label", caption={np("total_energy"), luautil.format_number(g.total_energy, true)}}
+    summary.add{type="label", caption={np("total_energy"), g.total_energy and luautil.format_number(g.total_energy or "", true)}}
 end
 
 ---@param g Graph

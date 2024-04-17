@@ -168,7 +168,9 @@ tools.on_named_event(np("settings"), defines.events.on_gui_click,
 tools.on_named_event(np("unselect_all"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
-        graph.unselect(game.players[e.player_index])
+        local player = game.players[e.player_index]
+        graph.unselect(player)
+        saving.clear_current(player)
     end)
 
 ---@param player LuaPlayer

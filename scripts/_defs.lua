@@ -42,6 +42,7 @@ local tools = require("scripts.tools")
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
 ---@field always_use_full_selection boolean?
+---@field require_full_selection boolean?
 ---@field move_recipe GRecipe?
 ---@field layout_on_selection boolean?
 ---@field graph_zoom_level number?
