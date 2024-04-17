@@ -330,14 +330,7 @@ tools.on_configuration_changed(function(data)
                 end
             end
 
-            if need_refresh then
-                gutils.compute_visibility(g)
-                drawing.delete_content(g)
-                graph.do_layout(g)
-                graph.create_recipe_objects(g)
-            end
-
-            drawing.redraw_selection(player)
+            graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
         end
     end
 end)

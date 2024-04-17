@@ -364,7 +364,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             if new_flow then
                 load_current(new_flow, save)
             end
-            if e.control and vars.saving_current then
+            if (e.control or g.autosave_on_graph_switching) and vars.saving_current then
                 update_save(g, vars.saving_current)
             end
             vars.saving_current = save

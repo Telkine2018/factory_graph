@@ -84,6 +84,11 @@ function settings_panel.create(player_index)
     flow.add { type = "label", caption = { np("world_zoom_level") } }
     flow.add { type = "textfield", name = "world_zoom_level", text = g.world_zoom_level and tostring(g.world_zoom_level) or 1, numeric = true, allow_decimal = true }
 
+    flow.add { type = "label", caption = { np("autosave_on_graph_switching") } }
+    flow.add { type = "checkbox", name = "autosave_on_graph_switching", state = not not g.autosave_on_graph_switching, 
+            tooltip = { np("autosave_on_graph_switching_tooltip") } }
+
+
     flow.add { type = "label", caption = { np("preferred_machines") } }
     local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_machines" }
     if g.preferred_machines then
@@ -210,33 +215,22 @@ local function save(player, frame)
         return
     end
 
-    local show_hidden = field_table.show_hidden.state
-    local show_only_researched = field_table.show_only_researched.state
-    local layout_on_selection = field_table["layout-on-selection"].state
-    local always_use_full_selection = field_table.always_use_full_selection.state
-
-    local preferred_machines = blist_values(field_table.preferred_machines)
-
-    local preferred_modules = blist_values(field_table.preferred_modules)
-
-    local preferred_beacon = field_table.preferred_beacon.elem_value
-
-    local preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
-
-    g.layout_on_selection = layout_on_selection
-    g.always_use_full_selection = always_use_full_selection
+    g.always_use_full_selection = field_table.always_use_full_selection.state
+    g.autosave_on_graph_switching = field_table.autosave_on_graph_switching.state
+    g.layout_on_selection = field_table["layout-on-selection"].state
     g.graph_zoom_level = tonumber(field_table.graph_zoom_level.text)
     g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
-    g.show_hidden = show_hidden
-    g.show_only_researched = show_only_researched
+    g.show_hidden = field_table.show_hidden.state
+    g.show_only_researched = field_table.show_only_researched.state
     if grid_size_value ~= g.grid_size then
         g.grid_size = grid_size_value
         graph.refresh(player)
     end
-    g.preferred_machines = preferred_machines
-    g.preferred_modules = preferred_modules
-    g.preferred_beacon = preferred_beacon --[[@as string]]
-    g.preferred_beacon_count = preferred_beacon_count
+
+    g.preferred_machines = blist_values(field_table.preferred_machines)
+    g.preferred_modules = blist_values(field_table.preferred_modules)
+    g.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
+    g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
     gutils.fire_production_data_change(g)
     frame.destroy()
 end

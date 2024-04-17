@@ -43,8 +43,12 @@ function graph.new(surface)
         iovalues = {},
         show_hidden = false,
         show_only_researched = false,
+        always_use_full_selection = true,
         visibility = commons.visibility_all,
-        layout_on_selection = true
+        layout_on_selection = true,
+        autosave_on_graph_switching = true,
+        graph_zoom_level = 0.5,
+        world_zoom_level = 2
     }
 end
 

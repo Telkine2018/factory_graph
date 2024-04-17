@@ -26,27 +26,32 @@ local tools = require("scripts.tools")
 ---@field rs_location GuiLocation?
 ---@field selector_id integer?                      @ selector rectangle id
 ---@field selector_product_name_id integer?         @ selector text id
----@field use_connected_recipes boolean
+---@field recipe_order integer
+---@field player_position MapPosition
+---@field module_limitations {[string]:({[string]:true})}
+---@field excluded_categories {[string]:boolean}?
+---@field require_full_selection boolean?
+---@field move_recipe GRecipe?
+
+---@class GraphSettings
+---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
+---@field grid_size integer
+---@field show_hidden boolean?
+---@field show_only_researched boolean?
+---@field always_use_full_selection boolean?
+---@field layout_on_selection boolean?
+---@field graph_zoom_level number?
+---@field world_zoom_level number?
+---@field autosave_on_graph_switching boolean?
+
+---@class GraphProduction
+---@field use_connected_recipes boolean             @ true if connected reciped use
 ---@field product_outputs {[string]:number}
 ---@field product_inputs {[string]:number}
 ---@field production_failed LocalisedString?
 ---@field production_recipes_failed {[string]:boolean}
 ---@field total_energy number
 ---@field bound_products {[string]:boolean}
----@field recipe_order integer
----@field player_position MapPosition
----@field module_limitations {[string]:({[string]:true})}
----@field excluded_categories {[string]:boolean}?
----@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
----@field grid_size integer
----@field show_hidden boolean?
----@field show_only_researched boolean?
----@field always_use_full_selection boolean?
----@field require_full_selection boolean?
----@field move_recipe GRecipe?
----@field layout_on_selection boolean?
----@field graph_zoom_level number?
----@field world_zoom_level number?
 
 ---@class GraphConfig
 ---@field visibility integer?
@@ -58,7 +63,7 @@ local tools = require("scripts.tools")
 ---@field iovalues {[string]:number|boolean}
 ---@field color_index integer
 
----@class Graph : GraphRuntime, GraphConfig
+---@class Graph : GraphRuntime, GraphConfig, GraphProduction, GraphSettings
 
 ---@class GElement
 ---@field name string     @ name of product or recipe

@@ -136,7 +136,7 @@ function product_panel.create(player_index)
         style = "inside_shallow_frame_with_padding",
         name = "summary"
     }
-    summary.add{type="label", caption="Energy 100Mw"}
+    summary.add{type="label", caption=""}
 
     product_panel.update_machine_panel(g, machine_frame)
 
