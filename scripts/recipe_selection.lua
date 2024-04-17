@@ -534,7 +534,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 else
                     amount = i.amount
                 end
-                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(amount) .. " x " .. label)
+                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tools.fround(amount) .. " x " .. label)
                 table.insert(i_table, { name = name, tooltip = label })
             end
             table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
@@ -570,7 +570,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                         amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
                     end
                     if p.probability and p.probability < 1 then
-                        amount = amount .. "(" .. tostring(p.probability * 100) .. "%)"
+                        amount = amount .. "(" .. tostring(tools.fround(p.probability * 100)) .. "%)"
                     end
                 end
                 table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
