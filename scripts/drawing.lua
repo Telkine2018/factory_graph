@@ -637,12 +637,14 @@ local function draw_select_ingredients(g, ids, base_recipe)
         local connected_recipes = { base_recipe }
         local is_in_selection = g.selection[base_recipe.name]
 
+        local set = { [base_recipe.name] = true }
         for _, recipe in pairs(ingredient.product_of) do
             if recipe.visible then
                 if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
                     goto cont
-                else
+                elseif not set[recipe.name] then
                     table.insert(connected_recipes, recipe)
+                    set[recipe.name] = true
                 end
             end
         end
@@ -1116,7 +1118,7 @@ function drawing.redraw_selection(player)
 
     drawing.clear_selection(g)
     redraw_connections(g)
-    if g.selected_recipe and g.selected_recipe_entity and  g.selected_recipe_entity.valid then
+    if g.selected_recipe and g.selected_recipe_entity and g.selected_recipe_entity.valid then
         draw_selected_entity(player, g.selected_recipe_entity, g.selected_recipe)
     else
         g.selected_recipe = nil
