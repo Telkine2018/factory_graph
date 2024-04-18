@@ -51,7 +51,7 @@ function saving.create(player_index)
     end
 
     ---@type Params.create_standard_panel
-    local params                             = {
+    local params                           = {
         panel_name           = panel_name,
         title                = { np("title") },
         is_draggable         = true,
@@ -59,15 +59,16 @@ function saving.create(player_index)
         close_button_tooltip = np("close_button_tooltip"),
         create_inner_frame   = true
     }
-    local frame, inner_frame                 = tools.create_standard_panel(player, params)
-    frame.style.minimal_width                = 400
-    frame.style.height                       = 400
+    local frame, inner_frame               = tools.create_standard_panel(player, params)
+    frame.style.minimal_width              = 400
+    frame.style.height                     = 400
 
-    local newflow                            = inner_frame.add { type = "flow", name = "new_flow" }
-    newflow.style.horizontally_stretchable   = true
-    newflow.style.bottom_margin              = 7
-    local bnew1                              = newflow.add { type = "choose-elem-button", elem_type = "signal", name = "icon1" }
-    bnew1.style.size                         = button_size
+    local newflow                          = inner_frame.add { type = "flow", name = "new_flow" }
+    newflow.style.horizontally_stretchable = true
+    newflow.style.bottom_margin            = 7
+    local bnew1                            = newflow.add { type = "choose-elem-button", elem_type = "signal", name = "icon1" }
+    bnew1.style.size                       = button_size
+    tools.set_name_handler(bnew1, np("icon1"))
     local bnew2                              = newflow.add { type = "choose-elem-button", elem_type = "signal", name = "icon2" }
     bnew2.style.size                         = button_size
     local newlabel                           = newflow.add { type = "textfield", name = "label" }
@@ -375,6 +376,18 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             local data = game.json_to_table(json) --[[@as SavingData]]
             graph.import_saving(g, data)
         end
+    end)
+
+tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
+    ---@param e EventData.on_gui_elem_changed
+    function(e)
+        if not (e.element and e.element.valid) then return end
+
+        local value = e.element.elem_value
+        local parent = e.element.parent
+        if not parent then return end
+
+        parent.icon2.elem_value = value
     end)
 
 return saving

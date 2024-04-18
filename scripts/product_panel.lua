@@ -102,7 +102,6 @@ function product_panel.create(player_index)
     }
     local frame = tools.create_standard_panel(player, params)
     frame.style.maximal_height = 800
-    frame.style.maximal_height = 800
 
     local inner_flow = frame.add { type = "flow", direction = "horizontal" }
     local product_frame = inner_flow.add {
@@ -113,30 +112,34 @@ function product_panel.create(player_index)
     }
     product_frame.style.vertically_stretchable = true
     product_frame.style.horizontally_stretchable = true
-    product_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name = "sroll-table" }
+    local scroll = product_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name = "scroll-table" }
+    scroll.style.horizontally_stretchable = true
     product_panel.create_product_tables(player)
 
     local machine_frame = inner_flow.add {
         type = "frame",
         direction = "vertical",
         style = "inside_shallow_frame_with_padding",
-        name="machine_frame"
+        name = "machine_frame"
     }
+
     machine_frame.style.minimal_width = 200
-    machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
-    
-    local machine_scroll = machine_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", name="machine_scroll"}
+    machine_frame.style.minimal_height = 400
+    local error_panel = machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
+    error_panel.visible = false
+
+    local machine_scroll = machine_frame.add { type = "scroll-pane",
+        horizontal_scroll_policy = "never", name = "machine_scroll", vertical_scroll_policy = "auto-and-reserve-space" }
     machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
-    local empty = machine_frame.add { type = "empty-widget" }
-    empty.style.vertically_stretchable = true
-    
+    machine_scroll.style.horizontally_stretchable = true
+
     local summary = machine_frame.add {
         type = "frame",
         direction = "vertical",
         style = "inside_shallow_frame_with_padding",
         name = "summary"
     }
-    summary.add{type="label", caption=""}
+    summary.add { type = "label", caption = "" }
 
     product_panel.update_machine_panel(g, machine_frame)
 
@@ -221,7 +224,7 @@ function product_panel.create_product_tables(player)
     local frame = player.gui.screen[product_panel_name]
     if not frame then return end
 
-    local scroll = tools.get_child(frame, "sroll-table")
+    local scroll = tools.get_child(frame, "scroll-table")
     if not scroll then return end
 
     scroll.clear()
@@ -239,12 +242,12 @@ function product_panel.create_product_tables(player)
             recipes = g.recipes
         end
     end
-    g.require_full_selection  = nil
+    g.require_full_selection             = nil
     local inputs, outputs, intermediates = gutils.get_product_flow(g, recipes)
 
-    local column_count = 3
-    local column_width = 120
-    local product_button_tooltip = { np("product_button_tooltip") }
+    local column_count                   = 3
+    local column_width                   = 120
+    local product_button_tooltip         = { np("product_button_tooltip") }
 
     ---@param products table<string, GProduct>
     ---@param table_name string
@@ -551,7 +554,8 @@ local get_product_amount = production.get_product_amount
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine
 local function create_product_line(container, machine)
-    local col1 = container.add { type = "flow", direction = "horizontal" }
+    local line1 = container.add { type = "flow", direction = "horizontal" }
+    line1.style.height = 40
 
     local caption
     if machine.count > 1000 then
@@ -560,25 +564,25 @@ local function create_product_line(container, machine)
         caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
     end
 
-    local b = col1.add { type = "choose-elem-button", elem_type = "entity",
+    local b = line1.add { type = "choose-elem-button", elem_type = "entity",
         entity = machine.machine.name, style = green_button, tooltip = { np("machine-tooltip") } }
     b.locked = true
     tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
     b.raise_hover_events = true
     local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
 
-    local frecipe = col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
+    local frecipe = line1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
     frecipe.style.right_margin = 5
     frecipe.locked = true
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
-    line = col1.add { type = "line", direction = "vertical" }
+    line = line1.add { type = "line", direction = "vertical" }
     line.style.left_margin = 5
     line.style.right_margin = 8
 
     for _, ingredient in pairs(machine.recipe.ingredients) do
         local type = ingredient.type
-        b = col1.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = ingredient_button_style }
+        b = line1.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = ingredient_button_style }
         b.locked = true
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
 
@@ -589,9 +593,9 @@ local function create_product_line(container, machine)
     end
 
     -- local col2 = container.add { type = "flow", direction = "horizontal" }
-    local col2 = col1
+    local line2 = line1
 
-    local b = col2.add {
+    local b = line2.add {
         type = "sprite-button",
         name = np("goto"),
         tooltip = { np("goto-tooltip") },
@@ -605,7 +609,7 @@ local function create_product_line(container, machine)
 
     for _, product in pairs(machine.recipe.products) do
         local type = product.type
-        b = col2.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = product_button_style }
+        b = line2.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = product_button_style }
         b.locked = true
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
 
@@ -621,20 +625,25 @@ product_panel.create_product_line = create_product_line
 ---@param g Graph
 ---@param machine_frame LuaGuiElement
 function product_panel.update_machine_panel(g, machine_frame)
-    local container = machine_frame.machine_scroll.machine_container
+    local machine_container = machine_frame.machine_scroll.machine_container
 
-    container.clear()
+    machine_container.clear()
     if not g.selection then return end
 
-    local error_panel = container.parent.parent.error_panel
+    local error_panel = machine_container.parent.parent.error_panel
     if error_panel then
         error_panel.clear()
     end
+
+    local summary = machine_frame.summary
 
     if g.production_failed then
         if not error_panel or not g.production_recipes_failed then
             return
         end
+        error_panel.visible = true
+        machine_container.visible = false
+        summary.visible = false
 
         ---@type ProductionMachine[]
         local failed_machines = {}
@@ -726,6 +735,10 @@ function product_panel.update_machine_panel(g, machine_frame)
         return
     end
 
+    error_panel.visible = false
+    machine_container.visible = true
+    summary.visible = true
+
     ---@type ProductionMachine[]
     local machines = {}
     for _, grecipe in pairs(g.selection) do
@@ -739,12 +752,16 @@ function product_panel.update_machine_panel(g, machine_frame)
     table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
     for _, machine in pairs(machines) do
-        create_product_line(container, machine)
+        create_product_line(machine_container, machine)
     end
 
-    local summary = machine_frame.summary
+    for i = 1, 5 do
+        local empty = machine_container.add { type = "empty-widget" }
+        empty.style.vertically_stretchable = true
+    end
+
     summary.clear()
-    summary.add{type="label", caption={np("total_energy"), g.total_energy and luautil.format_number(g.total_energy or "", true)}}
+    summary.add { type = "label", caption = { np("total_energy"), g.total_energy and luautil.format_number(g.total_energy or "", true) } }
 end
 
 ---@param g Graph

@@ -646,7 +646,7 @@ local function draw_select_ingredients(g, ids, base_recipe)
                 end
             end
         end
-        if #connected_recipes > 1 then
+        if table_size(connected_recipes) > 1 then
             draw_recipe_connections(g, ids, ingredient, connected_recipes, color, true)
         end
         ::cont::
