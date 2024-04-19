@@ -29,6 +29,9 @@ end
 
 ---@param player LuaPlayer
 function saving.clear_current(player)
+
+    local vars = tools.get_vars(player)
+    vars.saving_current = nil
     local frame = player.gui.screen[panel_name]
     if not (frame and frame.valid) then return end
     local flow = tools.get_child(frame, "new_flow")

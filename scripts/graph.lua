@@ -1045,12 +1045,7 @@ tools.on_event(defines.events.on_tick,
 ---@param player LuaPlayer
 function graph.unselect(player)
     local g = gutils.get_graph(player)
-    g.selection = {}
-    g.iovalues = {}
-    g.color_index = 0
-    for _, gproduct in pairs(g.products) do
-        gproduct.color = nil
-    end
+    gutils.clear(g)
     graph.refresh(player)
     gutils.fire_production_data_change(g)
 end
@@ -1219,3 +1214,4 @@ function graph.create_sorted_recipe_table(set)
 end
 
 return graph
+

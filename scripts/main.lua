@@ -419,8 +419,8 @@ local function import_entities(e, clear)
     end
 
     if clear then
+        gutils.clear(g)
         g.selection = {}
-        g.iovalues = {}
     end
     for _, entity in pairs(e.entities) do
         ---@cast entity LuaEntity

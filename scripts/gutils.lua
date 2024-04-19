@@ -580,5 +580,23 @@ function gutils.exit(player) end
 ---@param player LuaPlayer
 function gutils.enter(player) end
 
+---@param g Graph
+function gutils.clear(g)
+    g.selection = {}
+    g.iovalues = {}
+    g.color_index = 0
+    for _, gproduct in pairs(g.products) do
+        gproduct.color = nil
+    end
+    g.product_outputs = nil
+    g.product_inputs = nil
+    g.production_failed = nil
+    g.production_recipes_failed = nil
+    g.bound_products = nil
+    for _,grecipe in pairs(g.recipes) do
+        grecipe.production_config = nil
+        grecipe.machine = nil
+    end
+end
 
 return gutils
