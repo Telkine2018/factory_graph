@@ -653,6 +653,7 @@ function product_panel.update_error_panel(g, error_panel)
         local line1 = flow.add { type = "flow", direction = "horizontal" }
 
         local current = machine.grecipe
+        local recurs_set = {}
         while true do
             ---@param products GProduct[]
             ---@return integer, GProduct?
@@ -686,7 +687,11 @@ function product_panel.update_error_panel(g, error_panel)
             if #irecipes ~= 1 then
                 break
             end
+            recurs_set[current.name] = true
             current = irecipes[1]
+            if recurs_set[current.name] then
+                break
+            end
             if current == machine.grecipe then
                 break
             end

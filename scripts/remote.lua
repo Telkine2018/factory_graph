@@ -4,6 +4,7 @@ local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
 local graph = require("scripts.graph")
 local main = require("scripts.main")
+local saving = require("scripts.saving")
 
 local prefix = commons.prefix
 
@@ -39,6 +40,7 @@ commands.add_command(prefix .. "_speed", nil, function(command)
         local vars = tools.get_vars(player)
         vars.character_speed = not vars.character_speed
         main.set_speed(player, vars.character_speed)
+        saving.clear_current(player)
         if vars.character_speed then
             player.print("Speed on")
         else

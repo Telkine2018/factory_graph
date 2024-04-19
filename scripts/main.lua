@@ -12,6 +12,7 @@ local drawing = require("scripts.drawing")
 local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
 local product_panel = require("scripts.product_panel")
+local saving = require("scripts.saving")
 
 local main = {}
 
@@ -421,6 +422,7 @@ local function import_entities(e, clear)
     if clear then
         gutils.clear(g)
         g.selection = {}
+        saving.clear_current(player)
     end
     for _, entity in pairs(e.entities) do
         ---@cast entity LuaEntity
