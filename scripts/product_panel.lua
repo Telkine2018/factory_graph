@@ -127,6 +127,7 @@ function product_panel.create(player_index)
     machine_frame.style.minimal_height = 400
     local error_panel = machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
     error_panel.visible = false
+    error_panel.style.vertically_stretchable = true
 
     local machine_scroll = machine_frame.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", name = "machine_scroll", vertical_scroll_policy = "auto-and-reserve-space" }
@@ -623,9 +624,102 @@ end
 product_panel.create_product_line = create_product_line
 
 ---@param g Graph
+---@param error_panel LuaGuiElement
+function product_panel.update_error_panel(g, error_panel)
+    ---@type ProductionMachine[]
+    local failed_machines = {}
+    for name in pairs(g.production_recipes_failed) do
+        local machine = g.recipes[name].machine
+        if machine then
+            table.insert(failed_machines, machine)
+        end
+    end
+    if #failed_machines == 0 then
+        return
+    end
+    error_panel.add { type = "label", caption = { np("error_title") } }
+
+    for _, machine in pairs(failed_machines) do
+        local line = error_panel.add { type = "flow", direction = "horizontal" }
+
+        local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
+        b.locked = true
+        tools.set_name_handler(b, np("recipe_detail"), { recipe_name = machine.name })
+
+        local flow = line.add { type = "flow", direction = "vertical" }
+        flow.add { type = "label", caption = { np("error_recipe_lanel"),
+            translations.get_recipe_name(error_panel.player_index, machine.name) } }
+
+        local line1 = flow.add { type = "flow", direction = "horizontal" }
+
+        local current = machine.grecipe
+        while true do
+            ---@param products GProduct[]
+            ---@return integer, GProduct?
+            local function unbound_count(products)
+                local count = 0
+                local found
+                for _, gproduct in pairs(products) do
+                    if g.bound_products[gproduct.name] then
+                        count = count + 1
+                        found = gproduct
+                    end
+                    if count > 1 then
+                        return count, nil
+                    end
+                end
+                return count, found
+            end
+            local count_product = unbound_count(current.products)
+            if count_product > 1 then break end
+
+            local _, ingredient = unbound_count(current.ingredients)
+            if not ingredient then break end
+
+            local irecipes = {}
+            for _, irecipe in pairs(ingredient.product_of) do
+                if g.selection[irecipe.name] then
+                    table.insert(irecipes, irecipe)
+                end
+            end
+
+            if #irecipes ~= 1 then
+                break
+            end
+            current = irecipes[1]
+            if current == machine.grecipe then
+                break
+            end
+        end
+
+        line1.add { type = "label", caption = { np("error_recipe_constraints") } }
+        for _, product in pairs(current.products) do
+            if not g.iovalues[product.name] then
+                local signal = tools.sprite_to_signal(product.name)
+                local b
+                ---@cast signal -nil
+                if signal.type == "item" then
+                    b = line1.add { type = "choose-elem-button", elem_type = "item", item = signal.name }
+                else
+                    b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
+                end
+
+                local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+                set_output_value(g, product.name, qtlabel)
+
+                tools.set_name_handler(b, np("error-unlock-product"), { product_name = product.name })
+                b.style.size = 30
+                b.locked = true
+            end
+        end
+    end
+end
+
+---@param g Graph
 ---@param machine_frame LuaGuiElement
 function product_panel.update_machine_panel(g, machine_frame)
-    local machine_container = machine_frame.machine_scroll.machine_container
+    local machine_scroll = machine_frame.machine_scroll
+    local machine_container = machine_scroll.machine_container
 
     machine_container.clear()
     if not g.selection then return end
@@ -636,107 +730,20 @@ function product_panel.update_machine_panel(g, machine_frame)
     end
 
     local summary = machine_frame.summary
-
     if g.production_failed then
         if not error_panel or not g.production_recipes_failed then
             return
         end
         error_panel.visible = true
-        machine_container.visible = false
+        machine_scroll.visible = false
         summary.visible = false
 
-        ---@type ProductionMachine[]
-        local failed_machines = {}
-        for name in pairs(g.production_recipes_failed) do
-            local machine = g.recipes[name].machine
-            if machine then
-                table.insert(failed_machines, machine)
-            end
-        end
-        if #failed_machines == 0 then
-            return
-        end
-        error_panel.add { type = "label", caption = { np("error_title") } }
-
-        for _, machine in pairs(failed_machines) do
-            local line = error_panel.add { type = "flow", direction = "horizontal" }
-
-            local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
-            b.locked = true
-            tools.set_name_handler(b, np("recipe_detail"), { recipe_name = machine.name })
-
-            local flow = line.add { type = "flow", direction = "vertical" }
-            flow.add { type = "label", caption = { np("error_recipe_lanel"),
-                translations.get_recipe_name(error_panel.player_index, machine.name) } }
-
-            local line1 = flow.add { type = "flow", direction = "horizontal" }
-
-            local current = machine.grecipe
-            while true do
-                ---@param products GProduct[]
-                ---@return integer, GProduct?
-                local function unbound_count(products)
-                    local count = 0
-                    local found
-                    for _, gproduct in pairs(products) do
-                        if g.bound_products[gproduct.name] then
-                            count = count + 1
-                            found = gproduct
-                        end
-                        if count > 1 then
-                            return count, nil
-                        end
-                    end
-                    return count, found
-                end
-                local count_product = unbound_count(current.products)
-                if count_product > 1 then break end
-
-                local _, ingredient = unbound_count(current.ingredients)
-                if not ingredient then break end
-
-                local irecipes = {}
-                for _, irecipe in pairs(ingredient.product_of) do
-                    if g.selection[irecipe.name] then
-                        table.insert(irecipes, irecipe)
-                    end
-                end
-
-                if #irecipes ~= 1 then
-                    break
-                end
-                current = irecipes[1]
-                if current == machine.grecipe then
-                    break
-                end
-            end
-
-            line1.add { type = "label", caption = { np("error_recipe_constraints") } }
-            for _, product in pairs(current.products) do
-                if not g.iovalues[product.name] then
-                    local signal = tools.sprite_to_signal(product.name)
-                    local b
-                    ---@cast signal -nil
-                    if signal.type == "item" then
-                        b = line1.add { type = "choose-elem-button", elem_type = "item", item = signal.name }
-                    else
-                        b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
-                    end
-
-                    local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-                    set_output_value(g, product.name, qtlabel)
-
-                    tools.set_name_handler(b, np("unlock-product"), { product_name = product.name })
-                    b.style.size = 30
-                    b.locked = true
-                end
-            end
-        end
+        product_panel.update_error_panel(g, error_panel)
         return
     end
 
     error_panel.visible = false
-    machine_container.visible = true
+    machine_scroll.visible = true
     summary.visible = true
 
     ---@type ProductionMachine[]
@@ -809,7 +816,7 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
-        if not e.shift and not e.control then
+        if not (e.button ~= defines.mouse_button_type.right or e.shift or e.control or e.alt) then
             local element = e.element
             local player = game.players[e.player_index]
             if not element or not element.valid then return end
@@ -820,6 +827,7 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
 
             local g = gutils.get_graph(player)
             recipe_selection.open(g, g.products[product_name], g.recipes[recipe_name])
+        elseif not (e.button ~= defines.mouse_button_type.left or e.shift or e.control or e.alt) then
         end
     end)
 
@@ -953,7 +961,7 @@ tools.on_named_event(np("mini_maxi"), defines.events.on_gui_click,
     end
 )
 
-tools.on_named_event(np("unlock-product"), defines.events.on_gui_click,
+tools.on_named_event(np("error-unlock-product"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         local player = game.players[e.player_index]
