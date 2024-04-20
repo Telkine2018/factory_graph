@@ -193,17 +193,17 @@ function main.enter_surface(player)
     local player_position = { 0, 0 }
     if g and g.player_position then
         player_position = g.player_position
+        local zoom = g.graph_zoom_level
+        if zoom then
+            if zoom < 0.2 then
+                zoom = 0.2
+            elseif zoom > 5 then
+                zoom = 5
+            end
+            player.zoom = zoom
+        end
     end
     player.teleport(player_position, surface)
-    local zoom = g.graph_zoom_level
-    if zoom then
-        if zoom < 0.2 then
-            zoom = 0.2
-        elseif zoom > 5 then
-            zoom = 5
-        end
-        player.zoom = zoom
-    end
     return surface
 end
 

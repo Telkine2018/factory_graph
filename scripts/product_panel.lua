@@ -128,6 +128,7 @@ function product_panel.create(player_index)
     local error_panel = machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
     error_panel.visible = false
     error_panel.style.vertically_stretchable = true
+    error_panel.style.maximal_height = 600
 
     local machine_scroll = machine_frame.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", name = "machine_scroll", vertical_scroll_policy = "auto-and-reserve-space" }
