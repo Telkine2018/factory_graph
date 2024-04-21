@@ -5,7 +5,7 @@
   "author": "Telkine2018",
   "contact": "",
   "homepage": "",
-  "description": "A tool to build a graph of recipes and products. It can be also compute a default setup of machines and its throughput.",
+  "description": "A tool to build a graph of recipes and products. It can also compute a default setup of machines and its throughput.",
   "factorio_version": "1.1",
   "dependencies": [
 		"base >= 1.1",

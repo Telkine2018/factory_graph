@@ -10,10 +10,11 @@ local graph = require("scripts.graph")
 local prefix = commons.prefix
 
 ---@param player LuaPlayer
----@return Graph
+---@return Graph?
 ---@return GRecipe?
 local function prepare(player)
     local g = gutils.get_graph(player)
+    if not g then return nil, nil end
     local grecipe = g.selected_recipe
     if not grecipe then
         grecipe = g.move_recipe
@@ -44,7 +45,7 @@ end
 script.on_event(prefix .. "-up", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe then return end
+    if not g or not grecipe then return end
 
     local line = grecipe.line - 1
     local col = grecipe.col
@@ -63,7 +64,7 @@ end)
 script.on_event(prefix .. "-down", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe then return end
+    if not g or not grecipe then return end
 
     local line = grecipe.line + 1
     local col = grecipe.col
@@ -82,7 +83,7 @@ end)
 script.on_event(prefix .. "-left", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe then return end
+    if not g or not grecipe then return end
 
     local line = grecipe.line 
     local col = grecipe.col - 1
@@ -101,7 +102,7 @@ end)
 script.on_event(prefix .. "-right", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
-    if not grecipe then return end
+    if not g or not grecipe then return end
 
     local line = grecipe.line 
     local col = grecipe.col + 1
@@ -120,6 +121,7 @@ end)
 script.on_event(prefix .. "-del", function(e)
     local player = game.players[e.player_index]
     local g, grecipe = prepare(player)
+    if not g or not grecipe then return end
     if not grecipe or not grecipe.entity or not grecipe.entity.valid or not grecipe.visible then return end
 
     grecipe.entity.destroy()

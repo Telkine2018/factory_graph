@@ -3,3 +3,10 @@ Version: 1.0.0
 Date: 13. 04. 2024.
   Info:
     - Initial release
+---------------------------------------------------------------------------------------------------
+Version: 1.0.1
+Date: 20. 04. 2024.
+  Changes:
+    - Add SHIFT on graph button to open production panel
+  Fixes:
+    - Fix crash when using keys at start

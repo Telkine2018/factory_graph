@@ -112,11 +112,13 @@ script.on_event(prefix .. "-alt_k", on_switch_surface)
 function on_switch_click(e)
     if e.button == defines.mouse_button_type.left then
         local player = game.players[e.player_index]
-        if not e.control and not e.shift then
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
             switch_surface(player)
-        else
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
             player.cursor_stack.clear()
             player.cursor_stack.set_stack(prefix .. "-selection_tool")
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift or e.alt) then
+            product_panel.create(e.player_index)
         end
     end
 end
