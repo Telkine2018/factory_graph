@@ -9,4 +9,4 @@ Date: 20. 04. 2024.
   Changes:
     - Add SHIFT on graph button to open production panel
   Fixes:
-    - Fix crash when using keys at start
+    - Fix crash at startup

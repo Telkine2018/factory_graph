@@ -100,12 +100,12 @@ function command.open(player)
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("settings") }, name = np("settings"), tooltip= {np("settings_tooltip")} }
-    hflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip= {np("save_tooltip")} }
+    hflow.add { type = "button", caption = { np("settings") }, name = np("settings"), tooltip = { np("settings_tooltip") } }
+    hflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip = { np("save_tooltip") } }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") , tooltip= {np("unselect_tooltip")} }
+    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all"), tooltip = { np("unselect_tooltip") } }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
     hflow.style.bottom_margin = 5
 end
@@ -141,6 +141,19 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         graph.refresh(player)
         gutils.recenter(g)
     end)
+
+function command.update_display(player)
+    local frame = player.gui.left[command_frame_name]
+    if not frame then return end
+
+    local vis = tools.get_child(frame, np("visibility"))
+    if not vis then return end
+
+    local g = gutils.get_graph(player)
+    if not g then return end
+
+    vis.selected_index = g.visibility
+end
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
     function(e)

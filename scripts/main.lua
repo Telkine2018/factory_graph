@@ -118,6 +118,8 @@ function on_switch_click(e)
             player.cursor_stack.clear()
             player.cursor_stack.set_stack(prefix .. "-selection_tool")
         elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift or e.alt) then
+            local g = gutils.get_graph(player)
+            if not g then return end
             product_panel.create(e.player_index)
         end
     end
@@ -416,9 +418,14 @@ local function import_entities(e, clear)
     if e.item ~= prefix .. "-selection_tool" then return end
 
     local g = gutils.get_graph(player)
+    if not g then 
+        main.enter(player)
+        g = gutils.get_graph(player)
+    end
 
     if g.visibility == commons.visibility_all then
         g.visibility = commons.visibility_selection
+        command.update_display(player)
     end
 
     if clear then
@@ -439,7 +446,9 @@ local function import_entities(e, clear)
     graph.refresh(player)
     gutils.fire_selection_change(g)
     player.cursor_stack.clear();
-    switch_surface(player)
+    if player.surface.index ~= g.surface.index then
+        switch_surface(player)
+    end
     gutils.recenter(g)
 end
 
