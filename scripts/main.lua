@@ -121,6 +121,13 @@ function on_switch_click(e)
             local g = gutils.get_graph(player)
             if not g then return end
             product_panel.create(e.player_index)
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or not e.alt) then
+
+            local vars = tools.get_vars(player)
+            if vars.saved_character then
+                vars.character = vars.saved_character
+            end
+            switch_surface(player)
         end
     end
 end
@@ -138,6 +145,7 @@ function main.enter_surface(player)
     if not game.tile_prototypes[tile_name] then
         tile_name = "lab-dark-2"
     end
+
     local surface_name = surface_prefix .. player.index
     local surface = game.surfaces[surface_name]
 
@@ -181,11 +189,13 @@ function main.enter_surface(player)
     end
 
     local character = player.character
-    vars.character = character
     vars.surface = surface
+    vars.extern_surface = player.surface
     vars.extern_position = player.position
-    ---@cast character -nil
-    player.disassociate_character(character)
+    if character then
+        vars.character = character
+        player.disassociate_character(character)
+    end
     local controller_type
     controller_type = defines.controllers.ghost
     controller_type = defines.controllers.spectator
@@ -207,38 +217,50 @@ function main.enter_surface(player)
             player.zoom = zoom
         end
     end
-    player.teleport(player_position, surface)
+    player.teleport(player_position, surface, false)
     return surface
 end
 
 ---@param player LuaPlayer
 function main.exit(player)
     local vars = tools.get_vars(player)
+    local g = gutils.get_graph(player)
+
+    if not g then return end
+    if g.surface.index ~= player.surface_index then return end
+
+    local extern_position = vars.extern_position
+    if not extern_position and vars.character then
+        extern_position = vars.character.position
+    end
+
+    local zoom = g.world_zoom_level
+    if zoom then
+        if zoom < 0.2 then
+            zoom = 0.2
+        elseif zoom > 5 then
+            zoom = 5
+        end
+        player.zoom = zoom
+    end
+
     local character = vars.character
-
-    if character then
-        local g = gutils.get_graph(player)
-        local extern_position = vars.extern_position
-        if not extern_position then
-            extern_position = character.position
-        end
-        g.player_position = player.position
-        player.teleport(extern_position, character.surface, true)
-
-        local zoom = g.world_zoom_level
-        if zoom then
-            if zoom < 0.2 then
-                zoom = 0.2
-            elseif zoom > 5 then
-                zoom = 5
-            end
-            player.zoom = zoom
-        end
+    if character and character.valid then
+        player.teleport(character.position, character.surface, false)
+        player.associate_character(vars.character)
+        player.set_controller { type = defines.controllers.character, character = vars.character }
+        character.cheat_mode = false
+        vars.character = nil
+    elseif vars.extern_position and vars.extern_surface then
+        player.teleport(vars.extern_position, vars.extern_surface, false)
+    elseif vars.extern_position then
+        player.teleport(vars.extern_position, "Nauvis", false)
+    elseif vars.extern_position then
+        player.teleport({ 0, 0 }, "Nauvis", false)
     end
 end
 
 tools.on_event(defines.events.on_player_changed_surface,
-
     ---@param e EventData.on_player_changed_surface
     function(e)
         local player = game.players[e.player_index]
@@ -249,14 +271,18 @@ tools.on_event(defines.events.on_player_changed_surface,
         if e.surface_index == g.surface.index then
             tools.close_panels(player)
             command.close(player)
-            local character = vars.character
-            if vars.character then
-                player.teleport(character.position, character.surface)
-                player.associate_character(vars.character)
-                player.set_controller { type = defines.controllers.character, character = vars.character }
-                vars.character = nil
-            end
         end
+    end)
+
+tools.on_event(defines.events.on_player_changed_position,
+    ---@param e EventData.on_player_changed_position
+    function(e)
+        local player = game.players[e.player_index]
+        local character = player.character
+        if not character then return end
+
+        local vars = tools.get_vars(player)
+        vars.saved_character = character
     end)
 
 
@@ -418,7 +444,7 @@ local function import_entities(e, clear)
     if e.item ~= prefix .. "-selection_tool" then return end
 
     local g = gutils.get_graph(player)
-    if not g then 
+    if not g then
         main.enter(player)
         g = gutils.get_graph(player)
     end

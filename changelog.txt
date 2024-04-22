@@ -10,3 +10,8 @@ Date: 20. 04. 2024.
     - Add SHIFT on graph button to open production panel
   Fixes:
     - Fix crash at startup
+
+---------------------------------------------------------------------------------------------------
+Version: 1.0.2
+  Fixes:
+    - Add compatibility with Blueprint Sandox (Add <ALT>+<Graph button> to exit from Graph Exitor directly to Nauvis)
