@@ -34,17 +34,22 @@ remote.add_interface(prefix, {
     add_recipes = add_recipes
 })
 
+local default_speed = 4
+
 commands.add_command(prefix .. "_speed", nil, function(command)
     if command.player_index ~= nil then
         local player = game.players[command.player_index]
-        local vars = tools.get_vars(player)
-        vars.character_speed = not vars.character_speed
-        main.set_speed(player, vars.character_speed)
-        saving.clear_current(player)
-        if vars.character_speed then
-            player.print("Speed on")
-        else
-            player.print("Speed off")
+        local param = command.parameter
+        if not param then
+            param = tostring(default_speed)
         end
+
+        local speed = tonumber(param)
+        if not speed then
+            speed = default_speed
+        end
+
+        main.set_speed(player, speed)
+        player.print("Speed " .. speed)
     end
 end)

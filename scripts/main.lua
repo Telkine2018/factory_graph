@@ -76,7 +76,7 @@ function main.enter(player)
     if player.gui.left[switch_button_name] then
         player.gui.left[switch_button_name].destroy()
     end
-
+    
     local vars = tools.get_vars(player)
     local surface = main.enter_surface(player)
     if not vars.graph then
@@ -126,6 +126,9 @@ function on_switch_click(e)
             local vars = tools.get_vars(player)
             if vars.saved_character then
                 vars.character = vars.saved_character
+                if vars.saved_force_index then
+                    player.force = vars.saved_force_index
+                end
             end
             switch_surface(player)
         end
@@ -195,6 +198,11 @@ function main.enter_surface(player)
     if character then
         vars.character = character
         player.disassociate_character(character)
+    else
+        vars.character = nil
+        if vars.saved_force_index  then
+            player.force = vars.saved_force_index 
+        end
     end
     local controller_type
     controller_type = defines.controllers.ghost
@@ -279,10 +287,10 @@ tools.on_event(defines.events.on_player_changed_position,
     function(e)
         local player = game.players[e.player_index]
         local character = player.character
-        if not character then return end
-
+        if not character or not character.valid then return end
         local vars = tools.get_vars(player)
         vars.saved_character = character
+        vars.saved_force_index = player.force_index
     end)
 
 
@@ -331,9 +339,6 @@ tools.on_configuration_changed(function(data)
         create_player_button(player)
 
         local vars = tools.get_vars(player)
-        if vars.character_speed then
-            main.set_speed(player, true)
-        end
 
         ---@type Graph
         local g = vars.graph
@@ -495,15 +500,13 @@ tools.on_event(defines.events.on_player_alt_selected_area,
 
 
 ---@param player LuaPlayer
----@param value boolean?
+---@param value integer?
 function main.set_speed(player, value)
     if not value then
-        player.force.character_running_speed_modifier = 0
-        player.force.manual_crafting_speed_modifier   = 0
-    else
-        player.force.character_running_speed_modifier = 3
-        player.force.manual_crafting_speed_modifier   = 3
+        value = 0
     end
+    player.force.character_running_speed_modifier = value
+    player.force.manual_crafting_speed_modifier   = value
 end
 
 gutils.exit = main.exit
