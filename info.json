@@ -1,6 +1,6 @@
 {
   "name": "factory_graph",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "title": "Factory graph",
   "author": "Telkine2018",
   "contact": "",
@@ -10,6 +10,6 @@
   "dependencies": [
 		"base >= 1.1",
     "flib >= 0.12.9",
-    "?seablock"
+    "?SeaBlock"
 	]
 }

@@ -284,19 +284,21 @@ local function save(player, frame)
         end
     end
     local layer_change
-    if g.visible_layers then
-        if table_size(g.visible_layers) ~= table_size(visible_layers) then
-            layer_change = true
-        else
-            for layer in pairs(visible_layers) do
-                if not g.visible_layers[layer] then
-                    layer_change = true
-                    break
+    if g.visibility == commons.visibility_layers then
+        if g.visible_layers then
+            if table_size(g.visible_layers) ~= table_size(visible_layers) then
+                layer_change = true
+            else
+                for layer in pairs(visible_layers) do
+                    if not g.visible_layers[layer] then
+                        layer_change = true
+                        break
+                    end
                 end
             end
+        else
+            layer_change = true
         end
-    else
-        layer_change = true
     end
 
     g.visible_layers = visible_layers
