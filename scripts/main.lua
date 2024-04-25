@@ -362,7 +362,18 @@ tools.on_configuration_changed(function(data)
             for _, grecipe in pairs(g.recipes) do
                 if grecipe.visible and (not grecipe.line and not grecipe.col) then
                     need_refresh = true
-                    break
+                end
+                grecipe.layer = tools.check_sprite(grecipe.layer)
+            end
+            g.current_layer = tools.check_sprite(g.current_layer)
+            if g.visible_layers then
+                for layer in pairs(g.visible_layers) do
+                    if not tools.check_sprite(layer) then
+                        g.visible_layers = {}
+                        g.visibility = commons.visibility_selection
+                        need_refresh = true
+                        break
+                    end
                 end
             end
 

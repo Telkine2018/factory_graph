@@ -530,8 +530,8 @@ local function on_control_click(e)
 
     msettings.create(player.index, g.selected_recipe)
 end
-
 script.on_event(prefix .. "-control-click", on_control_click)
+
 
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine

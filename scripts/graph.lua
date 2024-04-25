@@ -961,6 +961,7 @@ function graph.create_recipe_objects(g)
     for _, grecipe in pairs(g.recipes) do
         create_recipe_object(g, grecipe)
     end
+    drawing.draw_layers(g)
 end
 
 ---@param player LuaPlayer
@@ -1018,10 +1019,16 @@ tools.on_event(defines.events.on_tick,
                 drawing.delete_content(g)
                 graph.do_layout(g)
                 graph.create_recipe_objects(g)
+            elseif data.do_redraw then
+                gutils.compute_visibility(g, true)
+                graph.create_recipe_objects(g)
             end
             drawing.redraw_selection(game.players[player_index])
             if data.selection_changed then
                 gutils.fire_selection_change(g)
+                if not data.no_recipe_selection_update then
+                    graph.update_recipe_selection(g.player)
+                end
             end
             if data.center_on_recipe then
                 if g.player.surface_index == g.surface.index then
@@ -1037,6 +1044,10 @@ tools.on_event(defines.events.on_tick,
                 if grecipe then
                     drawing.draw_target(g, grecipe)
                 end
+            end
+            drawing.draw_layers(g)
+            if data.update_command then
+                graph.update_command_display(g.player)
             end
         end
     end
@@ -1059,7 +1070,10 @@ function graph.load_saving(g, data)
         local current = g.recipes[grecipe.name]
         if current then
             selection[grecipe.name] = current
-            set_recipe_location(g, current, grecipe.col, grecipe.line)
+            current.layer = tools.check_sprite(grecipe.layer)
+            if grecipe.col then
+                set_recipe_location(g, current, grecipe.col, grecipe.line)
+            end
         end
     end
     g.selection = selection
@@ -1082,12 +1096,14 @@ function graph.load_saving(g, data)
 
     if g.visibility == commons.visibility_selection and
         data.config.visibility == commons.visibility_selection then
-        gutils.compute_visibility(g, true)
-        graph.create_recipe_objects(g)
-        drawing.redraw_selection(g.player)
-        gutils.recenter(g)
-    else
-        graph.refresh(g.player)
+        graph.deferred_update(g.player, { selection_changed = true, do_redraw = true, center_on_graph = true })
+    else    
+        local update_command
+        if g.visibility == commons.visibility_layers then
+            g.visibility = commons.visibility_selection
+            update_command = true
+        end
+        graph.deferred_update(g.player, { selection_changed = true, do_layout = true, center_on_graph = true, update_command = update_command })
     end
     gutils.fire_selection_change(g)
 end
@@ -1213,5 +1229,12 @@ function graph.create_sorted_recipe_table(set)
     return sort_table
 end
 
-return graph
+---@param player LuaPlayer
+function graph.update_command_display(player)
+end
 
+---@param player LuaPlayer
+function graph.update_recipe_selection(player)
+end
+
+return graph

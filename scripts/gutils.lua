@@ -50,7 +50,7 @@ function gutils.get_recipe_name(player, grecipe)
             localised_name = translations.get_fluid_name(player.index, string.sub(grecipe.name, 7))
         end
     else
-        localised_name = translations.get_recipe_name(player.index, grecipe.name)
+        localised_name = translations.get_recipe_name(player.index, grecipe.name) or ""
     end
     return localised_name
 end
@@ -59,6 +59,9 @@ end
 ---@param name string
 ---@return LocalisedString
 function gutils.get_product_name(player, name)
+    ---@type LocalisedString
+    local localised_name
+
     if match(name, "^item/") then
         localised_name = translations.get_item_name(player.index, string.sub(name, 6))
     else -- fluid
@@ -200,6 +203,30 @@ function gutils.compute_visibility(g, keep_position)
             grecipe.selector_positions = nil
             grecipe.entity = nil
             if selection[grecipe.name] then
+                if not keep_position then
+                    grecipe.line = nil
+                    grecipe.col = nil
+                end
+                grecipe.visible = true
+            else
+                grecipe.line = nil
+                grecipe.col = nil
+                grecipe.visible = false
+            end
+        end
+    elseif g.visibility == commons.visibility_layers then
+        local selection = g.selection
+        if not selection then
+            selection = {}
+        end
+        local visible_layers = g.visible_layers
+        if not visible_layers then
+            visible_layers = {}
+        end
+        for _, grecipe in pairs(g.recipes) do
+            grecipe.selector_positions = nil
+            grecipe.entity = nil
+            if selection[grecipe.name] and grecipe.layer and visible_layers[grecipe.layer] then
                 if not keep_position then
                     grecipe.line = nil
                     grecipe.col = nil
@@ -466,7 +493,8 @@ local saved_reciped_fields = {
     "name",
     "production_config",
     "line",
-    "col"
+    "col",
+    "layer"
 }
 
 gutils.saved_graph_fields = saved_graph_fields
@@ -593,7 +621,7 @@ function gutils.clear(g)
     g.production_failed = nil
     g.production_recipes_failed = nil
     g.bound_products = nil
-    for _,grecipe in pairs(g.recipes) do
+    for _, grecipe in pairs(g.recipes) do
         grecipe.production_config = nil
         grecipe.machine = nil
     end

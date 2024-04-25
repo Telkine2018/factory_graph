@@ -38,6 +38,7 @@ local function move_recipe(g, grecipe, col, line)
     local x, y = gutils.get_position(g, col, line)
     grecipe.entity.teleport { x, y }
     drawing.redraw_selection(g.player)
+    drawing.draw_layers(g)
 end
 
 
@@ -127,6 +128,7 @@ script.on_event(prefix .. "-del", function(e)
     grecipe.entity.destroy()
     graph.remove_recipe_visibility(g, grecipe)
     drawing.redraw_selection(g.player)
+    drawing.draw_layers(g)
     g.gcols[grecipe.col].line_set[grecipe.line] = nil
     gutils.fire_selection_change(g)
     gutils.set_cursor_stack(player, grecipe.name)

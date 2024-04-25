@@ -959,6 +959,33 @@ local function draw_selected_entity(player, entity, grecipe)
     g.product_selectors = selectors
 end
 
+
+---@param g Graph
+function drawing.draw_layers(g)
+    g.layer_ids = gutils.destroy_drawing(g.layer_ids)
+    local offset = 0.30
+    local scale = 0.4
+    local ids = {}
+    g.layer_ids = ids
+    for _, grecipe in pairs(g.selection) do
+        if grecipe.visible and grecipe.layer then
+            local x, y = gutils.get_position(g, grecipe.col, grecipe.line)
+            local id = rendering.draw_sprite { sprite = grecipe.layer, surface = g.surface,
+                target = { x + 0.5 + offset, y = y - 0.5 - offset }, 
+                x_scale=scale, y_scale=scale }
+            table.insert(ids, id)
+        end
+    end
+end
+
+---@param g Graph
+function drawing.unmark_all(g)
+    for _, grecipe in pairs(g.selection) do
+        grecipe.layer = nil
+    end
+    drawing.draw_layers(g)
+end
+
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)
     local player_index = e.player_index
@@ -1131,6 +1158,7 @@ end
 function drawing.delete_content(g, keep_location)
     drawing.clear_selection(g)
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
+    g.layer_ids = gutils.destroy_drawing(g.layer_ids)
 
     local entities = g.surface.find_entities_filtered {}
     for _, entity in pairs(entities) do
@@ -1154,5 +1182,23 @@ end
 ---@param src GRecipe
 function drawing.open_recipe_selection(g, product, src)
 end
+
+---@param e EventData.on_lua_shortcut
+local function on_control_click2(e)
+    local player = game.players[e.player_index]
+    local surface = player.surface
+
+    if not string.find(surface.name, commons.surface_prefix_filter) then
+        return
+    end
+    local g = gutils.get_graph(player)
+    if not g.selected_recipe then return end
+
+    local current_layer = g.current_layer or "virtual-signal/signal-yellow"
+
+    g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
+    drawing.draw_layers(g)
+end
+script.on_event(prefix .. "-control-click2", on_control_click2)
 
 return drawing

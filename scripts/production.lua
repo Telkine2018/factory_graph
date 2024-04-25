@@ -204,7 +204,9 @@ function production.compute_products(g, machines)
                     end
                 end
 
-                g.total_energy = g.total_energy + get_energy(machine)
+                if machine.grecipe.visible then
+                    g.total_energy = g.total_energy + get_energy(machine)
+                end
             end
         end
     end

@@ -37,6 +37,12 @@ add({
   name = prefix .. "-control-click"
 })
 
+add({
+  type = "custom-input",
+  key_sequence = "SHIFT + mouse-button-1",
+  name = prefix .. "-control-click2"
+})
+
 ---------------------------------------------
 local function create_symbol(name, filename)
   local entity = table.deepcopy(data.raw["container"]["iron-chest"])

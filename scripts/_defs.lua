@@ -32,6 +32,7 @@ local tools = require("scripts.tools")
 ---@field excluded_categories {[string]:boolean}?
 ---@field require_full_selection boolean?
 ---@field move_recipe GRecipe?
+---@field layer_ids integer[]?
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
@@ -43,6 +44,8 @@ local tools = require("scripts.tools")
 ---@field graph_zoom_level number?
 ---@field world_zoom_level number?
 ---@field autosave_on_graph_switching boolean?
+---@field current_layer string?
+---@field visible_layers {[string]:boolean}
 
 ---@class GraphProduction
 ---@field use_connected_recipes boolean             @ true if connected reciped use
@@ -90,6 +93,7 @@ local tools = require("scripts.tools")
 ---@field visible boolean?
 ---@field is_void boolean?
 ---@field is_recursive boolean?
+---@field layer string?
 
 ---@class GSortNode
 ---@field sort_level integer?
@@ -179,6 +183,9 @@ local tools = require("scripts.tools")
 ---@class RedrawRequest
 ---@field selection_changed boolean?
 ---@field do_layout boolean?
----@field center_on_recipe string
+---@field do_redraw boolean?
+---@field center_on_recipe string?   @ recipe to center on
 ---@field center_on_graph boolean?
 ---@field draw_target  boolean?
+---@field update_command  boolean?
+---@field no_recipe_selection_update boolean?

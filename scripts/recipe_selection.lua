@@ -414,7 +414,8 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
             selection_changed = true,
             do_layout = g.layout_on_selection,
             center_on_recipe = recipe_name,
-            draw_target = true
+            draw_target = true,
+            no_recipe_selection_update = true
         })
     end)
 
@@ -633,6 +634,27 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     end
 end
 
+---@param player LuaPlayer
+function recipe_selection.update_recipes(player)
+    local g = gutils.get_graph(player)
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local recipe_table = tools.get_child(frame, "recipe_table")
+    if not recipe_table then return end
+
+    local recipes = {}
+    for _, line in pairs(recipe_table.children) do
+        local recipe_name = line.tags.recipe_name --[[@as string]]
+        local grecipe = g.recipes[recipe_name]
+        if grecipe then
+            recipes[recipe_name] = grecipe
+        end
+    end
+    recipe_table.clear()
+    recipe_selection.display_recipes(player, recipes, recipe_table)
+end
+
 tools.on_gui_click(np("close"),
     ---@param e EventData.on_gui_click
     function(e)
@@ -827,7 +849,7 @@ tools.on_gui_click(np("select-all"),
                 cb.state = true
             end
         end
-        graph.deferred_update(player, { do_layout = true, center_on_graph = true })
+        graph.deferred_update(player, { do_layout = true, center_on_graph = true, no_recipe_selection_update = true })
     end)
 
 
@@ -907,4 +929,6 @@ tools.register_user_event(commons.selection_change_event, function(data)
 end)
 
 drawing.open_recipe_selection = recipe_selection.open
+graph.update_recipe_selection = recipe_selection.update_recipes
+
 return recipe_selection

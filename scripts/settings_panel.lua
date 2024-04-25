@@ -16,6 +16,9 @@ end
 local settings_panel_name = np("frame ")
 commons.settings_panel_name = settings_panel_name
 
+local selected_style = "flib_slot_button_red"
+local unselected_style = "flib_slot_button_default"
+
 tools.add_panel_name(settings_panel_name)
 
 ---@param container LuaGuiElement
@@ -85,9 +88,43 @@ function settings_panel.create(player_index)
     flow.add { type = "textfield", name = "world_zoom_level", text = g.world_zoom_level and tostring(g.world_zoom_level) or 1, numeric = true, allow_decimal = true }
 
     flow.add { type = "label", caption = { np("autosave_on_graph_switching") } }
-    flow.add { type = "checkbox", name = "autosave_on_graph_switching", state = not not g.autosave_on_graph_switching, 
-            tooltip = { np("autosave_on_graph_switching_tooltip") } }
+    flow.add { type = "checkbox", name = "autosave_on_graph_switching", state = not not g.autosave_on_graph_switching,
+        tooltip = { np("autosave_on_graph_switching_tooltip") } }
 
+    flow.add { type = "label", caption = { np("current_layer") } }
+    local current_layer = g.current_layer
+    if not current_layer then current_layer = "virtual-signal/signal-yellow" end
+    local layer_signal = tools.sprite_to_signal(current_layer)
+    local b = flow.add { type = "choose-elem-button", elem_type = "signal", signal = layer_signal,
+        name = "current_layer", tooltip = { np("current_layer_tooltip") } }
+
+    flow.add { type = "line" }
+    flow.add { type = "line" }
+    flow.add { type = "label", caption = { np("visible_layers") } }
+    local visible_layers = g.visible_layers
+    if not visible_layers then
+        visible_layers = {}
+    end
+    local all_layers = {}
+    for _, grecipe in pairs(g.selection) do
+        if grecipe.layer then
+            all_layers[grecipe.layer] = true
+        end
+    end
+    local layer_flow = flow.add { type = "table", name = "visible_layers", column_count = 6 }
+    for layer in pairs(all_layers) do
+        local layer_signal = tools.sprite_to_signal(layer)
+        b = layer_flow.add { type = "choose-elem-button", elem_type = "signal", signal = layer_signal, tooltip = { np("visible_layers_tooltip") } }
+        b.locked = true
+        tools.set_name_handler(b, np("visible_layer"))
+        if visible_layers[layer] then
+            b.style = selected_style
+        else
+            b.style = unselected_style
+        end
+    end
+    flow.add { type = "line" }
+    flow.add { type = "line" }
 
     flow.add { type = "label", caption = { np("preferred_machines") } }
     local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_machines" }
@@ -227,11 +264,48 @@ local function save(player, frame)
         graph.refresh(player)
     end
 
+    local signal = field_table.current_layer.elem_value --[[@as SignalID]]
+    g.current_layer = tools.signal_to_sprite(signal)
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
     g.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
-    gutils.fire_production_data_change(g)
+
+    local visible_layers_flow = field_table.visible_layers
+    local visible_layers = {}
+    for i = 1, #visible_layers_flow.children do
+        local b = visible_layers_flow.children[i]
+        local signal = b.elem_value --[[@as SignalID]]
+        if signal and b.style.name == selected_style then
+            local sprite = tools.signal_to_sprite(signal)
+            if sprite then
+                visible_layers[sprite] = true
+            end
+        end
+    end
+    local layer_change
+    if g.visible_layers then
+        if table_size(g.visible_layers) ~= table_size(visible_layers) then
+            layer_change = true
+        else
+            for layer in pairs(visible_layers) do
+                if not g.visible_layers[layer] then
+                    layer_change = true
+                    break
+                end
+            end
+        end
+    else
+        layer_change = true
+    end
+
+    g.visible_layers = visible_layers
+    if layer_change then
+        graph.deferred_update(player, { do_layout = true, center_on_graph = true })
+        gutils.fire_selection_change(g)
+    else
+        gutils.fire_production_data_change(g)
+    end
     frame.destroy()
 end
 
@@ -264,6 +338,32 @@ tools.on_event(defines.events.on_gui_confirmed,
         save(player, frame)
     end
 )
+
+tools.on_named_event(np("visible_layer"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        if not e.element.valid then return end
+
+        local frame = player.gui.screen[settings_panel_name]
+        local field_table = tools.get_child(frame, "field_table")
+        if not field_table then return end
+
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+            local name = e.element.style.name
+            if name == selected_style then
+                name = unselected_style
+            else
+                name = selected_style
+            end
+            e.element.style = name
+        elseif not (e.button ~= defines.mouse_button_type.right or e.control or e.shift or e.alt) then
+            local signal = e.element.elem_value
+            field_table.current_layer.elem_value = signal
+        end
+    end
+)
+
 
 ---@param player LuaPlayer
 function settings_panel.close(player)

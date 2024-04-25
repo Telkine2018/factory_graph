@@ -40,7 +40,8 @@ end
 
 local visibility_items = {
     { np("visibility_all") },
-    { np("visibility_selection") }
+    { np("visibility_selection") },
+    { np("visibility_layers") }
 }
 
 ---@param player LuaPlayer
@@ -138,10 +139,14 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
         g.visibility = e.element.selected_index
-        graph.refresh(player)
-        gutils.recenter(g)
+        graph.deferred_update(player, {
+            do_layout = true,
+            center_on_graph = true
+        })
+        gutils.fire_selection_change(g)
     end)
 
+---@param player LuaPlayer
 function command.update_display(player)
     local frame = player.gui.left[command_frame_name]
     if not frame then return end
@@ -182,8 +187,14 @@ tools.on_named_event(np("unselect_all"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         local player = game.players[e.player_index]
-        graph.unselect(player)
-        saving.clear_current(player)
+
+        if not(e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+            graph.unselect(player)
+            saving.clear_current(player)
+        elseif not(e.button ~= defines.mouse_button_type.right or e.control or e.shift or e.alt) then
+            local g = gutils.get_graph(player)
+            drawing.unmark_all(g)
+        end
     end)
 
 ---@param player LuaPlayer
@@ -198,5 +209,7 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
     function(e)
         saving.create(e.player_index)
     end)
+
+graph.update_command_display = command.update_display
 
 return command

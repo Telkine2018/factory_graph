@@ -764,6 +764,17 @@ function product_panel.update_machine_panel(g, machine_frame)
 
     table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
+    if g.visibility == commons.visibility_layers then
+        local visible_layers =  g.visible_layers or {}
+        local new_machines = {}
+        for _, machine in pairs(machines) do
+            if machine.grecipe.layer and visible_layers[machine.grecipe.layer] then
+                table.insert(new_machines, machine)
+            end
+        end
+        machines = new_machines
+    end
+
     for _, machine in pairs(machines) do
         create_product_line(machine_container, machine)
     end
