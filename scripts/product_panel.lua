@@ -119,31 +119,43 @@ function product_panel.create(player_index)
     local machine_frame = inner_flow.add {
         type = "frame",
         direction = "vertical",
-        style = "inside_shallow_frame_with_padding",
-        name = "machine_frame"
+        style = "inside_shallow_frame_with_padding"
     }
 
     machine_frame.style.minimal_width = 200
     machine_frame.style.minimal_height = 400
-    local error_panel = machine_frame.add { type = "flow", direction = "vertical", name = "error_panel" }
+
+    local tabbed_pane = machine_frame.add { type = "tabbed-pane" }
+    tabbed_pane.style.vertically_stretchable = true
+    tabbed_pane.style.horizontally_stretchable = true
+
+    local setup_tab = tabbed_pane.add { type = "tab", caption = { np("setup") } }
+    local summary_tab = tabbed_pane.add { type = "tab", caption = { np("summary") } }
+    local setup_flow = tabbed_pane.add { type = "flow", direction = "vertical", name = "setup_flow" }
+
+    local summary_scroll = tabbed_pane.add { type = "scroll-pane", direction = "vertical",
+        horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
+    summary_scroll.style.horizontally_stretchable = true
+    summary_scroll.style.vertically_stretchable = true
+    local summary_flow = summary_scroll.add { type = "flow", direction = "vertical", name = "summary_flow" }
+
+    tabbed_pane.add_tab(setup_tab, setup_flow)
+    tabbed_pane.add_tab(summary_tab, summary_scroll)
+
+    local error_panel = setup_flow.add { type = "flow", direction = "vertical", name = "error_panel" }
     error_panel.visible = false
     error_panel.style.vertically_stretchable = true
     error_panel.style.maximal_height = 600
 
-    local machine_scroll = machine_frame.add { type = "scroll-pane",
+    local machine_scroll = setup_flow.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", name = "machine_scroll", vertical_scroll_policy = "auto-and-reserve-space" }
     machine_scroll.add { type = "table", column_count = 1, name = "machine_container" }
     machine_scroll.style.horizontally_stretchable = true
+    machine_scroll.style.vertically_stretchable = true
 
-    local summary = machine_frame.add {
-        type = "frame",
-        direction = "vertical",
-        style = "inside_shallow_frame_with_padding",
-        name = "summary"
-    }
-    summary.add { type = "label", caption = "" }
+    summary_flow.add { type = "label", caption = "" }
 
-    product_panel.update_machine_panel(g, machine_frame)
+    product_panel.update_machine_panel(g, setup_flow, summary_flow)
 
     local location = vars[location_name]
     if location then
@@ -722,10 +734,13 @@ function product_panel.update_error_panel(g, error_panel)
 end
 
 ---@param g Graph
----@param machine_frame LuaGuiElement
-function product_panel.update_machine_panel(g, machine_frame)
-    local machine_scroll = machine_frame.machine_scroll
+---@param setup_flow LuaGuiElement
+---@param summary_flow LuaGuiElement
+function product_panel.update_machine_panel(g, setup_flow, summary_flow)
+    local machine_scroll = setup_flow.machine_scroll
     local machine_container = machine_scroll.machine_container
+    local player = g.player
+    local vars = tools.get_vars(player)
 
     machine_container.clear()
     if not g.selection then return end
@@ -735,14 +750,13 @@ function product_panel.update_machine_panel(g, machine_frame)
         error_panel.clear()
     end
 
-    local summary = machine_frame.summary
     if g.production_failed then
         if not error_panel or not g.production_recipes_failed then
             return
         end
         error_panel.visible = true
         machine_scroll.visible = false
-        summary.visible = false
+        summary_flow.visible = false
 
         product_panel.update_error_panel(g, error_panel)
         return
@@ -750,7 +764,7 @@ function product_panel.update_machine_panel(g, machine_frame)
 
     error_panel.visible = false
     machine_scroll.visible = true
-    summary.visible = true
+    summary_flow.visible = true
 
     ---@type ProductionMachine[]
     local machines = {}
@@ -765,7 +779,7 @@ function product_panel.update_machine_panel(g, machine_frame)
     table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
     if g.visibility == commons.visibility_layers then
-        local visible_layers =  g.visible_layers or {}
+        local visible_layers = g.visible_layers or {}
         local new_machines = {}
         for _, machine in pairs(machines) do
             if machine.grecipe.layer and visible_layers[machine.grecipe.layer] then
@@ -775,8 +789,16 @@ function product_panel.update_machine_panel(g, machine_frame)
         machines = new_machines
     end
 
+    local count_per_machine = {}
     for _, machine in pairs(machines) do
         create_product_line(machine_container, machine)
+
+        local count = math.ceil(machine.count)
+        if count > 0 and machine.machine then
+            local machine_name = machine.machine.name
+
+            count_per_machine[machine_name] = (count_per_machine[machine_name] or 0) + count
+        end
     end
 
     for i = 1, 5 do
@@ -784,8 +806,97 @@ function product_panel.update_machine_panel(g, machine_frame)
         empty.style.vertically_stretchable = true
     end
 
-    summary.clear()
-    summary.add { type = "label", caption = { np("total_energy"), g.total_energy and luautil.format_number(g.total_energy or "", true) } }
+    summary_flow.clear()
+    summary_flow.add { type = "label", caption = { np("total_energy"), g.total_energy and luautil.format_number(g.total_energy or "", true) } }
+
+    summary_flow.add { type = "line" }
+    local per_machine_table = summary_flow.add { type = "table", column_count = 5, style = prefix .. "_default_table", draw_vertical_lines = true }
+    per_machine_table.style.horizontally_stretchable = true
+
+    local character = player.character
+    if not character and vars.saved_character and vars.saved_character.valid then
+        character = vars.saved_character
+    end
+    local inv
+    local network
+    if character then
+        inv = character.get_main_inventory()
+        network = character.surface.find_logistic_network_by_position(character.position, player.force_index)
+    end
+
+    ---@class ProductPanel_Machines
+    ---@field name string
+    ---@field label string
+    ---@field count integer
+
+    ---@type ProductPanel_Machines[]
+    local sorted_table = {}
+
+    local lwidth = 50
+
+    per_machine_table.add { type = "empty-widget" }
+    per_machine_table.add { type = "empty-widget" }
+
+    local label                  = per_machine_table.add { type = "label", caption = { np("build-used") } }
+    label.style.horizontal_align = "center"
+    label.style.width            = lwidth
+
+    label                        = per_machine_table.add { type = "label", caption = { np("build-inventory") } }
+    label.style.horizontal_align = "center"
+    label.style.width            = lwidth
+
+    label                        = per_machine_table.add { type = "label", caption = { np("build-logistic") } }
+    label.style.horizontal_align = "center"
+    label.style.width            = lwidth
+
+    for name, count in pairs(count_per_machine) do
+        table.insert(sorted_table, {
+            name = name,
+            label = translations.get_entity_name(summary_flow.player_index, name),
+            count = count
+        })
+    end
+    table.sort(sorted_table, function(m1, m2) return m1.label < m2.label end)
+
+    for _, m in pairs(sorted_table) do
+        local name               = m.name
+        local count              = m.count
+        local item               = game.entity_prototypes[name].items_to_place_this[1].name
+        local in_inventory_count = inv and inv.get_item_count(item) or 0
+        local in_network_count   = network and network.get_item_count(item) or 0
+        local b                  = per_machine_table.add {
+            type = "choose-elem-button",
+            elem_type = "item",
+            item = item,
+            tooltip = { np("build-button-tooltip") } }
+        tools.set_name_handler(b, np("summary_machine"), {
+            item = item,
+            count = count,
+            in_inventory_count = in_inventory_count,
+            in_network_count = in_network_count
+        })
+        b.locked                         = true
+        local machine_label              = per_machine_table.add {
+            type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
+        machine_label.style.right_margin = 10
+
+        local label                      = per_machine_table.add {
+            type = "label", caption = tostring(count), tooltip = { np("build-used-tooltip") } }
+        label.style.horizontal_align     = "center"
+        label.style.width                = lwidth
+
+        label                            = per_machine_table.add {
+            type = "label", caption = tostring(in_inventory_count), tooltip = { np("build-inventory-tooltip") } }
+        label.style.horizontal_align     = "center"
+        label.style.width                = lwidth
+
+        local in_network                 = network and tostring(network.get_item_count(item)) or ""
+
+        label                            = per_machine_table.add {
+            type = "label", caption = tostring(in_network_count), tooltip = { np("build-logistic-tooltip") } }
+        label.style.horizontal_align     = "center"
+        label.style.width                = lwidth
+    end
 end
 
 ---@param g Graph
@@ -794,11 +905,46 @@ local function update_machines(g)
     local frame = player.gui.screen[product_panel_name]
     if not frame then return end
 
-    local machine_frame = tools.get_child(frame, "machine_frame")
-    if machine_frame then
-        product_panel.update_machine_panel(g, machine_frame)
+    local setup_flow = tools.get_child(frame, "setup_flow")
+    local summary_flow = tools.get_child(frame, "summary_flow")
+    if setup_flow and summary_flow then
+        product_panel.update_machine_panel(g, setup_flow, summary_flow)
     end
 end
+
+tools.on_event(defines.events.on_player_crafted_item,
+    ---@param e EventData.on_player_crafted_item
+    function(e)
+        local player = game.players[e.player_index]
+        graph.deferred_update(player, { update_product_list = true })
+    end)
+
+---@param player LuaPlayer
+---@param item string
+function product_panel.craft_machine(player, item)
+    local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
+        elem_filters = { { filter = "name", name = item } } } }
+
+    if string.find(player.surface.name, commons.surface_prefix_filter) then
+        gutils.exit(player)
+    end
+    if #recipes > 0 then
+        for name in pairs(recipes) do
+            player.begin_crafting { recipe = name, count = 1 }
+            break
+        end
+    end
+end
+
+tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+            local player = game.players[e.player_index]
+
+            product_panel.craft_machine(player, e.element.tags.item --[[@as string]])
+        end
+    end)
 
 tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
@@ -922,20 +1068,9 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
             ---@type ProductionMachine
             local machine = grecipe.machine
             if not machine or not machine.machine then return end
-            local item = machine.machine.items_to_place_this[1]
-            local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
-                elem_filters = { { filter = "name", name = item } } } }
+            local item = machine.machine.items_to_place_this[1].name
 
-            if string.find(player.surface.name, commons.surface_prefix_filter) then
-                gutils.exit(player)
-            end
-
-            if #recipes > 0 then
-                for name in pairs(recipes) do
-                    player.begin_crafting { recipe = name, count = 1 }
-                    break
-                end
-            end
+            product_panel.craft_machine(player, item)
         else
             msettings_panel.create(e.player_index, grecipe)
         end

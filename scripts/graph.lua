@@ -1049,6 +1049,9 @@ tools.on_event(defines.events.on_tick,
             if data.update_command then
                 graph.update_command_display(g.player)
             end
+            if data.update_product_list then
+                tools.fire_user_event(commons.production_compute_event, { g = g })
+            end
         end
     end
 )
