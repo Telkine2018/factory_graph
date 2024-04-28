@@ -733,6 +733,30 @@ function product_panel.update_error_panel(g, error_panel)
     end
 end
 
+---@param player any
+---@return LuaInventory?
+---@return LuaLogisticNetwork?
+local function get_inventories(player)
+
+    ---@type LuaEntity
+    local character = player.character
+    local vars = tools.get_vars(player)
+    if not character and vars.saved_character and vars.saved_character.valid then
+        character = vars.saved_character
+    end
+
+    ---@type LuaInventory?
+    local inv
+    ---@type LuaLogisticNetwork?
+    local network
+
+    if character then
+        inv = character.get_main_inventory()
+        network = character.surface.find_logistic_network_by_position(character.position, player.force_index)
+    end
+    return inv, network
+end
+
 ---@param g Graph
 ---@param setup_flow LuaGuiElement
 ---@param summary_flow LuaGuiElement
@@ -813,16 +837,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     local per_machine_table = summary_flow.add { type = "table", column_count = 5, style = prefix .. "_default_table", draw_vertical_lines = true }
     per_machine_table.style.horizontally_stretchable = true
 
-    local character = player.character
-    if not character and vars.saved_character and vars.saved_character.valid then
-        character = vars.saved_character
-    end
-    local inv
-    local network
-    if character then
-        inv = character.get_main_inventory()
-        network = character.surface.find_logistic_network_by_position(character.position, player.force_index)
-    end
+    local inv, network = get_inventories(player)
 
     ---@class ProductPanel_Machines
     ---@field name string
@@ -916,21 +931,30 @@ tools.on_event(defines.events.on_player_crafted_item,
     ---@param e EventData.on_player_crafted_item
     function(e)
         local player = game.players[e.player_index]
-        graph.deferred_update(player, { update_product_list = true })
+        local vars = tools.get_vars(player)
+        if e.recipe and vars.current_craft_recipe == e.recipe.name then
+            graph.deferred_update(player, { update_product_list = true })
+        end
     end)
 
 ---@param player LuaPlayer
 ---@param item string
-function product_panel.craft_machine(player, item)
+---@param count integer?
+function product_panel.craft_machine(player, item, count)
     local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
         elem_filters = { { filter = "name", name = item } } } }
 
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         gutils.exit(player)
     end
+    if not count then 
+        count = 1
+    end
     if #recipes > 0 then
         for name in pairs(recipes) do
-            player.begin_crafting { recipe = name, count = 1 }
+            player.begin_crafting { recipe = name, count = count }
+            local vars = tools.get_vars(player)
+            vars.current_craft_recipe = name
             break
         end
     end
@@ -939,10 +963,21 @@ end
 tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
+        local item = e.element.tags.item --[[@as string]]
         if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
             local player = game.players[e.player_index]
+            product_panel.craft_machine(player, item)
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
+            local player = game.players[e.player_index]
+            local count = e.element.tags.count --[[@as integer]]
+            local inv, network = get_inventories(player)
 
-            product_panel.craft_machine(player, e.element.tags.item --[[@as string]])
+            local in_inventory_count = inv and inv.get_item_count(item) or 0
+            local in_network_count   = network and network.get_item_count(item) or 0
+            count = count - in_inventory_count - in_network_count
+            if count > 0 then
+                product_panel.craft_machine(player, item, count)
+            end
         end
     end)
 

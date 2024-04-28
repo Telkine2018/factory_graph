@@ -195,6 +195,8 @@ function main.enter_surface(player)
     vars.surface = surface
     vars.extern_surface = player.surface
     vars.extern_position = player.position
+    vars.extern_force = nil
+    local extern_force = player.force
     if character then
         vars.character = character
         player.disassociate_character(character)
@@ -226,6 +228,7 @@ function main.enter_surface(player)
         end
     end
     player.teleport(player_position, surface, false)
+    vars.extern_force = extern_force
     return surface
 end
 
@@ -252,6 +255,10 @@ function main.exit(player)
         player.zoom = zoom
     end
 
+    if vars.extern_force then
+        player.force = vars.extern_force
+    end
+
     local character = vars.character
     if character and character.valid then
         player.teleport(character.position, character.surface, false)
@@ -276,6 +283,7 @@ tools.on_event(defines.events.on_player_changed_surface,
         local g = gutils.get_graph(player)
         if not g then return end
 
+        vars.extern_force = nil
         if e.surface_index == g.surface.index then
             tools.close_panels(player)
             command.close(player)

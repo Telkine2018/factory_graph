@@ -309,7 +309,7 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
         if not container then return end
         saving.update(player, container)
 
-        saving.close(player)
+        --saving.close(player)
     end)
 
 tools.on_named_event(np("close"), defines.events.on_gui_click,

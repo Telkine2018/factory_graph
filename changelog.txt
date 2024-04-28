@@ -18,3 +18,10 @@ Date: 25. 04. 2024.
     - Add compatibility with Blueprint Sandox (Add <ALT>+<Graph button> to exit from Graph Exitor directly to Nauvis)
     - Add layer management (<Shift>Click on recipe in graph, parameters in global settings)
     - Fix crash on translations
+---------------------------------------------------------------------------------------------------
+Version: 1.0.3
+Date: 28. 04. 2024.
+  Fixes:
+    - Fix force change in enter/exit
+  Changes:
+    - Add summary of all machines used in a production
