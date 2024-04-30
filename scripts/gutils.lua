@@ -187,6 +187,9 @@ function gutils.select_current_recipe(g, recipe)
     if not recipe then return false end
     if g.selection[recipe.name] then return false end
     g.selection[recipe.name] = recipe
+    if g.visibility == commons.visibility_layers then
+        recipe.layer = g.current_layer
+    end
     return true
 end
 
@@ -624,6 +627,7 @@ function gutils.clear(g)
     for _, grecipe in pairs(g.recipes) do
         grecipe.production_config = nil
         grecipe.machine = nil
+        grecipe.layer = nil
     end
 end
 

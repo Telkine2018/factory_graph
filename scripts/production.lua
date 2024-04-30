@@ -539,7 +539,7 @@ function production.compute_matrix(g)
             elseif maxv then
                 main_value = maxv
             end
-            if not main_value then
+            if not main_value or main_value < 0 then
                 failed = commons.production_failures.too_many_constraints
                 failed_recipes[main_var] = true
             else

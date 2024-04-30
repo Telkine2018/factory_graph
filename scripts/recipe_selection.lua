@@ -87,6 +87,9 @@ local function push_history(player, gproduct, grecipe)
     end
     local recipe_name = grecipe and grecipe.name
     local product_name = gproduct and gproduct.name
+    if not recipe_name and not product_name then
+        return
+    end
 
     local index = vars.recipe_history_index
     if index > 0 then
@@ -131,6 +134,18 @@ local function backward_history(player)
     local gproduct = top.product_name and g.products[top.product_name]
     local grecipe = top.recipe_name and g.recipes[top.recipe_name]
     recipe_selection.open(g, gproduct, grecipe, false, true)
+end
+
+---@param player LuaPlayer
+local function clear_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then        return
+    end
+    local vars = tools.get_vars(player)
+    local history = {}
+    vars.recipe_history = history
+    vars.recipe_history_index = 0
 end
 
 ---@param player LuaPlayer
@@ -376,7 +391,7 @@ local function set_recipes_to_selection(player)
     local not_visible = {}
     ---@cast recipe_table -nil
     for _, line in pairs(recipe_table.children) do
-        local name = line.tags.recipe_name
+        local name = line.tags.recipe_name --[[@as string]]
         local cb = line[cb_name]
         if name and cb then
             if cb.state then
@@ -385,6 +400,9 @@ local function set_recipes_to_selection(player)
                 recipes[name] = grecipe
                 if not grecipe.visible then
                     not_visible[name] = grecipe
+                end
+                if g.visibility == commons.visibility_layers then
+                    grecipe.layer = g.current_layer
                 end
             else
                 g.selection[name] = nil
@@ -405,7 +423,9 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
             graph.insert_recipe(g, grecipe)
         end
         graph.create_recipe_objects(g)
-        gutils.select_current_recipe(g, g.rs_recipe)
+        if g.rs_recipe and g.rs_recipe.visible then
+            gutils.select_current_recipe(g, g.rs_recipe)
+        end
         local recipe_name
         if e.element.state then
             recipe_name = e.element.tags.recipe_name --[[@as string]]
@@ -841,12 +861,15 @@ tools.on_gui_click(np("select-all"),
 
         ---@cast recipe_table -nil
         for _, line in pairs(recipe_table.children) do
-            local name = line.tags.recipe_name
+            local name = line.tags.recipe_name --[[@as string]]
             local cb = line[cb_name]
             if name and cb then
                 local grecipe = g.recipes[name]
                 g.selection[name] = grecipe
                 cb.state = true
+                if g.visibility == commons.visibility_layers then
+                    grecipe.layer = g.current_layer
+                end
             end
         end
         graph.deferred_update(player, { do_layout = true, center_on_graph = true, no_recipe_selection_update = true })
@@ -892,13 +915,19 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
 tools.on_named_event(np("backward"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
-        backward_history(game.players[e.player_index])
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.alt or e.shift) then
+            backward_history(game.players[e.player_index])
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.alt or e.shift) then
+            clear_history(game.players[e.player_index])
+        end
     end)
 
 tools.on_named_event(np("forward"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
-        forward_history(game.players[e.player_index])
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.alt or e.shift) then
+            forward_history(game.players[e.player_index])
+        end
     end)
 
 tools.on_named_event(np("remaining"), defines.events.on_gui_click,

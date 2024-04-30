@@ -273,6 +273,9 @@ local function save(player, frame)
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
+    if g.current_layer then
+        visible_layers[g.current_layer] = true
+    end
     for i = 1, #visible_layers_flow.children do
         local b = visible_layers_flow.children[i]
         local signal = b.elem_value --[[@as SignalID]]

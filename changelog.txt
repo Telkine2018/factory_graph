@@ -20,8 +20,10 @@ Date: 25. 04. 2024.
     - Fix crash on translations
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.3
-Date: 28. 04. 2024.
+Date: 29. 04. 2024.
   Fixes:
     - Fix force change in enter/exit
+    - Fix invalid solver solution
   Changes:
     - Add summary of all machines used in a production
+    - Misc. improvements on layer

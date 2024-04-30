@@ -736,8 +736,8 @@ end
 ---@param player any
 ---@return LuaInventory?
 ---@return LuaLogisticNetwork?
+---@return {[string]:integer}
 local function get_inventories(player)
-
     ---@type LuaEntity
     local character = player.character
     local vars = tools.get_vars(player)
@@ -754,7 +754,44 @@ local function get_inventories(player)
         inv = character.get_main_inventory()
         network = character.surface.find_logistic_network_by_position(character.position, player.force_index)
     end
-    return inv, network
+    local craft_queue = {}
+    if player.crafting_queue_size > 0 then
+        for _, c in pairs(player.crafting_queue) do
+            local recipe = game.recipe_prototypes[c.recipe]
+            if recipe then
+                for _, p in pairs(recipe.products) do
+                    if p.type == "item" then
+                        local amount = p.amount
+                        if not amount then
+                            amount = (p.amount_min + p.amount_max) / 2
+                        end
+                        craft_queue[p.name] = (craft_queue[p.name] or 0) + amount * c.count
+                    end
+                end
+            end
+        end
+    end
+    return inv, network, craft_queue
+end
+
+---@param count integer
+---@param in_inventory_count integer
+---@param in_network_count integer
+---@param crafted integer
+local function get_summary_labels(count, in_inventory_count, in_network_count, crafted)
+    local count_label = tostring(count)
+    if count > in_inventory_count + in_network_count + crafted then
+        count_label = "[color=red][font=default-bold]" .. count_label .. "[/font][/color]"
+    else
+        count_label = "[color=green][font=default-bold]" .. count_label .. "[/font][/color]"
+    end
+
+    local inventory_count = tostring(in_inventory_count)
+    if crafted > 0 then
+        inventory_count = inventory_count .. " (" .. crafted .. ")"
+    end
+
+    return count_label, inventory_count
 end
 
 ---@param g Graph
@@ -837,7 +874,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     local per_machine_table = summary_flow.add { type = "table", column_count = 5, style = prefix .. "_default_table", draw_vertical_lines = true }
     per_machine_table.style.horizontally_stretchable = true
 
-    local inv, network = get_inventories(player)
+    local inv, network, craft_queue = get_inventories(player)
 
     ---@class ProductPanel_Machines
     ---@field name string
@@ -877,6 +914,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
         local name               = m.name
         local count              = m.count
         local item               = game.entity_prototypes[name].items_to_place_this[1].name
+        local crafted            = craft_queue[item] or 0
         local in_inventory_count = inv and inv.get_item_count(item) or 0
         local in_network_count   = network and network.get_item_count(item) or 0
         local b                  = per_machine_table.add {
@@ -895,17 +933,17 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
         machine_label.style.right_margin = 10
 
+        local count_label, inv_label     = get_summary_labels(count, in_inventory_count, in_network_count, crafted)
+
         local label                      = per_machine_table.add {
-            type = "label", caption = tostring(count), tooltip = { np("build-used-tooltip") } }
+            type = "label", caption = count_label, tooltip = { np("build-used-tooltip") } }
         label.style.horizontal_align     = "center"
         label.style.width                = lwidth
 
         label                            = per_machine_table.add {
-            type = "label", caption = tostring(in_inventory_count), tooltip = { np("build-inventory-tooltip") } }
+            type = "label", caption = inv_label, tooltip = { np("build-inventory-tooltip") } }
         label.style.horizontal_align     = "center"
         label.style.width                = lwidth
-
-        local in_network                 = network and tostring(network.get_item_count(item)) or ""
 
         label                            = per_machine_table.add {
             type = "label", caption = tostring(in_network_count), tooltip = { np("build-logistic-tooltip") } }
@@ -947,7 +985,7 @@ function product_panel.craft_machine(player, item, count)
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         gutils.exit(player)
     end
-    if not count then 
+    if not count then
         count = 1
     end
     if #recipes > 0 then
@@ -964,21 +1002,22 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         local item = e.element.tags.item --[[@as string]]
+        local player = game.players[e.player_index]
         if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
-            local player = game.players[e.player_index]
             product_panel.craft_machine(player, item)
         elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
-            local player = game.players[e.player_index]
-            local count = e.element.tags.count --[[@as integer]]
-            local inv, network = get_inventories(player)
+            local count                        = e.element.tags.count --[[@as integer]]
+            local inv, network, crafting_queue = get_inventories(player)
 
-            local in_inventory_count = inv and inv.get_item_count(item) or 0
-            local in_network_count   = network and network.get_item_count(item) or 0
-            count = count - in_inventory_count - in_network_count
+            local in_inventory_count           = inv and inv.get_item_count(item) or 0
+            local in_network_count             = network and network.get_item_count(item) or 0
+            local crafted                      = crafting_queue[item] or 0
+            count                              = count - in_inventory_count - in_network_count - crafted
             if count > 0 then
                 product_panel.craft_machine(player, item, count)
             end
         end
+        graph.deferred_update(player, { update_product_list = true })
     end)
 
 tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
