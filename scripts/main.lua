@@ -69,16 +69,17 @@ local excluded_categories = {
 }
 
 ---@param player any
-function main.enter(player)
+---@param recipe_name string?
+function main.enter(player, recipe_name)
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         return
     end
     if player.gui.left[switch_button_name] then
         player.gui.left[switch_button_name].destroy()
     end
-    
+
     local vars = tools.get_vars(player)
-    local surface = main.enter_surface(player)
+    local surface = main.enter_surface(player, recipe_name)
     if not vars.graph then
         local g = graph.new(surface)
         g.player = player
@@ -92,21 +93,35 @@ function main.enter(player)
 end
 
 ---@param player LuaPlayer
-local function switch_surface(player)
+---@param recipe_name string?
+local function switch_surface(player, recipe_name)
     if not string.find(player.surface.name, commons.surface_prefix_filter) then
-        main.enter(player)
+        main.enter(player, recipe_name)
     else
         main.exit(player)
     end
 end
 
 ---@param e EventData.on_lua_shortcut
-local function on_switch_surface(e)
+local function on_switch_surface_by_key(e)
     local player = game.players[e.player_index]
-    switch_surface(player)
+    local selected = player.selected
+    local recipe
+    if selected then
+        local type = selected.type
+        if type == "assembling-machine" or type == "furnace" then
+            recipe = selected.get_recipe()
+            if not recipe and type == "furnace" then
+                recipe = selected.previous_recipe
+            end
+        end
+    end
+    local recipe_name = recipe and recipe.name
+
+    switch_surface(player, recipe_name)
 end
 
-script.on_event(prefix .. "-alt_k", on_switch_surface)
+script.on_event(prefix .. "-alt_k", on_switch_surface_by_key)
 
 ---@param e EventData.on_gui_click
 function on_switch_click(e)
@@ -122,7 +137,6 @@ function on_switch_click(e)
             if not g then return end
             product_panel.create(e.player_index)
         elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or not e.alt) then
-
             local vars = tools.get_vars(player)
             if vars.saved_character then
                 vars.character = vars.saved_character
@@ -141,8 +155,9 @@ tools.on_gui_click(prefix .. "_switch", on_switch_click)
 local tile_name = commons.tile_name
 
 ---@param player LuaPlayer
+---@param recipe_name string?
 ---@return LuaSurface
-function main.enter_surface(player)
+function main.enter_surface(player, recipe_name)
     local vars = tools.get_vars(player)
 
     if not game.tile_prototypes[tile_name] then
@@ -202,8 +217,8 @@ function main.enter_surface(player)
         player.disassociate_character(character)
     else
         vars.character = nil
-        if vars.saved_force_index  then
-            player.force = vars.saved_force_index 
+        if vars.saved_force_index then
+            player.force = vars.saved_force_index
         end
     end
     local controller_type
@@ -215,6 +230,17 @@ function main.enter_surface(player)
     local g = gutils.get_graph(player)
     ---@type MapPosition
     local player_position = { 0, 0 }
+    local grecipe
+    if recipe_name then
+        grecipe = g.recipes[recipe_name]
+        if grecipe.visible then
+            player_position = gutils.get_recipe_position(g, grecipe)
+            g.player_position = nil
+        else
+            grecipe = nil
+        end
+    end
+
     if g and g.player_position then
         player_position = g.player_position
         local zoom = g.graph_zoom_level
@@ -229,6 +255,11 @@ function main.enter_surface(player)
     end
     player.teleport(player_position, surface, false)
     vars.extern_force = extern_force
+    if grecipe then
+        drawing.draw_target(g, grecipe)
+        local zoom = g.graph_zoom_level or 2
+        player.zoom = zoom
+    end
     return surface
 end
 
@@ -258,6 +289,7 @@ function main.exit(player)
     if vars.extern_force then
         player.force = vars.extern_force
     end
+    g.player_position = player.position
 
     local character = vars.character
     if character and character.valid then

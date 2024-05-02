@@ -21,7 +21,7 @@ local button_size = 28
 
 ---@param flow LuaGuiElement
 ---@param save Saving
-local function load_current(flow, save)
+local function load_current_header(flow, save)
     flow.icon1.elem_value = tools.sprite_to_signal(save.icon1)
     flow.icon2.elem_value = tools.sprite_to_signal(save.icon2)
     flow.label.text = save.label
@@ -29,7 +29,6 @@ end
 
 ---@param player LuaPlayer
 function saving.clear_current(player)
-
     local vars = tools.get_vars(player)
     vars.saving_current = nil
     local frame = player.gui.screen[panel_name]
@@ -88,7 +87,7 @@ function saving.create(player_index)
     container.style.vertically_stretchable   = true
 
     if vars.saving_current then
-        load_current(newflow, vars.saving_current)
+        load_current_header(newflow, vars.saving_current)
     end
 
     ---@type Saving[]
@@ -331,16 +330,15 @@ tools.on_named_event(np("delete"), defines.events.on_gui_click,
 
         if saves[index] == vars.saving_current then
             vars.saving_current = nil
+            saving.clear_current(player)
         end
         table.remove(saves, index)
-
         local frame = player.gui.screen[panel_name]
         if not (frame and frame.valid) then return end
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         local parent = line.parent --[[@as LuaGuiElement]]
         saving.update(player, container)
-        saving.clear_current(player)
         saving.update_selection(parent)
     end)
 
@@ -366,10 +364,16 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             local data = game.json_to_table(json) --[[@as SavingData]]
             local new_flow = tools.get_child(frame, "new_flow")
             if new_flow then
-                load_current(new_flow, save)
+                load_current_header(new_flow, save)
             end
-            if (e.control or g.autosave_on_graph_switching) and vars.saving_current then
-                update_save(g, vars.saving_current)
+            ---@type Saving
+            local saving_current = vars.saving_current
+            if (e.control or g.autosave_on_graph_switching) and saving_current then
+                if saving_current.icon1 ~= save.icon1 or
+                    saving_current.icon2 ~= save.icon2 or
+                    saving_current.label ~= save.label then
+                    update_save(g, saving_current)
+                end
             end
             vars.saving_current = save
             graph.load_saving(g, data)
