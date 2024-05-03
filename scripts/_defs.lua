@@ -168,6 +168,7 @@ local tools = require("scripts.tools")
 ---@field icon2 string?
 ---@field label string
 ---@field json string 
+---@field pinned boolean?
 
 ---@class SavingData
 ---@field config GraphConfig

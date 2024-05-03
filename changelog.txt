@@ -29,10 +29,11 @@ Date: 29. 04. 2024.
     - Misc. improvements on layer
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.4
-Date: 30. 04. 2024.
+Date: 03. 05. 2024.
   Fixes:
     - Fix clear of savings
     - Loading current selected saving does not override saved one
     - Save position in graph upon exit
   Changes:
     - Alt-k on an assembly machine or a furnace move the graph to the corresponding machine
+    - Add pinned selections in saving panel

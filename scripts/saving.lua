@@ -117,7 +117,12 @@ function saving.update(player, container)
     end
     container.clear()
     for _, save in pairs(saves) do
-        local line    = container.add { type = "flow", direction = "horizontal" }
+        local line = container.add { type = "flow", direction = "horizontal" }
+
+        local cb = line.add { type = "checkbox", tooltip = { np("pinned-tooltip") }, name = "pinned", state = not not save.pinned }
+        cb.style.margin = 5
+        cb.style.horizontal_align = "center"
+        tools.set_name_handler(cb, np("pin"))
 
         local signal1 = tools.sprite_to_signal(save.icon1)
         local b       = line.add { type = "choose-elem-button", elem_type = "signal", signal = signal1, tooltip = { np("load-tooltip") }, name = "b1" }
@@ -137,8 +142,8 @@ function saving.update(player, container)
         local ftext                              = flow_text.add { type = "label", caption = save.label }
         ftext.style.horizontally_stretchable     = true
 
-
-        local bdelete = line.add { type = "button", caption = { np("delete") }, tooltip = { np("delete-tooltip") } }
+        local bdelete                            = line.add { type = "sprite-button", sprite = prefix .. "_delete", tooltip = { np("delete-tooltip") } }
+        bdelete.style.size                       = 32
         tools.set_name_handler(bdelete, np("delete"))
     end
 
@@ -237,6 +242,14 @@ function saving.sort(player)
         ---@param s1 Saving
         ---@param s2 Saving
         function(s1, s2)
+            if s1.pinned then
+                if not s2.pinned then
+                    return true
+                end
+            elseif s2.pinned then
+                return false
+            end
+
             local c1, c2 = compare_icon(s1.icon1, s2.icon1)
             if c1 ~= c2 then return c1 < c2 end
             c1, c2 = compare_icon(s1.icon2, s2.icon2)
@@ -395,6 +408,32 @@ tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
         if not parent then return end
 
         parent.icon2.elem_value = value
+    end)
+
+
+tools.on_named_event(np("pin"), defines.events.on_gui_checked_state_changed,
+    ---@param e EventData.on_gui_checked_state_changed
+    function(e)
+        local player = game.players[e.player_index]
+        local vars = tools.get_vars(player)
+        local g = gutils.get_graph(player)
+        local frame = player.gui.screen[panel_name]
+        if not (frame and frame.valid) then return end
+
+        local line = e.element.parent
+        if not line then return end
+
+        ---@type Saving[]
+        local saves = vars.saves
+        local index = line.get_index_in_parent()
+        local save = saves[index]
+
+        save.pinned = e.element.state or nil
+        saving.sort(player)
+
+        local container = tools.get_child(frame, "save_list")
+        if not container then return end
+        saving.update(player, container)
     end)
 
 return saving

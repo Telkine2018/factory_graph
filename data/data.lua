@@ -250,6 +250,14 @@ add {
 }
 
 add {
+  type = "sprite",
+  name = prefix .. "_delete",
+  filename = png("delete"),
+  width = 64,
+  height = 64
+}
+
+add {
   type = "custom-input",
   name = prefix .. "-up",
   key_sequence = "SHIFT + UP"
