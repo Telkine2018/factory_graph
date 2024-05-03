@@ -34,6 +34,7 @@ Date: 03. 05. 2024.
     - Fix clear of savings
     - Loading current selected saving does not override saved one
     - Save position in graph upon exit
+    - Fix invalid use of black tile in nauvis
   Changes:
     - Alt-k on an assembly machine or a furnace move the graph to the corresponding machine
     - Add pinned selections in saving panel

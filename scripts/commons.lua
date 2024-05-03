@@ -11,7 +11,7 @@ local commons = {
     context_version = 1,
     prefix = prefix,
     surface_prefix = "_factory_graph_",
-    tile_name = prefix .. "-ground",
+    tile_name = prefix .. "-ground2",
 
     recipe_symbol_name = prefix .. "-recipe-symbol",
     product_symbol_name = prefix .. "-product-symbol",
@@ -45,7 +45,8 @@ local commons = {
         invalid_soluce = "invalid_soluce",
         too_many_free_variables = "too_many_free_variables",
         too_many_constraints = "too_many_constraints"
-    }
+    },
+    generate_with_lab_tiles = true
 
 }
 

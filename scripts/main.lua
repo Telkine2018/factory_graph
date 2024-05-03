@@ -182,19 +182,15 @@ function main.enter_surface(player, recipe_name)
                 tile = {
                     treat_missing_as_default = false,
                     settings = {
-                        [tile_name] = {
-                            frequency = 6,
-                            size = 6,
-                            richness = 6
-                        }
+                        [tile_name] = {}
                     }
                 },
                 decorative = { treat_missing_as_default = false, frequency = "none" }
             },
             property_expression_names = {
                 cliffiness = 0,
-                ["tile:water:probability"] = -1000,
-                ["tile:deep-water:probability"] = -1000,
+                ["tile:water:probability"] = -10000,
+                ["tile:deep-water:probability"] = -10000,
                 ["tile:" .. tile_name .. ":probability"] = "inf"
             }
         }
@@ -204,6 +200,7 @@ function main.enter_surface(player, recipe_name)
         surface.daytime = 0
         surface.freeze_daytime = true
         surface.show_clouds = false
+        surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
     end
 
     local character = player.character
@@ -373,54 +370,96 @@ tools.on_event(defines.events.on_player_created,
         create_player_button(player)
     end)
 
-tools.on_configuration_changed(function(data)
-    picker_dolly_install()
-    for _, player in pairs(game.players) do
-        create_player_button(player)
+tools.on_configuration_changed(
+---@param data ConfigurationChangedData
+    function(data)
+        picker_dolly_install()
+        for _, player in pairs(game.players) do
+            create_player_button(player)
 
-        local vars = tools.get_vars(player)
+            local vars = tools.get_vars(player)
 
-        ---@type Graph
-        local g = vars.graph
-        if g then
-            if not g.grid_size then
-                g.grid_size = commons.grid_size
-            end
-            if not g.color_index then
-                g.color_index = 0
-            end
-            local has_command = player.gui.left[command.frame_name] ~= nil
-            tools.close_panels(player)
-            tools.close_panel(player, prefix .. "-product-panel.frame")
-            if has_command then
-                command.open(player)
-            end
-            local recipes = player.force.recipes
-            graph.update_recipes(g, recipes, g.excluded_categories)
-
-            local need_refresh
-            for _, grecipe in pairs(g.recipes) do
-                if grecipe.visible and (not grecipe.line and not grecipe.col) then
-                    need_refresh = true
+            ---@type Graph
+            local g = vars.graph
+            if g then
+                if not g.grid_size then
+                    g.grid_size = commons.grid_size
                 end
-                grecipe.layer = tools.check_sprite(grecipe.layer)
-            end
-            g.current_layer = tools.check_sprite(g.current_layer)
-            if g.visible_layers then
-                for layer in pairs(g.visible_layers) do
-                    if not tools.check_sprite(layer) then
-                        g.visible_layers = {}
-                        g.visibility = commons.visibility_selection
+                if not g.color_index then
+                    g.color_index = 0
+                end
+                local has_command = player.gui.left[command.frame_name] ~= nil
+                tools.close_panels(player)
+                tools.close_panel(player, prefix .. "-product-panel.frame")
+                if has_command then
+                    command.open(player)
+                end
+                local recipes = player.force.recipes
+                graph.update_recipes(g, recipes, g.excluded_categories)
+
+                local need_refresh
+                for _, grecipe in pairs(g.recipes) do
+                    if grecipe.visible and (not grecipe.line and not grecipe.col) then
                         need_refresh = true
-                        break
+                    end
+                    grecipe.layer = tools.check_sprite(grecipe.layer)
+                end
+                g.current_layer = tools.check_sprite(g.current_layer)
+                if g.visible_layers then
+                    for layer in pairs(g.visible_layers) do
+                        if not tools.check_sprite(layer) then
+                            g.visible_layers = {}
+                            g.visibility = commons.visibility_selection
+                            need_refresh = true
+                            break
+                        end
                     end
                 end
+                if data.mod_changes
+                    and data.mod_changes.factory_graph
+                    and data.mod_changes.factory_graph.old_version
+                    and data.mod_changes.factory_graph.old_version <= "1.0.3" then
+                    g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
+                    g.surface.clear()
+                else
+                    graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
+                end
             end
-
-            graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
         end
+    end)
+
+tools.on_event(defines.events.on_surface_cleared,
+    ---@param e EventData.on_surface_cleared
+    function(e)
+        local surface = game.surfaces[e.surface_index]
+        if not string.find(surface.name, commons.surface_prefix_filter) then
+            return
+        end
+        local player_index = tonumber(string.sub(surface.name, #commons.surface_prefix + 1))
+        local player = game.players[player_index]
+        graph.deferred_update(player, { selection_changed = true, do_redraw = true })
     end
-end)
+)
+
+local tile_name = commons.tile_name
+
+tools.on_event(defines.events.on_chunk_generated,
+    ---@param e EventData.on_chunk_generated
+    function(e)
+        local surface = e.surface
+        if not string.find(surface.name, commons.surface_prefix_filter) then
+            return
+        end
+        local tiles = {}
+        local xstart = e.position.x * 32
+        local ystart = e.position.y * 32
+        for y = 0, 31 do
+            for x = 0, 31 do
+                table.insert(tiles, {position={xstart+x, ystart+y}, name=tile_name})
+            end
+        end
+        surface.set_tiles(tiles, false)
+    end)
 
 tools.on_load(function()
     picker_dolly_install()
