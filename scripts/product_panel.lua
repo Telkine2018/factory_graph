@@ -990,10 +990,12 @@ function product_panel.craft_machine(player, item, count)
     end
     if #recipes > 0 then
         for name in pairs(recipes) do
-            player.begin_crafting { recipe = name, count = count }
+            local craft_count = player.begin_crafting { recipe = name, count = count }
             local vars = tools.get_vars(player)
             vars.current_craft_recipe = name
-            break
+            if craft_count > 0 then
+                break   
+            end
         end
     end
 end

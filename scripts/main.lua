@@ -455,7 +455,7 @@ tools.on_event(defines.events.on_chunk_generated,
         local ystart = e.position.y * 32
         for y = 0, 31 do
             for x = 0, 31 do
-                table.insert(tiles, {position={xstart+x, ystart+y}, name=tile_name})
+                table.insert(tiles, { position = { xstart + x, ystart + y }, name = tile_name })
             end
         end
         surface.set_tiles(tiles, false)
@@ -556,12 +556,14 @@ local function import_entities(e, clear)
     end
     for _, entity in pairs(e.entities) do
         ---@cast entity LuaEntity
-        local recipe = entity.get_recipe()
-        if not recipe and entity.type == "furnace" then
-            recipe = entity.previous_recipe
-        end
-        if recipe then
-            g.selection[recipe.name] = g.recipes[recipe.name]
+        if entity.type == "assembling-machine" or entity.type == "furnace" then
+            local recipe = entity.get_recipe()
+            if not recipe and entity.type == "furnace" then
+                recipe = entity.previous_recipe
+            end
+            if recipe then
+                g.selection[recipe.name] = g.recipes[recipe.name]
+            end
         end
     end
     graph.refresh(player)

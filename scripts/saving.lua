@@ -314,6 +314,7 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
         end
         table.insert(saves, save)
         ::done::
+        save.pinned = true
         saving.sort(player)
 
         vars.saving_current = save

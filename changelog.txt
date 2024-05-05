@@ -38,3 +38,11 @@ Date: 03. 05. 2024.
   Changes:
     - Alt-k on an assembly machine or a furnace move the graph to the corresponding machine
     - Add pinned selections in saving panel
+---------------------------------------------------------------------------------------------------
+Version: 1.0.5
+Date: 04. 05. 2024.
+  Changes:
+    - A saved selection is automatically pinned
+  Fixes:
+    - Crash when importing from a wrong machine
+    - Invalid craft recipe for furnace
