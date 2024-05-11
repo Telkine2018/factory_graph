@@ -66,7 +66,7 @@ end
 local function install_beacon_modules(container, g, config, grecipe)
     container.clear()
 
-    if count == 0 then
+    if total_count == 0 then
         return
     end
 

@@ -61,9 +61,12 @@ function saving.create(player_index)
         close_button_tooltip = np("close_button_tooltip"),
         create_inner_frame   = true
     }
+    local height = player.mod_settings["factory_graph-saving-height"].value --[[@as int]]
+
     local frame, inner_frame               = tools.create_standard_panel(player, params)
     frame.style.minimal_width              = 400
-    frame.style.height                     = 400
+    frame.style.minimal_height             = 400
+    frame.style.maximal_height             = height
 
     local newflow                          = inner_frame.add { type = "flow", name = "new_flow" }
     newflow.style.horizontally_stretchable = true
@@ -80,11 +83,9 @@ function saving.create(player_index)
     local scroll                             = inner_frame.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", vertical_scroll_policy = "auto-and-reserve-space" }
     scroll.style.horizontally_stretchable    = true
-    scroll.style.vertically_stretchable      = true
 
     local container                          = scroll.add { type = "table", column_count = 1, name = "save_list" }
     container.style.horizontally_stretchable = true
-    container.style.vertically_stretchable   = true
 
     if vars.saving_current then
         load_current_header(newflow, vars.saving_current)
@@ -321,6 +322,10 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
+
+        if not game.is_multiplayer() and player.mod_settings["factory_graph-saving-auto"].value then
+            game.auto_save("factory-graph")
+        end
 
         --saving.close(player)
     end)

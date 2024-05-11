@@ -41,6 +41,28 @@ local function add_module_button(container, module_name)
     return b
 end
 
+---@param g Graph
+---@param pmachine_flow LuaGuiElement
+local function set_machine_buttons(g, pmachine_flow)
+    if g.preferred_machines then
+        for _, machine_name in pairs(g.preferred_machines) do
+            add_machine_button(pmachine_flow, machine_name)
+        end
+    end
+    add_machine_button(pmachine_flow)
+end
+
+---@param g Graph
+---@param pmodule_flow LuaGuiElement
+local function set_module_buttons(g, pmodule_flow)
+    if g.preferred_modules then
+        for _, name in pairs(g.preferred_modules) do
+            add_module_button(pmodule_flow, name)
+        end
+    end
+    add_module_button(pmodule_flow)
+end
+
 ---@param player_index integer
 function settings_panel.create(player_index)
     local player = game.players[player_index]
@@ -127,22 +149,12 @@ function settings_panel.create(player_index)
     flow.add { type = "line" }
 
     flow.add { type = "label", caption = { np("preferred_machines") } }
-    local pmachine_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_machines" }
-    if g.preferred_machines then
-        for _, machine_name in pairs(g.preferred_machines) do
-            add_machine_button(pmachine_flow, machine_name)
-        end
-    end
-    add_machine_button(pmachine_flow)
+    local pmachine_flow = flow.add { type = "table", direction = "horizontal", name = "preferred_machines", column_count = 6 }
+    set_machine_buttons(g, pmachine_flow)
 
     flow.add { type = "label", caption = { np("preferred_modules") } }
     local pmodule_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_modules" }
-    if g.preferred_modules then
-        for _, name in pairs(g.preferred_modules) do
-            add_module_button(pmodule_flow, name)
-        end
-    end
-    add_module_button(pmodule_flow)
+    set_module_buttons(g, pmodule_flow)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
     flow.add { type = "choose-elem-button", elem_type = "entity", elem_filters = { { filter = "type", type = "beacon" } },
@@ -158,6 +170,13 @@ function settings_panel.create(player_index)
 
     b = bpanel.add { type = "button", caption = { np("cancel") } }
     tools.set_name_handler(b, np("cancel"))
+
+    b = bpanel.add { type = "button", caption = { np("copy") }, tooltip= {np("copy-tooltip")} }
+    tools.set_name_handler(b, np("copy"))
+
+    b = bpanel.add { type = "button", caption = { np("paste") }, tooltip= {np("paste-tooltip")} }
+    tools.set_name_handler(b, np("paste"))
+
 
     frame.force_auto_center()
 end
@@ -331,6 +350,57 @@ tools.on_named_event(np("cancel"), defines.events.on_gui_click,
         tools.close_panel(game.players[e.player_index], settings_panel_name)
     end
 )
+
+tools.on_named_event(np("copy"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[settings_panel_name]
+        if not frame then return end
+
+        local field_table = tools.get_child(frame, "field_table")
+        if not field_table then return end
+
+        ---@type Graph
+        local copy = {}
+        copy.preferred_machines = blist_values(field_table.preferred_machines)
+        copy.preferred_modules = blist_values(field_table.preferred_modules)
+        copy.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
+        copy.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
+        local vars = tools.get_vars(player)
+        vars.copy_g = copy
+    end
+)
+
+tools.on_named_event(np("paste"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[settings_panel_name]
+        if not frame then return end
+
+        local field_table = tools.get_child(frame, "field_table")
+        if not field_table then return end
+
+        ---@type Graph
+        local vars = tools.get_vars(player)
+        local copy = vars.copy_g 
+        if not copy then return end
+
+        local g = gutils.get_graph(player)
+        if not g then return end
+
+        field_table.preferred_machines.clear()
+        set_machine_buttons(copy, field_table.preferred_machines)
+
+        field_table.preferred_modules.clear()
+        set_module_buttons(copy, field_table.preferred_modules)
+
+        field_table.preferred_beacon.elem_value = copy.preferred_beacon
+        field_table.preferred_beacon_count.text =  copy.preferred_beacon_count and tostring(copy.preferred_beacon_count) or ""
+    end
+)
+
 
 tools.on_event(defines.events.on_gui_confirmed,
     ---@param e EventData.on_gui_confirmed

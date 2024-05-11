@@ -782,6 +782,8 @@ local function get_summary_labels(count, in_inventory_count, in_network_count, c
     local count_label = tostring(count)
     if count > in_inventory_count + in_network_count + crafted then
         count_label = "[color=red][font=default-bold]" .. count_label .. "[/font][/color]"
+    elseif count > in_inventory_count + crafted then
+        count_label = "[color=yellow][font=default-bold]" .. count_label .. "[/font][/color]"
     else
         count_label = "[color=green][font=default-bold]" .. count_label .. "[/font][/color]"
     end
@@ -994,20 +996,158 @@ function product_panel.craft_machine(player, item, count)
             local vars = tools.get_vars(player)
             vars.current_craft_recipe = name
             if craft_count > 0 then
-                break   
+                break
             end
         end
     end
 end
+
+local logistic_request_timeout = 60 * 60
+
+---@param player LuaPlayer
+---@param notcreate boolean?
+---@return {[string]:LogisticRequest} ?
+function product_panel.get_request_table(player, notcreate)
+    local vars = tools.get_vars(player)
+    local logistic_request_table = vars.logistic_request_table
+    if not logistic_request_table then
+        if notcreate then return nil end
+        logistic_request_table = {}
+        vars.logistic_request_table = logistic_request_table
+    end
+    return logistic_request_table
+end
+
+---@class LogisticRequest
+---@field slot_index integer
+---@field item string
+---@field total_count integer
+---@field has_value boolean
+---@field min integer?
+---@field max integer?
+
+---@param player LuaPlayer
+---@param item string
+---@param total_count integer
+function product_panel.request_items(player, item, total_count)
+    local request_table = product_panel.get_request_table(player)
+    ---@cast request_table -nil
+    local current = request_table[item]
+
+    if not player.character then return end
+
+    local vars = tools.get_vars(player)
+    vars.logistic_request_start = game.tick
+    if current then
+        current.total_count = total_count
+        player.set_personal_logistic_slot(current.slot_index,
+            {
+                name = item,
+                min = current.total_count,
+                max = current.total_count
+            })
+        return
+    end
+
+    local slot_index = 1
+    for i = 1, player.character.request_slot_count + 1 do
+        local slot = player.get_personal_logistic_slot(i)
+        if slot.name == nil or slot.name == item then
+            slot_index = i
+            break
+        end
+    end
+
+    local slot = player.get_personal_logistic_slot(slot_index)
+
+    ---@type LogisticRequest
+    local current = {
+        item = item,
+        total_count = total_count,
+        slot_index = slot_index,
+        has_value = slot.name ~= nil,
+        min = slot and slot.min,
+        max = slot and slot.max
+    }
+    request_table[item] = current
+    player.set_personal_logistic_slot(current.slot_index, { name = item, min = current.total_count, max = current.total_count })
+end
+
+local function clear_logistic_slot(player, request)
+    if not request.has_value then
+        player.clear_personal_logistic_slot(request.slot_index)
+    else
+        player.set_personal_logistic_slot(request.slot_index,
+            {
+                name = request.item,
+                min = request.min,
+                max = request.max
+            })
+    end
+end
+
+---@param player LuaPlayer
+function product_panel.clear_requests(player)
+    local vars = tools.get_vars(player)
+    local request_table = product_panel.get_request_table(player, true)
+    if not request_table then
+        return
+    end
+
+    for _, request in pairs(request_table) do
+        clear_logistic_slot(player, request)
+    end
+    vars.logistic_request_table = nil
+    vars.logistic_request_start = nil
+    graph.deferred_update(player, { update_product_list = true })
+end
+
+tools.on_event(defines.events.on_player_main_inventory_changed,
+
+    ---@param e EventData.on_player_main_inventory_changed
+    function(e)
+        if not e.player_index then return end
+        ---@type LuaPlayer
+        local player = game.players[e.player_index]
+        local vars = tools.get_vars(player)
+
+        local start = vars.logistic_request_start
+        if not start then return end
+        local tick = game.tick
+        if tick - start > logistic_request_timeout then
+            product_panel.clear_requests(player)
+        else
+            local request_table = product_panel.get_request_table(player, true)
+            if not request_table then return end
+
+            for _, request in pairs(request_table) do
+                local inv = player.character.get_main_inventory()
+                if inv then
+                    local current_count = inv.get_item_count(request.item)
+                    if current_count >= request.total_count then
+                        clear_logistic_slot(player, request)
+                        request_table[request.item] = nil
+                        if not next(request_table) then
+                            vars.logistic_request_table = nil
+                            vars.logistic_request_start = nil
+                            graph.deferred_update(player, { update_product_list = true })
+                        end
+                    end
+                end
+            end
+        end
+    end
+)
 
 tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         local item = e.element.tags.item --[[@as string]]
         local player = game.players[e.player_index]
-        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+        if e.alt then return end
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift) then
             product_panel.craft_machine(player, item)
-        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift) then
             local count                        = e.element.tags.count --[[@as integer]]
             local inv, network, crafting_queue = get_inventories(player)
 
@@ -1018,6 +1158,15 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
             if count > 0 then
                 product_panel.craft_machine(player, item, count)
             end
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift) then
+            local count                        = e.element.tags.count --[[@as integer]]
+            local inv, network, crafting_queue = get_inventories(player)
+            local in_inventory_count           = inv and inv.get_item_count(item) or 0
+            local in_network_count             = network and network.get_item_count(item) or 0
+            count                              = math.min(count - in_inventory_count, in_network_count) + in_inventory_count
+            if count > 0 then
+                product_panel.request_items(player, item, count)
+            end
         end
         graph.deferred_update(player, { update_product_list = true })
     end)
@@ -1027,7 +1176,7 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
     function(e)
         if e.alt then return end
         if e.button == defines.mouse_button_type.left then
-            if not e.shift and not e.control then
+            if not (e.shift or not e.control or e.alt) then
                 local element = e.element
                 local player = game.players[e.player_index]
                 if not element or not element.valid then return end
@@ -1099,56 +1248,95 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
-        if e.button ~= defines.mouse_button_type.left then return end
 
         local player = game.players[e.player_index]
+        if e.button == defines.mouse_button_type.left then
+            local element = e.element
+            if not element or not element.valid then return end
 
-        local element = e.element
-        if not element or not element.valid then return end
+            local g = gutils.get_graph(player)
+            local recipe_name = element.tags.recipe_name --[[@as string]]
+            if not recipe_name then return end
+            local grecipe = g.recipes[recipe_name]
 
-        local g = gutils.get_graph(player)
-        local recipe_name = element.tags.recipe_name --[[@as string]]
-        if not recipe_name then return end
-        local grecipe = g.recipes[recipe_name]
+            if e.control then
+                local machine = grecipe.machine
+                if not machine then return end
 
-        if e.control then
-            local machine = grecipe.machine
-            if not machine then return end
-
-            if string.find(player.surface.name, commons.surface_prefix_filter) then
-                gutils.exit(player)
-            end
-
-            local bp_entity = {
-
-                entity_number = 1,
-                name = machine.machine.name,
-                position = { 0.5, 0.5 },
-                recipe = recipe_name
-            }
-            if machine.modules then
-                bp_entity.items = {}
-                for _, module in pairs(machine.modules) do
-                    bp_entity.items[module.name] = (bp_entity.items[module.name] or 0) + 1
+                if string.find(player.surface.name, commons.surface_prefix_filter) then
+                    gutils.exit(player)
                 end
+
+                local bp_entity = {
+
+                    entity_number = 1,
+                    name = machine.machine.name,
+                    position = { 0.5, 0.5 },
+                    recipe = recipe_name
+                }
+                if machine.modules then
+                    bp_entity.items = {}
+                    for _, module in pairs(machine.modules) do
+                        bp_entity.items[module.name] = (bp_entity.items[module.name] or 0) + 1
+                    end
+                end
+
+                local cursor_stack = player.cursor_stack
+                if not cursor_stack then return end
+
+                cursor_stack.clear()
+                cursor_stack.set_stack { name = "blueprint", count = 1 }
+                cursor_stack.set_blueprint_entities { bp_entity }
+                player.cursor_stack_temporary = true
+            elseif e.shift then
+                ---@type ProductionMachine
+                local machine = grecipe.machine
+                if not machine or not machine.machine then return end
+                local item = machine.machine.items_to_place_this[1].name
+
+                product_panel.craft_machine(player, item)
+            else
+                msettings_panel.create(e.player_index, grecipe)
             end
+        elseif e.button == defines.mouse_button_type.right then
+            if not (e.control or e.shift) then
+                if string.find(player.surface.name, commons.surface_prefix_filter) then
+                    gutils.exit(player)
+                end
 
-            local cursor_stack = player.cursor_stack
-            if not cursor_stack then return end
+                local g = gutils.get_graph(player)
+                local recipe_name = e.element.tags.recipe_name --[[@as string]]
+                if not recipe_name then return end
+                local grecipe = g.recipes[recipe_name]
 
-            cursor_stack.clear()
-            cursor_stack.set_stack { name = "blueprint", count = 1 }
-            cursor_stack.set_blueprint_entities { bp_entity }
-            player.cursor_stack_temporary = true
-        elseif e.shift then
-            ---@type ProductionMachine
-            local machine = grecipe.machine
-            if not machine or not machine.machine then return end
-            local item = machine.machine.items_to_place_this[1].name
+                local machine = grecipe.machine
+                if not machine or not machine.machine then return end
 
-            product_panel.craft_machine(player, item)
-        else
-            msettings_panel.create(e.player_index, grecipe)
+                local surface = player.surface
+                local entities = surface.find_entities_filtered { name = machine.machine.name, position = player.position, radius = 1000 }
+                local count = 0
+                if #entities > 0 then
+                    local color = { 0, 1, 1 }
+                    for _, entity in pairs(entities) do
+                        local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+                        if crecipe and crecipe.name == recipe_name then
+                            local w = entity.tile_width / 2
+                            local h = entity.tile_height / 2
+                            rendering.draw_rectangle {
+                                surface = surface,
+                                color = color,
+                                left_top = entity,
+                                right_bottom = entity,
+                                left_top_offset = { -w, -h },
+                                right_bottom_offset = { w, h },
+                                width = 2, time_to_live = 2 * 60
+                            }
+                            count = count + 1
+                        end
+                    end
+                end
+                player.print({ np("machine_report"), count })
+            end
         end
     end)
 

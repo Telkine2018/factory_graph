@@ -1,23 +1,26 @@
 ---------------------------------------------------------------------------------------------------
-Version: 1.0.0
-Date: 13. 04. 2024.
-  Info:
-    - Initial release
----------------------------------------------------------------------------------------------------
-Version: 1.0.1
-Date: 20. 04. 2024.
+Version: 1.0.5
+Date: 04. 05. 2024.
   Changes:
-    - Add SHIFT on graph button to open production panel
+    - A saved selection is automatically pinned
+    - Add settings for the height of the save panel
+    - An game autosave is done when a selection is saved (can be disabled in settings)
+    - Right click on a machine in production panel highlights the real machines on origin surface
+    - Shift left click on a machine request missing machines from logistic network
   Fixes:
-    - Fix crash at startup
-
+    - Crash when importing from a wrong machine
+    - Invalid craft recipe for furnace
 ---------------------------------------------------------------------------------------------------
-Version: 1.0.2
-Date: 25. 04. 2024.
+Version: 1.0.4
+Date: 03. 05. 2024.
   Fixes:
-    - Add compatibility with Blueprint Sandox (Add <ALT>+<Graph button> to exit from Graph Exitor directly to Nauvis)
-    - Add layer management (<Shift>Click on recipe in graph, parameters in global settings)
-    - Fix crash on translations
+    - Fix clear of savings
+    - Loading current selected saving does not override saved one
+    - Save position in graph upon exit
+    - Fix invalid use of black tile in nauvis
+  Changes:
+    - Alt-k on an assembly machine or a furnace move the graph to the corresponding recipe
+    - Add pinned selections in saving panel
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.3
 Date: 29. 04. 2024.
@@ -28,21 +31,21 @@ Date: 29. 04. 2024.
     - Add summary of all machines used in a production
     - Misc. improvements on layer
 ---------------------------------------------------------------------------------------------------
-Version: 1.0.4
-Date: 03. 05. 2024.
+Version: 1.0.2
+Date: 25. 04. 2024.
   Fixes:
-    - Fix clear of savings
-    - Loading current selected saving does not override saved one
-    - Save position in graph upon exit
-    - Fix invalid use of black tile in nauvis
-  Changes:
-    - Alt-k on an assembly machine or a furnace move the graph to the corresponding machine
-    - Add pinned selections in saving panel
+    - Add compatibility with Blueprint Sandox (Add <ALT>+<Graph button> to exit from Graph Exitor directly to Nauvis)
+    - Add layer management (<Shift>Click on recipe in graph, parameters in global settings)
+    - Fix crash on translations
 ---------------------------------------------------------------------------------------------------
-Version: 1.0.5
-Date: 04. 05. 2024.
+Version: 1.0.1
+Date: 20. 04. 2024.
   Changes:
-    - A saved selection is automatically pinned
+    - Add SHIFT on graph button to open production panel
   Fixes:
-    - Crash when importing from a wrong machine
-    - Invalid craft recipe for furnace
+    - Fix crash at startup
+---------------------------------------------------------------------------------------------------
+Version: 1.0.0
+Date: 13. 04. 2024.
+  Info:
+    - Initial release
