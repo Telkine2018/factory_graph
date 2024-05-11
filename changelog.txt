@@ -7,6 +7,7 @@ Date: 04. 05. 2024.
     - An game autosave is done when a selection is saved (can be disabled in settings)
     - Right click on a machine in production panel highlights the real machines on origin surface
     - Shift left click on a machine request missing machines from logistic network
+    - Add copy/paste machine preferences
   Fixes:
     - Crash when importing from a wrong machine
     - Invalid craft recipe for furnace
