@@ -11,6 +11,7 @@ Date: 04. 05. 2024.
   Fixes:
     - Crash when importing from a wrong machine
     - Invalid craft recipe for furnace
+    - Crash on configuration change
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.4
 Date: 03. 05. 2024.

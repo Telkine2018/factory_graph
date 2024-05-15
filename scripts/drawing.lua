@@ -682,15 +682,18 @@ local function draw_select_products(g, ids, base_recipe)
     end
 end
 
-
 ---@param g Graph
-local function redraw_connections(g)
-    drawing.clear_selection(g)
-
+local function destroy_graph_ids(g)
     g.graph_ids = gutils.destroy_drawing(g.graph_ids)
     for _, gproduct in pairs(g.products) do
         gproduct.ids = nil
     end
+end
+
+---@param g Graph
+local function redraw_connections(g)
+    drawing.clear_selection(g)
+    destroy_graph_ids(g)
 
     if not g.selection then return end
 
@@ -1157,7 +1160,7 @@ end
 ---@param keep_location boolean?
 function drawing.delete_content(g, keep_location)
     drawing.clear_selection(g)
-    g.graph_ids = gutils.destroy_drawing(g.graph_ids)
+    destroy_graph_ids(g)
     g.layer_ids = gutils.destroy_drawing(g.layer_ids)
 
     local entities = g.surface.find_entities_filtered {}
