@@ -58,6 +58,26 @@ production.get_ingredient_amount = get_ingredient_amount
 production.get_energy = get_energy
 
 ---@param g Graph
+---@param module LuaItemPrototype
+---@return {[string]:true}
+function production.add_limitation(g, module)
+
+    if not g.module_limitations then
+        g.module_limitations = {}
+    end
+    local module_name = module.name
+    local limitation_map = g.module_limitations[module_name]
+    if not limitation_map then
+        limitation_map = {}
+        g.module_limitations[module_name] = limitation_map
+        for _, name in pairs(module.limitations) do
+            limitation_map[name] = true
+        end
+    end
+    return limitation_map
+end
+
+---@param g Graph
 ---@param grecipe GRecipe
 ---@param config ProductionConfig
 ---@return ProductionMachine?
@@ -115,17 +135,7 @@ function production.compute_machine(g, grecipe, config)
                 local effects = module.module_effects
 
                 if module.limitations and #module.limitations > 0 then
-                    if not g.module_limitations then
-                        g.module_limitations = {}
-                    end
-                    local limitation_map = g.module_limitations[module_name]
-                    if not limitation_map then
-                        limitation_map = {}
-                        g.module_limitations[module_name] = limitation_map
-                        for _, name in pairs(module.limitations) do
-                            limitation_map[name] = true
-                        end
-                    end
+                    local limitation_map = production.add_limitation(g, module)
                     if not limitation_map[recipe_name] then
                         goto skip
                     end

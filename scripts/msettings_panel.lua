@@ -20,8 +20,10 @@ commons.msettings_panel_name = panel_name
 local msettings = {}
 
 ---@param container LuaGuiElement
+---@param g Graph
 ---@param config ProductionConfig
-local function install_modules(container, config)
+---@param grecipe GRecipe
+local function install_modules(container, g, config, grecipe)
     container.clear()
 
     local assembly_machine = game.entity_prototypes[config.machine_name]
@@ -31,6 +33,24 @@ local function install_modules(container, config)
     local count = assembly_machine.module_inventory_size
     if count == 0 then
         return
+    end
+
+    local allowed = {}
+    local modules = game.get_filtered_item_prototypes { { filter = "type", type = "module" } }
+    for _, module in pairs(modules) do
+        for effect, _ in pairs(module.module_effects) do
+            if not assembly_machine.allowed_effects[effect] then
+                goto skip
+            end
+        end
+        if module.limitations and #module.limitations > 0 then
+            local limitation_map = production.add_limitation(g, module)
+            if not limitation_map[grecipe.name] then
+                goto skip
+            end
+        end
+        table.insert(allowed, module.name)
+        ::skip::
     end
 
     ---@cast count -nil
@@ -54,7 +74,7 @@ local function install_modules(container, config)
         end
 
         local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
-            elem_filters = { { filter = "type", type = "module" } } }
+            elem_filters = { { filter = "name", name = allowed } } }
         tools.set_name_handler(b, np("module_button"), { count = count })
     end
 end
@@ -85,11 +105,9 @@ local function install_beacon_modules(container, g, config, grecipe)
                 end
             end
             if module.limitations and #module.limitations > 0 then
-                if g.module_limitations then
-                    limitations = g.module_limitations[module.name]
-                    if limitations and not limitations[grecipe.name] then
-                        goto skip
-                    end
+                local limitation_map = production.add_limitation(g, module)
+                if not limitation_map[grecipe.name] then
+                    goto skip
                 end
             end
             table.insert(allowed, module.name)
@@ -207,7 +225,7 @@ function msettings.create(player_index, grecipe)
 
     field_table.add { type = "label", caption = { np("modules") } }
     local module_flow = field_table.add { type = "table", column_count = 6, name = "modules" }
-    install_modules(module_flow, config)
+    install_modules(module_flow, g, config, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
     b = field_table.add { type = "choose-elem-button", elem_type = "entity", entity = config.beacon_name, name = "beacon",
