@@ -571,6 +571,10 @@ local function create_product_line(container, machine)
     local line1 = container.add { type = "flow", direction = "horizontal" }
     line1.style.height = 40
 
+    if not machine.count then
+        machine.count = 1
+    end
+    
     local caption
     if machine.count > 1000 then
         caption = string.format("%.0f", math.ceil(machine.count))
