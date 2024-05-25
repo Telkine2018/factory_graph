@@ -86,11 +86,6 @@ end
 local function install_beacon_modules(container, g, config, grecipe)
     container.clear()
 
-    if total_count == 0 then
-        return
-    end
-
-    container.clear()
     if config.beacon_name then
         local beacon = game.entity_prototypes[config.beacon_name]
         if not beacon then return end
@@ -290,15 +285,19 @@ tools.on_named_event(np("is_default"), defines.events.on_gui_checked_state_chang
 
             local def_config = machinedb.get_default_config(g, recipe_name, {})
             if not def_config then return end
+            config.beacon_modules = nil
+            config.machine_modules = nil
             for name, value in pairs(def_config) do
                 config[name] = value
             end
 
             field_table.machine.elem_value = config.machine_name
-            install_modules(field_table.modules, config)
+            install_modules(field_table.modules, g, config, g.recipes[recipe_name])
 
             field_table.beacon.elem_value = config.beacon_name
             install_beacon_modules(field_table.beacon_modules, g, config, recipe_name)
+
+            enable_config(field_table, e.element.state)
 
             field_table.beacon_count.text = tostring(config.beacon_count or 0)
             msettings.save(player)
@@ -324,7 +323,9 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         local vars = tools.get_vars(player)
         local config = vars.msettings_config
         config.machine_name = e.element.elem_value --[[@as string]]
-        install_modules(field_table.modules, config)
+
+        install_modules(field_table.modules, g, config, g.recipes[recipe_name])
+
         msettings.save(player)
     end
 )
