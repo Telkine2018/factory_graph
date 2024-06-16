@@ -104,10 +104,12 @@ function recipe_panel.create(player_index, grecipe)
         for _, p in pairs(recipe.ingredients) do
             local caption
             if machine and machine.count and machine.count > 0 then
+                local per_machine = production.get_ingredient_amount(machine, p)
                 caption = { np("ingredient"),
-                    tools.fround(production.get_ingredient_amount(machine, p) * machine.count),
+                    tools.fround(per_machine* machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
-                    gutils.get_product_name(player, p.type .. "/" .. p.name)
+                    gutils.get_product_name(player, p.type .. "/" .. p.name),
+                    "(" .. tools.fround(per_machine) .. "/m)"
                 }
             else
                 caption = get_product_label(player_index, p)
@@ -126,11 +128,12 @@ function recipe_panel.create(player_index, grecipe)
             local caption
 
             if machine and machine.count and machine.count > 0 then
+                local per_machine = production.get_product_amount(machine, p)
                 caption = { np("product"),
-                    tools.fround(production.get_product_amount(machine, p) * machine.count),
+                    tools.fround(per_machine * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name),
-
+                    "(" .. tools.fround(per_machine) .. "/m)"
                 }
             else
                 caption = get_product_label(player_index, p)

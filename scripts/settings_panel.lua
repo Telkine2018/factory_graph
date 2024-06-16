@@ -292,7 +292,7 @@ local function save(player, frame)
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
-    if g.current_layer then
+    if g.current_layer and g.visibility == commons.visibility_layers then
         visible_layers[g.current_layer] = true
     end
     for i = 1, #visible_layers_flow.children do

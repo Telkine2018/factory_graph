@@ -75,20 +75,19 @@ function load_initial_recipes(g, product, recipe, only_product)
 end
 
 ---@param player LuaPlayer
----@param gproduct GProduct?
----@param grecipe GRecipe?
-local function push_history(player, gproduct, grecipe)
+---@param recipe_name string?
+---@param product_name string?
+local function push_history_with_names(player, recipe_name, product_name)
+
+    if not recipe_name and not product_name then
+        return
+    end
     local vars = tools.get_vars(player)
     local history = vars.recipe_history
     if not history then
         history = {}
         vars.recipe_history = history
         vars.recipe_history_index = 0
-    end
-    local recipe_name = grecipe and grecipe.name
-    local product_name = gproduct and gproduct.name
-    if not recipe_name and not product_name then
-        return
     end
 
     local index = vars.recipe_history_index
@@ -114,6 +113,16 @@ local function push_history(player, gproduct, grecipe)
     table.insert(history, { product_name = product_name, recipe_name = recipe_name })
     index = index + 1
     vars.recipe_history_index = index
+end
+
+---@param player LuaPlayer
+---@param gproduct GProduct?
+---@param grecipe GRecipe?
+local function push_history(player, gproduct, grecipe)
+    local recipe_name = grecipe and grecipe.name
+    local product_name = gproduct and gproduct.name
+
+    push_history_with_names(player, recipe_name, product_name)
 end
 
 ---@param player LuaPlayer
@@ -826,6 +835,7 @@ tools.on_named_event(np("choose_item"), defines.events.on_gui_elem_changed,
         end
 
         name = "item/" .. name
+        push_history_with_names(player, nil, name)
         recipe_selection.process_query(player, name)
     end)
 
@@ -846,6 +856,7 @@ tools.on_named_event(np("choose_fluid"), defines.events.on_gui_elem_changed,
         end
 
         name = "fluid/" .. name
+        push_history_with_names(player, nil, name)
         recipe_selection.process_query(player, name)
     end)
 
