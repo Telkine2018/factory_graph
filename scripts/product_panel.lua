@@ -386,19 +386,36 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
 
         if not e.element.valid then return end
 
-        local product_name = e.element.tags.product_name
+        local product_name = e.element.tags.product_name --[[@as string]]
         if not product_name then return end
 
-        if e.button == defines.mouse_button_type.right then
+        if not(e.button ~= defines.mouse_button_type.right or e.control or e.shift) then
             recipe_selection.open(g, g.products[product_name], nil)
-        elseif e.control then
+        elseif not(e.button ~= defines.mouse_button_type.left or not e.control or e.shift)  then
             get_vinput(e.element.parent)
             if g.iovalues[product_name] == true then
                 g.iovalues[product_name] = nil
             else
                 g.iovalues[product_name] = true
             end
-        else
+        elseif not(e.button ~= defines.mouse_button_type.left or e.control or not e.shift)  then
+            for _, grecipe in pairs(g.selection) do
+                for _, ingredient in pairs(grecipe.ingredients) do
+                    if ingredient.name == product_name then
+                        grecipe.layer = product_name 
+                        goto skip
+                    end
+                end
+                for _, product in pairs(grecipe.products) do
+                    if product.name == product_name then
+                        grecipe.layer = product_name 
+                        goto skip
+                    end
+                end
+::skip::
+            end
+            drawing.draw_layers(g)
+        elseif not(e.button ~= defines.mouse_button_type.left or e.control or e.shift)  then
             local vinput = get_vinput(e.element.parent)
             if not vinput then return end
             local hinput = vinput.add { type = "flow", direction = "horizontal" }

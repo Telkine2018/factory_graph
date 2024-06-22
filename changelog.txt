@@ -5,6 +5,7 @@ Version: 1.0.6
     - Fix crash when production failed
     - Fix history on recipe selection
     - Fix layer management
+    - Shift left click on a product (in the product panel) will set the layer of all recipe for this product
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.5
 Date: 04. 05. 2024.
