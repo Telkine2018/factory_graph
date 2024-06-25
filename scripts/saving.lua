@@ -369,6 +369,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local g = gutils.get_graph(player)
         local frame = player.gui.screen[panel_name]
         if not (frame and frame.valid) then return end
+        if e.alt then return end
 
         local line = e.element.parent
         if not line then return end
@@ -378,7 +379,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local index = line.get_index_in_parent()
         local save = saves[index]
 
-        if not (e.button ~= defines.mouse_button_type.left or e.shift or e.alt) then
+        if not (e.button ~= defines.mouse_button_type.left or e.shift) then
             local json = game.decode_string(save.json) --[[@as string]]
             local data = game.json_to_table(json) --[[@as SavingData]]
             local new_flow = tools.get_child(frame, "new_flow")
@@ -397,7 +398,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             vars.saving_current = save
             graph.load_saving(g, data)
             saving.update_selection(line.parent)
-        elseif not (e.button ~= defines.mouse_button_type.left or not e.shift or e.control or e.alt) then
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.shift or e.control) then
             local json = game.decode_string(save.json) --[[@as string]]
             local data = game.json_to_table(json) --[[@as SavingData]]
             graph.import_saving(g, data)
@@ -407,13 +408,21 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
 tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
     ---@param e EventData.on_gui_elem_changed
     function(e)
+        local player = game.players[e.player_index]
         if not (e.element and e.element.valid) then return end
 
-        local value = e.element.elem_value
+        local signal = e.element.elem_value --[[@as SignalID]]
         local parent = e.element.parent
         if not parent then return end
 
-        parent.icon2.elem_value = value
+        parent.icon2.elem_value = signal
+        if parent.label and parent.label.text == "" then
+            if signal.type == "item" then
+                parent.label.text = translations.get_item_name(e.player_index, signal.name) or ""
+            elseif signal.type == "fluid" then
+                parent.label.text = translations.get_fluid_name(e.player_index, signal.name) or ""
+            end
+        end
     end)
 
 
