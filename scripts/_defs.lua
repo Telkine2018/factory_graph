@@ -65,6 +65,7 @@ local tools = require("scripts.tools")
 ---@field preferred_beacon_count integer
 ---@field iovalues {[string]:number|boolean}
 ---@field color_index integer
+---@field use_machine_in_inventory boolean?
 
 ---@class Graph : GraphRuntime, GraphConfig, GraphProduction, GraphSettings
 

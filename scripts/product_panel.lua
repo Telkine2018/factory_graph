@@ -389,33 +389,33 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
         local product_name = e.element.tags.product_name --[[@as string]]
         if not product_name then return end
 
-        if not(e.button ~= defines.mouse_button_type.right or e.control or e.shift) then
+        if not (e.button ~= defines.mouse_button_type.right or e.control or e.shift) then
             recipe_selection.open(g, g.products[product_name], nil)
-        elseif not(e.button ~= defines.mouse_button_type.left or not e.control or e.shift)  then
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift) then
             get_vinput(e.element.parent)
             if g.iovalues[product_name] == true then
                 g.iovalues[product_name] = nil
             else
                 g.iovalues[product_name] = true
             end
-        elseif not(e.button ~= defines.mouse_button_type.left or e.control or not e.shift)  then
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift) then
             for _, grecipe in pairs(g.selection) do
                 for _, ingredient in pairs(grecipe.ingredients) do
                     if ingredient.name == product_name then
-                        grecipe.layer = product_name 
+                        grecipe.layer = product_name
                         goto skip
                     end
                 end
                 for _, product in pairs(grecipe.products) do
                     if product.name == product_name then
-                        grecipe.layer = product_name 
+                        grecipe.layer = product_name
                         goto skip
                     end
                 end
-::skip::
+                ::skip::
             end
             drawing.draw_layers(g)
-        elseif not(e.button ~= defines.mouse_button_type.left or e.control or e.shift)  then
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift) then
             local vinput = get_vinput(e.element.parent)
             if not vinput then return end
             local hinput = vinput.add { type = "flow", direction = "horizontal" }
@@ -591,7 +591,7 @@ local function create_product_line(container, machine)
     if not machine.count then
         machine.count = 1
     end
-    
+
     local caption
     if machine.count > 1000 then
         caption = string.format("%.0f", math.ceil(machine.count))
@@ -599,8 +599,13 @@ local function create_product_line(container, machine)
         caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
     end
 
-    local b = line1.add { type = "choose-elem-button", elem_type = "entity",
-        entity = machine.machine.name, style = green_button, tooltip = { np("machine-tooltip") } }
+    local b = line1.add {
+        type = "choose-elem-button",
+        elem_type = "entity",
+        entity = machine.machine.name,
+        style = green_button,
+        tooltip = { np("machine-tooltip") }
+    }
     b.locked = true
     tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
     b.raise_hover_events = true
@@ -949,9 +954,11 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             item = item,
             count = count,
             in_inventory_count = in_inventory_count,
-            in_network_count = in_network_count
+            in_network_count = in_network_count,
+            machine_name = name
         })
         b.locked                         = true
+        b.raise_hover_events             = true
         local machine_label              = per_machine_table.add {
             type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
         machine_label.style.right_margin = 10
@@ -1192,6 +1199,27 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
         graph.deferred_update(player, { update_product_list = true })
     end)
 
+
+tools.on_named_event(np("summary_machine"), defines.events.on_gui_hover,
+    ---@param e EventData.on_gui_hover
+    function(e)
+        if not e.element.valid then return end
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        local tags = e.element.tags
+        local machine_name = tags.machine_name --[[@as string]]
+
+        if not machine_name then return end
+
+        local parts = { "" }
+        local proto = game.entity_prototypes[machine_name]
+        if proto then
+            parts = product_panel.create_parts_tooltip(player, proto)
+            e.element.tooltip = { np("build-button-tooltip_hover"), parts }
+        end
+    end)
+
 tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
@@ -1240,6 +1268,39 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
         end
     end)
 
+---@param player LuaPlayer
+---@param machine_entity LuaEntityPrototype
+---@return table
+function product_panel.create_parts_tooltip(player, machine_entity)
+    local parts = { "" }
+    if machine_entity then
+        local machine_item = machine_entity.items_to_place_this[1]
+        if machine_item then
+            local machine_recipes =
+                game.get_filtered_recipe_prototypes { {
+                    filter = "has-product-item",
+                    elem_filters = { { filter = "name", name = machine_item } } } }
+
+            local machine_recipe
+            for _, mp in pairs(machine_recipes) do
+                machine_recipe = mp
+                break
+            end
+            if machine_recipe then
+                local ingredients = machine_recipe.ingredients
+                for _, p in pairs(ingredients) do
+                    local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
+                    local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
+                    local ptext = {
+                        np("machine_product_tooltip"),
+                        amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
+                    table.insert(parts, ptext)
+                end
+            end
+        end
+    end
+    return parts
+end
 
 tools.on_named_event(np("machine"), defines.events.on_gui_hover,
     ---@param e EventData.on_gui_hover
@@ -1256,9 +1317,13 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         local grecipe = g.recipes[recipe_name]
         local machine = grecipe.machine
 
+        local parts = { "" }
         if machine then
-            e.element.tooltip = { np("machine-tooltip"),
-                { "", tools.fround(machine.count), " x ", machine.machine.localised_name } }
+            parts = product_panel.create_parts_tooltip(player, machine.machine)
+        end
+
+        if machine then
+            e.element.tooltip = { np("machine-tooltip"), { "", tools.fround(machine.count), " x ", machine.machine.localised_name }, parts }
         else
             e.element.tooltip = { np("machine-tooltip"), "" }
         end

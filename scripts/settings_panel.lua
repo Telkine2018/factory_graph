@@ -92,7 +92,7 @@ function settings_panel.create(player_index)
     flow.add { type = "textfield", numeric = true, text = tostring(g.grid_size), name = "grid_size" }
 
     flow.add { type = "label", caption = { np("show_hidden") } }
-    flow.add { type = "checkbox", numeric = true, state = not not g.show_hidden, name = "show_hidden" }
+    flow.add { type = "checkbox", state = not not g.show_hidden, name = "show_hidden" }
 
     flow.add { type = "label", caption = { np("only-researched") } }
     flow.add { type = "checkbox", name = "show_only_researched", state = not not g.show_only_researched }
@@ -148,6 +148,9 @@ function settings_panel.create(player_index)
     flow.add { type = "line" }
     flow.add { type = "line" }
 
+    flow.add { type = "label", caption = { np("use_machine_in_inventory") } }
+    flow.add { type = "checkbox", state = not not g.use_machine_in_inventory, name = "use_machine_in_inventory" }
+    
     flow.add { type = "label", caption = { np("preferred_machines") } }
     local pmachine_flow = flow.add { type = "table", direction = "horizontal", name = "preferred_machines", column_count = 6 }
     set_machine_buttons(g, pmachine_flow)
@@ -285,6 +288,7 @@ local function save(player, frame)
 
     local signal = field_table.current_layer.elem_value --[[@as SignalID]]
     g.current_layer = tools.signal_to_sprite(signal)
+    g.use_machine_in_inventory = field_table.use_machine_in_inventory.state
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
     g.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]

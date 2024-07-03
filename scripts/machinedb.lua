@@ -109,6 +109,25 @@ end
 
 local is_machine_enabled = machinedb.is_machine_enabled
 
+---@param player LuaPlayer
+---@return LuaInventory?
+local function get_player_inventory(player)
+    
+    ---@type LuaEntity
+    local character = player.character
+    local vars = tools.get_vars(player)
+    if not character and vars.saved_character and vars.saved_character.valid then
+        character = vars.saved_character
+    end
+
+    ---@type LuaInventory?
+    local inv
+    if character then
+        return character.get_main_inventory()
+    end
+    return nil
+end
+
 ---@param g Graph
 ---@param recipe_name string
 ---@param enabled_cache {[string]:boolean}
@@ -125,6 +144,11 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local preferred_machines = g.preferred_machines
     local preferred_modules  = g.preferred_modules
+
+    local inv 
+    if g.use_machine_in_inventory then
+        inv = get_player_inventory(g.player)
+    end
 
     if not preferred_machines then
         preferred_machines = {}
@@ -143,6 +167,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local found_index
     local found_order
+    local found_in_inventory = 0
     for i = 1, #machines do
         local machine = machines[i]
         local machine_name = machine.name
@@ -153,13 +178,20 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
         if enabled or machine_set[machine_name] then
             local new_order = machine_set[machine_name]
+            local new_in_inventory = 0
             if new_order then
                 if not found_order or (found_order and new_order < found_order) then
                     found_order = new_order
                     found_index = i
                 end
             elseif not found_order then
-                found_index = i
+                if inv then
+                    new_in_inventory = inv.get_item_count(machine_name)
+                end
+                if new_in_inventory > 0 or found_in_inventory == 0 then
+                    found_index = i
+                    found_in_inventory = new_in_inventory
+                end
             end
         end
     end

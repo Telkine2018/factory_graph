@@ -1,11 +1,13 @@
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.6
+Date: 02. 07. 2024.
   Fixes:
     - Fix module selection
     - Fix crash when production failed
     - Fix history on recipe selection
     - Fix layer management
-    - Shift left click on a product (in the product panel) will set the layer of all recipe for this product
+    - Shift left click on a product (in the product panel) will set the layer of all recipe using this product (to find which recipe use a product)
+    - Add a setting to prefer machines in player inventory
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.5
 Date: 04. 05. 2024.
