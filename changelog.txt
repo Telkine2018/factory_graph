@@ -8,6 +8,7 @@ Date: 02. 07. 2024.
     - Fix layer management
     - Shift left click on a product (in the product panel) will set the layer of all recipe using this product (to find which recipe use a product)
     - Add a setting to prefer machines in player inventory
+    - Change layer display to keep position when switching with selection display
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.5
 Date: 04. 05. 2024.

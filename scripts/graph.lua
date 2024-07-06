@@ -1020,8 +1020,16 @@ tools.on_event(defines.events.on_tick,
                 graph.do_layout(g)
                 graph.create_recipe_objects(g)
             elseif data.do_redraw then
-                gutils.compute_visibility(g, true)
-                graph.create_recipe_objects(g)
+                drawing.clear_selection(g)
+                local position_missing  = gutils.compute_visibility(g, true)
+                if not position_missing then
+                    drawing.delete_content(g, true)
+                    graph.create_recipe_objects(g)
+                else
+                    drawing.delete_content(g)
+                    graph.do_layout(g)
+                    graph.create_recipe_objects(g)
+                end
             end
             drawing.redraw_selection(game.players[player_index])
             if data.selection_changed then

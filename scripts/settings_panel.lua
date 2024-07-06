@@ -329,7 +329,7 @@ local function save(player, frame)
 
     g.visible_layers = visible_layers
     if layer_change then
-        graph.deferred_update(player, { do_layout = true, center_on_graph = true })
+        -- graph.deferred_update(player, { do_layout = true, center_on_graph = true })
         gutils.fire_selection_change(g)
     else
         gutils.fire_production_data_change(g)

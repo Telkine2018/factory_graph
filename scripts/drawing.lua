@@ -711,6 +711,7 @@ local function redraw_connections(g)
     end
 
     local grid_size = g.grid_size
+    local margin = 0.6
     for _, crecipe in pairs(g.selection) do
         ---@cast crecipe GRecipe
 
@@ -737,9 +738,17 @@ local function redraw_connections(g)
                 product_set[prod.name] = prod
             end
 
-            local margin = 0.6
             local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
+                left_top = { p.x - margin, p.y - margin },
+                right_bottom = { p.x + margin, p.y + margin },
+                draw_on_ground = true
+            }
+            table.insert(ids, id)
+        elseif crecipe.col and crecipe.line then
+
+            local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
+            id = rendering.draw_rectangle { surface = g.surface, color = { 0.4, 0.4, 0.4 },
                 left_top = { p.x - margin, p.y - margin },
                 right_bottom = { p.x + margin, p.y + margin },
                 draw_on_ground = true

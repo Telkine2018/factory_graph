@@ -256,16 +256,16 @@ end
 
 ------------------------------------------------
 
----@param event integer
+---@param event integer|defines.events
 ---@param handler fun(EventData)
 ---@param filters ({["filter"]:string}|{["name"]:string})[]?
 function tools.on_event(event, handler, filters)
-    local previous = script.get_event_handler(event)
+    local previous = script.get_event_handler(event --[[@as integer]])
     if not previous then
         ---@cast filters EventFilter
         script.on_event(event, handler, filters)
     else
-        local prev_filters = script.get_event_filter(event)
+        local prev_filters = script.get_event_filter(event  --[[@as integer]])
         local new_filters = nil
         if prev_filters == nil then
             new_filters = filters
@@ -431,7 +431,7 @@ local function call_handler(e)
 end
 
 ---@param name string
----@param event integer
+---@param event integer|defines.events
 ---@param callback fun(e:EventData)
 function tools.on_named_event(name, event, callback)
     if not handler_registered[event] then
@@ -826,13 +826,13 @@ tools.opposite_directions = {
 ---@return integer
 function tools.get_opposite_direction(direction)
     if direction == define_directions.north then
-        return define_directions.south
+        return define_directions.south  --[[@as integer]]
     elseif direction == define_directions.south then
-        return define_directions.north
+        return define_directions.north  --[[@as integer]]
     elseif direction == defines.direction.west then
-        return define_directions.east
+        return define_directions.east  --[[@as integer]]
     elseif direction == defines.direction.east then
-        return define_directions.west
+        return define_directions.west  --[[@as integer]]
     else
         error("Invalid direction: " .. tostring(direction))
     end

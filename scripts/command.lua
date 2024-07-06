@@ -138,11 +138,19 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
     function(e)
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
+        local old_visibility = g.visibility
         g.visibility = e.element.selected_index
-        graph.deferred_update(player, {
-            do_layout = true,
-            center_on_graph = true
-        })
+        if old_visibility == commons.visibility_all or g.visibility == commons.visibility_all then
+            graph.deferred_update(player, {
+                do_layout = true,
+                center_on_graph = true
+            })
+        else
+            graph.deferred_update(player, {
+                do_redraw = true,
+                update_product_list = true
+            })
+        end
         gutils.fire_selection_change(g)
     end)
 
@@ -188,10 +196,10 @@ tools.on_named_event(np("unselect_all"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
 
-        if not(e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
             graph.unselect(player)
             saving.clear_current(player)
-        elseif not(e.button ~= defines.mouse_button_type.right or e.control or e.shift or e.alt) then
+        elseif not (e.button ~= defines.mouse_button_type.right or e.control or e.shift or e.alt) then
             local g = gutils.get_graph(player)
             drawing.unmark_all(g)
         end

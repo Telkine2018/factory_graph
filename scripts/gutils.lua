@@ -195,8 +195,10 @@ end
 
 ---@param g Graph
 ---@param keep_position boolean?
+---@return boolean
 function gutils.compute_visibility(g, keep_position)
     local show_only_researched = g.show_only_researched
+    local position_missing = false
     if g.visibility == commons.visibility_selection then
         local selection = g.selection
         if not selection then
@@ -205,16 +207,18 @@ function gutils.compute_visibility(g, keep_position)
         for _, grecipe in pairs(g.recipes) do
             grecipe.selector_positions = nil
             grecipe.entity = nil
+            grecipe.visible = true
             if selection[grecipe.name] then
                 if not keep_position then
                     grecipe.line = nil
                     grecipe.col = nil
+                elseif not grecipe.line or not grecipe.col then
+                    position_missing = true
                 end
-                grecipe.visible = true
             else
                 grecipe.line = nil
                 grecipe.col = nil
-                grecipe.visible = false
+                grecipe.visible = nil
             end
         end
     elseif g.visibility == commons.visibility_layers then
@@ -229,16 +233,24 @@ function gutils.compute_visibility(g, keep_position)
         for _, grecipe in pairs(g.recipes) do
             grecipe.selector_positions = nil
             grecipe.entity = nil
-            if selection[grecipe.name] and grecipe.layer and visible_layers[grecipe.layer] then
+            if selection[grecipe.name]  then
+                if grecipe.layer and visible_layers[grecipe.layer] then
+                    grecipe.visible = true
+                else
+                    grecipe.visible = nil
+                end
                 if not keep_position then
                     grecipe.line = nil
                     grecipe.col = nil
+                else
+                    if not grecipe.line or not grecipe.col then
+                        position_missing = true
+                    end
                 end
-                grecipe.visible = true
             else
                 grecipe.line = nil
                 grecipe.col = nil
-                grecipe.visible = false
+                grecipe.visible = nil
             end
         end
     else -- if g.visibility == commons.visibility_all then
@@ -255,6 +267,7 @@ function gutils.compute_visibility(g, keep_position)
             end
         end
     end
+    return position_missing
 end
 
 ---@param g Graph
