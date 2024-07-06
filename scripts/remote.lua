@@ -30,8 +30,34 @@ local function add_recipes(player_index, remoteConfig)
     gutils.fire_selection_change(g)
 end
 
+---@param player_index integer
+local function get_ingredients(player_index) 
+    local player = game.players[player_index]
+    local g = gutils.get_graph(player)
+    if not g then return nil end
+
+    local product_outputs = g.product_outputs or {}
+    local product_inputs = g.product_inputs or {}
+
+    local inputs, _,_ = gutils.get_product_flow(g, g.selection)
+    if not inputs then return nil end
+
+    local result = {}
+    for product_name , _ in pairs(inputs) do
+        output = product_outputs[product_name] or 0
+        input = product_inputs[product_name] or 0
+        local amount = input - output
+        if amount > 0 then
+            result[product_name] = input - output
+        end
+    end
+
+    return result
+end
+
 remote.add_interface(prefix, {
-    add_recipes = add_recipes
+    add_recipes = add_recipes,
+    get_ingredients = get_ingredients
 })
 
 local default_speed = 4
