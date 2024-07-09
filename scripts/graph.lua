@@ -348,10 +348,11 @@ function graph.layout_recipe(g, grecipe)
     local max_col
     local gcols = g.gcols
 
+    local gname = grecipe.name
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
-                if irecipe.visible then
+                if irecipe.visible and irecipe.name ~= gname then
                     local col = irecipe.col
                     if col then
                         if not max_col or col > max_col then
@@ -382,7 +383,7 @@ function graph.layout_recipe(g, grecipe)
     if count == 0 then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
-                if irecipe.visible and irecipe.line then
+                if irecipe.visible and irecipe.line and irecipe.name ~= gname then
                     line = line + irecipe.line
                     count = count + 1
                 end
@@ -392,7 +393,7 @@ function graph.layout_recipe(g, grecipe)
     if count == 0 then
         for _, product in pairs(grecipe.products) do
             for _, precipe in pairs(product.ingredient_of) do
-                if precipe.visible and precipe.line then
+                if precipe.visible and precipe.line and precipe.name ~= gname then
                     line = line + precipe.line
                     count = count + 1
                 end
@@ -476,13 +477,13 @@ function graph.insert_recipe(g, grecipe)
     local center_line, center_col, count = 0, 0, 0
 
     for _, ingredient in pairs(grecipe.ingredients) do
-        local col1, line1, count1 = gutils.compute_sum(ingredient.product_of)
+        local col1, line1, count1 = gutils.compute_sum(ingredient.product_of, grecipe.name)
         center_col = center_col + col1
         center_line = center_line + line1
         count = count + count1
     end
     for _, product in pairs(grecipe.products) do
-        local col1, line1, count1 = gutils.compute_sum(product.ingredient_of)
+        local col1, line1, count1 = gutils.compute_sum(product.ingredient_of, grecipe.name)
         center_col = center_col + col1
         center_line = center_line + line1
         count = count + count1
@@ -571,7 +572,8 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
 end
 
 ---@param g Graph
-function graph.do_layout(g)
+---@param nooptimize boolean?
+function graph.do_layout(g, nooptimize)
     -- Processed product
     ---@type {[string]:GProduct}
     local processed_products = {}
@@ -785,10 +787,18 @@ function graph.do_layout(g)
         end
     end
     log("------- End layout ----------")
-    graph.reverse_equalize_recipes(g)
-    graph.equalize_recipes(g)
-    --    graph.reverse_equalize_recipes(g)
 
+    --graph.reverse_equalize_recipes(g)
+    --graph.equalize_recipes(g)
+
+    if not nooptimize then
+        graph.reorganize(g)
+    else
+        graph.reverse_equalize_recipes(g)
+        graph.equalize_recipes(g)
+    end
+
+    --    graph.reverse_equalize_recipes(g)
     graph.sort_recipes(g.selection)
 end
 
@@ -966,12 +976,17 @@ end
 
 ---@param player LuaPlayer
 ---@param keep_location boolean?
-function graph.refresh(player, keep_location)
+---@param nooptimize boolean?
+function graph.refresh(player, keep_location, nooptimize)
     local g = gutils.get_graph(player)
     gutils.compute_visibility(g, keep_location)
     drawing.delete_content(g, keep_location)
     if not keep_location then
-        graph.do_layout(g)
+        graph.do_layout(g, nooptimize)
+    else
+        if not nooptimize then
+            graph.reorganize(g)
+        end
     end
     graph.create_recipe_objects(g)
     drawing.redraw_selection(player)
@@ -1021,7 +1036,7 @@ tools.on_event(defines.events.on_tick,
                 graph.create_recipe_objects(g)
             elseif data.do_redraw then
                 drawing.clear_selection(g)
-                local position_missing  = gutils.compute_visibility(g, true)
+                local position_missing = gutils.compute_visibility(g, true)
                 if not position_missing then
                     drawing.delete_content(g, true)
                     graph.create_recipe_objects(g)
@@ -1105,17 +1120,13 @@ function graph.load_saving(g, data)
         end
     end
 
-    if g.visibility == commons.visibility_selection and
-        data.config.visibility == commons.visibility_selection then
-        graph.deferred_update(g.player, { selection_changed = true, do_redraw = true, center_on_graph = true })
-    else    
-        local update_command
-        if g.visibility == commons.visibility_layers then
-            g.visibility = commons.visibility_selection
-            update_command = true
-        end
-        graph.deferred_update(g.player, { selection_changed = true, do_layout = true, center_on_graph = true, update_command = update_command })
-    end
+    g.visibility = data.config.visibility
+    graph.deferred_update(g.player, {
+        selection_changed = true,
+        do_redraw = true,
+        center_on_graph = true,
+        update_command = true
+    })
     gutils.fire_selection_change(g)
 end
 
@@ -1238,6 +1249,268 @@ function graph.create_sorted_recipe_table(set)
     end
     table.sort(sort_table, function(r1, r2) return r1.sort_level < r2.sort_level end)
     return sort_table
+end
+
+local org_bound = 0.6
+local log_optim_enabled = true
+
+---@param g Graph
+function graph.reorganize(g)
+    ---@type GRecipe[]
+    local recipes = {}
+    for _, recipe in pairs(g.recipes) do
+        if recipe.visible and recipe.col then
+            table.insert(recipes, recipe)
+        end
+    end
+    local bary_count = #recipes
+    if bary_count > 100 then
+        return
+    end
+    if bary_count <= 1 then
+        return
+    end
+
+    local radius = math.ceil(2 * math.sqrt(bary_count))
+    local bary_col = 0
+    local bary_line = 0
+    for _, recipe in pairs(recipes) do
+        if recipe.visible and recipe.col then
+            bary_line = bary_line + recipe.line
+            bary_col = bary_col + recipe.col
+            recipe.pos_locked = false
+        end
+    end
+
+    bary_line = bary_line / bary_count
+    bary_col = bary_col / bary_count
+    table.sort(recipes,
+        function(r1, r2)
+            return math.abs(r1.col - bary_col) + math.abs(r1.line - bary_line) <
+                math.abs(r2.col - bary_col) + math.abs(r2.line - bary_line)
+        end)
+
+
+    local max_iter = 8
+    for i = 1, max_iter do
+        local get_element_at_position = gutils.get_element_at_position
+        local set_colline = gutils.set_colline
+
+        local change_count = 0
+        if log_optim_enabled then
+            log("----- iteration=" .. i .. " ----")
+        end
+        for _, grecipe in pairs(recipes) do
+            grecipe.pos_locked = nil
+        end
+
+        local start = 1
+        local iend = #recipes
+        local istep = 1
+        if i % 2 == 0 then
+            start = iend
+            iend = 1
+            istep = -1
+        end
+        for index = start, iend, istep do
+            local grecipe = recipes[index]
+            local m_coli = 0
+            local m_linei = 0
+            local m_counti = 0
+            local recipei
+
+            local m_colp = 0
+            local m_linep = 0
+            local m_countp = 0
+            local recipep
+
+            for _, ingredient in pairs(grecipe.ingredients) do
+                for _, irecipe in pairs(ingredient.product_of) do
+                    if irecipe.visible and irecipe.name ~= grecipe.name then
+                        m_counti = m_counti + 1
+                        m_coli = m_coli + irecipe.col
+                        m_linei = m_linei + irecipe.line
+                        recipei = irecipe
+                    end
+                end
+            end
+
+            for _, product in pairs(grecipe.products) do
+                for _, precipe in pairs(product.ingredient_of) do
+                    if precipe.visible and precipe.name ~= grecipe.name then
+                        m_countp = m_countp + 1
+                        m_colp = m_colp + precipe.col
+                        m_linep = m_linep + precipe.line
+                        recipep = precipe
+                    end
+                end
+            end
+
+            local m_count = m_counti + m_countp
+            if m_count > 0 then
+                local m_col = (m_coli + m_colp) / m_count
+                local m_line = (m_linei + m_linep) / m_count
+
+                local dcol = math.floor(m_col - grecipe.col)
+                local dline = math.floor(m_line - grecipe.line)
+
+                m_col = math.floor(m_col + 0.5)
+                m_line = math.floor(m_line + 0.5)
+
+                if math.abs(dcol) < 1 and math.abs(dline) < 1 then
+                    dcol = m_col - grecipe.col
+                    dline = m_line - grecipe.line
+                end
+
+                ---@param col integer
+                ---@param line integer
+                ---@param mode string
+                ---@return boolean
+                local function check_and_set(col, line, mode)
+                    local found = get_element_at_position(g, col, line)
+                    if not found then
+                        if log_optim_enabled then
+                            log("(" .. mode .. ")," .. grecipe.name .. " [" .. grecipe.col .. "," .. grecipe.line .. "] => [" .. col .. "," .. line .. "]")
+                        end
+                        set_colline(g, grecipe, col, line)
+                        change_count = change_count + 1
+                        return true
+                    elseif found == grecipe then
+                        if log_optim_enabled then
+                            log("(" .. mode .. ")," .. grecipe.name .. " [" .. grecipe.col .. "," .. grecipe.line .. "] => Stay")
+                        end
+                        return true
+                    end
+                    return false
+                end
+
+                local function apply_delta()
+                    if m_countp == 1 then
+                        if check_and_set(m_colp - 1, m_linep, "<:p") then
+                            recipep.pos_locked = true
+                            return true
+                        elseif check_and_set(m_colp, m_linep - 1, "^:p") then
+                            recipep.pos_locked = true
+                            return true
+                        elseif check_and_set(m_colp, m_linep + 1, "v:p") then
+                            recipep.pos_locked = true
+                            return true
+                        elseif check_and_set(m_colp + 1, m_linep, ">:p") then
+                            recipep.pos_locked = true
+                            return true
+                        end
+                    end
+
+                    if check_and_set(m_col, m_line, "Bary") then
+                        return true
+                    end
+
+                    --[[
+                    local dcol1 = math.max(0, math.abs(dcol) - 1)
+                    local dline1 = math.max(0, math.abs(dline) - 1)
+                    if dline1 > 0 or dcol1 > 0 then
+
+                        local min1 = math.min(dcol1, dline1)
+                        for delta1 = 1, min1 do
+                            if check_and_set(m_col - delta1, m_line, ">:c") then
+                                return true
+                            end
+                            if check_and_set(m_col + delta1, m_line, ">:c") then
+                                return true
+                            end
+                            if check_and_set(m_col, m_line + delta1, ">:c") then
+                                return true
+                            end
+                            if check_and_set(m_col, m_line - delta1, ">:c") then
+                                return true
+                            end
+                            for delta2 = 1, min1 do
+                                if check_and_set(m_col - delta1, m_line + delta2, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col - delta1, m_line - delta2, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col + delta1, m_line + delta2, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col + delta1, m_line - delta2, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col + delta2, m_line + delta1, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col + delta2, m_line - delta1, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col - delta2, m_line + delta1, ">:c") then
+                                    return true
+                                end
+                                if check_and_set(m_col - delta2, m_line - delta1, ">:c") then
+                                    return true
+                                end
+                            end
+                        end
+                    end
+                    --]]
+
+                    if not grecipe.pos_locked and m_counti == 1 then
+                        if check_and_set(m_coli + 1, m_linei, ">:i") then
+                            return true
+                        elseif check_and_set(m_coli, m_linei + 1, "v:i") then
+                            return true
+                        elseif check_and_set(m_coli, m_linei - 1, "^:i") then
+                            return true
+                        elseif check_and_set(m_coli - 1, m_linei, "<:i") then
+                            return true
+                        end
+                    end
+
+                    if dcol >= org_bound then
+                        dcol = 1
+                    elseif dcol <= -org_bound then
+                        dcol = -1
+                    else
+                        dcol = 0
+                    end
+                    if dline >= org_bound then
+                        dline = 1
+                    elseif dline <= -org_bound then
+                        dline = -1
+                    else
+                        dline = 0
+                    end
+                    local col = grecipe.col + dcol
+                    local line = grecipe.line + dline
+
+
+                    if check_and_set(col, line, "Delta") then
+                        return true
+                    elseif dcol ~= 0 then
+                        if check_and_set(col, grecipe.line, "line") then
+                            return true
+                        elseif dline ~= 0 and check_and_set(grecipe.col, line, "line")  then
+                            return true
+                        end
+                    end
+                    return false
+                end
+
+                apply_delta()
+                --[[
+                if not apply_delta() then
+                    dcol = bary_col - grecipe.col
+                    dline = bary_line - grecipe.line
+                    apply_delta()
+                end
+                --]]
+            end
+        end
+
+        if change_count == 0 then
+            return
+        end
+    end
 end
 
 ---@param player LuaPlayer

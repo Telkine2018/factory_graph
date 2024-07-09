@@ -447,10 +447,11 @@ function gutils.recenter(g)
 end
 
 ---@param recipes table<any, GRecipe>
-function gutils.compute_sum(recipes)
+---@param gname string?
+function gutils.compute_sum(recipes, gname)
     local col, line, count = 0, 0, 0
     for _, recipe in pairs(recipes) do
-        if recipe.visible and recipe.col then
+        if recipe.visible and recipe.col and recipe.name ~= gname then
             col = col + recipe.col
             line = line + recipe.line
             count = count + 1
@@ -502,7 +503,9 @@ local saved_graph_fields = {
     "preferred_beacon_count",
     "iovalues",
     "visibility",
-    "color_index"
+    "color_index",
+    "current_layer",
+    "visible_layers"
 }
 
 local saved_reciped_fields = {
@@ -608,6 +611,18 @@ function gutils.set_colline(g, grecipe, col, line)
     if not gcol.max_line or line > gcol.max_line then
         gcol.max_line = line
     end
+end
+
+---@param g Graph
+---@param col integer
+---@param line integer
+---@return GElement?
+function gutils.get_element_at_position(g, col, line)
+
+    local gcol = g.gcols[col]
+    if not gcol then return nil end
+
+    return gcol.line_set[line]
 end
 
 ---@param player LuaPlayer

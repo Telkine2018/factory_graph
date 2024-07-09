@@ -169,10 +169,18 @@ function command.update_display(player)
 end
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
     function(e)
         local player = game.players[e.player_index]
-        graph.refresh(player)
         local g = gutils.get_graph(player)
+    
+        if not(e.control or e.shift or e.alt) then
+            graph.refresh(player, false, false)
+        elseif e.shift and not( e.control or e.alt) then
+            graph.refresh(player, true, false)
+        elseif e.control and not( e.shift or e.alt) then
+            graph.refresh(player, false, true)
+        end
         gutils.fire_production_data_change(g)
     end)
 

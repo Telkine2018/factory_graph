@@ -95,6 +95,7 @@ local tools = require("scripts.tools")
 ---@field is_void boolean?
 ---@field is_recursive boolean?
 ---@field layer string?
+---@field pos_locked boolean?
 
 ---@class GSortNode
 ---@field sort_level integer?

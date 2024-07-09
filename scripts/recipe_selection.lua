@@ -640,12 +640,16 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             end
             local arrow = recipe_line.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
             arrow.style.top_margin = 6
+            local product_set = {}
             for _, def in pairs(p_table) do
-                local b = gutils.create_product_button(recipe_line, def.name)
-                b.style = product_button_style
-                b.style.size = sprite_button_size
-                b.style.margin = 0
-                tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
+                if not product_set[def.name] then
+                    product_set[def.name] = true
+                    local b = gutils.create_product_button(recipe_line, def.name)
+                    b.style = product_button_style
+                    b.style.size = sprite_button_size
+                    b.style.margin = 0
+                    tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
+                end
             end
             recipe_line.style.horizontally_stretchable = true
         else
