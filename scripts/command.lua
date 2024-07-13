@@ -175,11 +175,11 @@ tools.on_named_event(np("refresh"), defines.events.on_gui_click,
         local g = gutils.get_graph(player)
     
         if not(e.control or e.shift or e.alt) then
-            graph.refresh(player, false, false)
-        elseif e.shift and not( e.control or e.alt) then
-            graph.refresh(player, true, false)
-        elseif e.control and not( e.shift or e.alt) then
             graph.refresh(player, false, true)
+        elseif e.control and not( e.shift or e.alt) then
+            graph.refresh(player, true, false)
+        elseif e.shift and not( e.control or e.alt) then
+            graph.refresh(player, false, false)
         end
         gutils.fire_production_data_change(g)
     end)

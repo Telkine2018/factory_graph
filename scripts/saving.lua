@@ -416,7 +416,7 @@ tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
         if not parent then return end
 
         parent.icon2.elem_value = signal
-        if parent.label and parent.label.text == "" then
+        if signal and parent.label and parent.label.text == "" then
             if signal.type == "item" then
                 parent.label.text = translations.get_item_name(e.player_index, signal.name) or ""
             elseif signal.type == "fluid" then

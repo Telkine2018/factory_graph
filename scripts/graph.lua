@@ -572,8 +572,8 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
 end
 
 ---@param g Graph
----@param nooptimize boolean?
-function graph.do_layout(g, nooptimize)
+---@param old_layout boolean?
+function graph.do_layout(g, old_layout)
     -- Processed product
     ---@type {[string]:GProduct}
     local processed_products = {}
@@ -791,7 +791,7 @@ function graph.do_layout(g, nooptimize)
     --graph.reverse_equalize_recipes(g)
     --graph.equalize_recipes(g)
 
-    if not nooptimize then
+    if not old_layout then
         graph.reorganize(g)
     else
         graph.reverse_equalize_recipes(g)
@@ -976,15 +976,15 @@ end
 
 ---@param player LuaPlayer
 ---@param keep_location boolean?
----@param nooptimize boolean?
-function graph.refresh(player, keep_location, nooptimize)
+---@param old_layout boolean?
+function graph.refresh(player, keep_location, old_layout)
     local g = gutils.get_graph(player)
     gutils.compute_visibility(g, keep_location)
     drawing.delete_content(g, keep_location)
     if not keep_location then
-        graph.do_layout(g, nooptimize)
+        graph.do_layout(g, old_layout)
     else
-        if not nooptimize then
+        if not old_layout then
             graph.reorganize(g)
         end
     end
