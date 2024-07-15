@@ -791,12 +791,8 @@ function graph.do_layout(g, old_layout)
     --graph.reverse_equalize_recipes(g)
     --graph.equalize_recipes(g)
 
-    if not old_layout then
-        graph.reorganize(g)
-    else
-        graph.reverse_equalize_recipes(g)
-        graph.equalize_recipes(g)
-    end
+    graph.reverse_equalize_recipes(g)
+    graph.equalize_recipes(g)
 
     --    graph.reverse_equalize_recipes(g)
     graph.sort_recipes(g.selection)
@@ -1251,11 +1247,14 @@ function graph.create_sorted_recipe_table(set)
     return sort_table
 end
 
+local get_element_at_position = gutils.get_element_at_position
+local set_colline = gutils.set_colline
+
 local org_bound = 0.6
 local log_optim_enabled = true
 
 ---@param g Graph
-function graph.reorganize(g)
+function graph.reorganize_1(g)
     ---@type GRecipe[]
     local recipes = {}
     for _, recipe in pairs(g.recipes) do
@@ -1293,9 +1292,6 @@ function graph.reorganize(g)
 
     local max_iter = 8
     for i = 1, max_iter do
-        local get_element_at_position = gutils.get_element_at_position
-        local set_colline = gutils.set_colline
-
         local change_count = 0
         if log_optim_enabled then
             log("----- iteration=" .. i .. " ----")
@@ -1317,7 +1313,6 @@ function graph.reorganize(g)
             local m_coli = 0
             local m_linei = 0
             local m_counti = 0
-            local recipei
 
             local m_colp = 0
             local m_linep = 0
@@ -1330,7 +1325,6 @@ function graph.reorganize(g)
                         m_counti = m_counti + 1
                         m_coli = m_coli + irecipe.col
                         m_linei = m_linei + irecipe.line
-                        recipei = irecipe
                     end
                 end
             end
@@ -1405,55 +1399,6 @@ function graph.reorganize(g)
                         return true
                     end
 
-                    --[[
-                    local dcol1 = math.max(0, math.abs(dcol) - 1)
-                    local dline1 = math.max(0, math.abs(dline) - 1)
-                    if dline1 > 0 or dcol1 > 0 then
-
-                        local min1 = math.min(dcol1, dline1)
-                        for delta1 = 1, min1 do
-                            if check_and_set(m_col - delta1, m_line, ">:c") then
-                                return true
-                            end
-                            if check_and_set(m_col + delta1, m_line, ">:c") then
-                                return true
-                            end
-                            if check_and_set(m_col, m_line + delta1, ">:c") then
-                                return true
-                            end
-                            if check_and_set(m_col, m_line - delta1, ">:c") then
-                                return true
-                            end
-                            for delta2 = 1, min1 do
-                                if check_and_set(m_col - delta1, m_line + delta2, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col - delta1, m_line - delta2, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col + delta1, m_line + delta2, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col + delta1, m_line - delta2, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col + delta2, m_line + delta1, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col + delta2, m_line - delta1, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col - delta2, m_line + delta1, ">:c") then
-                                    return true
-                                end
-                                if check_and_set(m_col - delta2, m_line - delta1, ">:c") then
-                                    return true
-                                end
-                            end
-                        end
-                    end
-                    --]]
-
                     if not grecipe.pos_locked and m_counti == 1 then
                         if check_and_set(m_coli + 1, m_linei, ">:i") then
                             return true
@@ -1489,7 +1434,7 @@ function graph.reorganize(g)
                     elseif dcol ~= 0 then
                         if check_and_set(col, grecipe.line, "line") then
                             return true
-                        elseif dline ~= 0 and check_and_set(grecipe.col, line, "line")  then
+                        elseif dline ~= 0 and check_and_set(grecipe.col, line, "line") then
                             return true
                         end
                     end
@@ -1511,6 +1456,170 @@ function graph.reorganize(g)
             return
         end
     end
+end
+
+---@class RecipeNode
+---@field name string
+---@field recipe GRecipe
+---@field col number
+---@field line number
+---@field dcol number
+---@field dline number
+---@field distances table<string, number>
+
+---@param g Graph
+function graph.reorganize_2(g)
+    ---@type table<string, RecipeNode>
+    local nodes = {}
+    for _, recipe in pairs(g.recipes) do
+        if recipe.visible and recipe.col then
+            nodes[recipe.name] = {
+                name = recipe.name,
+                recipe = recipe,
+                col = recipe.col,
+                line = recipe.line,
+                distances = {}
+            }
+        end
+    end
+
+    for _, node in pairs(nodes) do
+        for _, ingredient in pairs(node.recipe.ingredients) do
+            for _, precipe in pairs(ingredient.product_of) do
+                if precipe.name ~= node.name then
+                    local source_node = nodes[precipe.name]
+                    if source_node then
+                        node.distances[precipe.name] = 1
+                    end
+                end
+            end
+        end
+        for _, product in pairs(node.recipe.products) do
+            for _, irecipe in pairs(product.ingredient_of) do
+                if irecipe.name ~= node.name then
+                    local target_node = nodes[irecipe.name]
+                    if target_node then
+                        node.distances[irecipe.name] = 1
+                    end
+                end
+            end
+        end
+    end
+
+    --- compute all distance
+    while (true) do
+        local has_changes
+        for name, node in pairs(nodes) do
+            for dname, dist in pairs(node.distances) do
+                local dest_node = nodes[dname]
+
+                local changes
+                for dname2, dist2 in pairs(dest_node.distances) do
+                    if dname2 ~= name then
+                        local d = dist + dist2
+                        local current = node.distances[dname2]
+                        if not current or current > d then
+                            if not changes then
+                                changes = { [dname2] = d }
+                            elseif not changes[dname2] or changes[dname2] > d then
+                                changes[dname2] = d
+                            end
+                        end
+                    end
+                    if changes then
+                        for dname, dist in pairs(changes) do
+                            node.distances[dname] = dist
+                            has_changes = true
+                        end
+                    end
+                end
+            end
+        end
+        if not has_changes then
+            break
+        end
+    end
+
+    for loop_index = 1, 4 do
+        for _, node in pairs(nodes) do
+            node.dcol = 0
+            node.dline = 0
+        end
+
+        local max_diff = 0
+        for _, node in pairs(nodes) do
+            for dname, dist in pairs(node.distances) do
+                local target = nodes[dname]
+                local dcol = target.col - node.col
+                local dline = target.line - node.line
+                local currentd = math.sqrt(dcol * dcol + dline * dline)
+                local ucol, uline
+                if currentd == 0 then
+                    ucol  = 1
+                    uline = 0
+                else
+                    ucol = dcol / currentd
+                    uline = dline / currentd
+                end
+                local diff = (currentd - dist) * 0.5 / (dist * dist)
+                local adiff = math.abs(diff)
+                if adiff > max_diff then
+                    max_diff = adiff
+                end
+                node.dcol = node.dcol + diff * ucol
+                node.dline = node.dline + diff * uline
+            end
+        end
+
+        local coef = 1
+        if max_diff > 1.2 then
+            coef = 1.2 / max_diff
+        end
+
+        for _, node in pairs(nodes) do
+            node.dcol = node.dcol * coef
+            node.dline = node.dline * coef
+            node.col = node.col + node.dcol
+            node.line = node.line + node.dline
+        end
+    end
+
+    g.gcols = {}
+
+    for _, node in pairs(nodes) do
+        local col = math.floor(node.col)
+        local line = math.floor(node.line)
+
+        ---@param col integer
+        ---@param line integer
+        ---@return boolean
+        local function test_location(col, line)
+            local elt = get_element_at_position(g, col, line)
+            if not elt then
+                set_colline(g, node.recipe, col, line)
+                return true
+            end
+            return false
+        end
+
+
+        if test_location(col, line) then goto skip end
+
+        local line_delta = 1
+        local col_delta = 1
+        while true do
+            if test_location(col, line + line_delta) then goto skip end
+            if test_location(col, line - line_delta) then goto skip end
+            if test_location(col + col_delta, line) then goto skip end
+            if test_location(col - col_delta, line) then goto skip end
+        end
+        ::skip::
+    end
+end
+
+---@param g Graph
+function graph.reorganize(g)
+    graph.reorganize_1(g)
 end
 
 ---@param player LuaPlayer

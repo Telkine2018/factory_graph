@@ -233,7 +233,7 @@ function gutils.compute_visibility(g, keep_position)
         for _, grecipe in pairs(g.recipes) do
             grecipe.selector_positions = nil
             grecipe.entity = nil
-            if selection[grecipe.name]  then
+            if selection[grecipe.name] then
                 if grecipe.layer and visible_layers[grecipe.layer] then
                     grecipe.visible = true
                 else
@@ -590,8 +590,11 @@ end
 ---@param col integer
 ---@param line integer
 function gutils.set_colline(g, grecipe, col, line)
-    local gcol = g.gcols[grecipe.col]
-    gcol.line_set[grecipe.line] = nil
+    local gcol
+    gcol = g.gcols[grecipe.col]
+    if gcol then
+        gcol.line_set[grecipe.line] = nil
+    end
 
     gcol = g.gcols[col]
     if not gcol then
@@ -618,10 +621,8 @@ end
 ---@param line integer
 ---@return GElement?
 function gutils.get_element_at_position(g, col, line)
-
     local gcol = g.gcols[col]
     if not gcol then return nil end
-
     return gcol.line_set[line]
 end
 
