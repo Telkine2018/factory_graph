@@ -272,6 +272,13 @@ function graph.remove_unused(g)
                 end
             end
         end
+        if g.preferred_beacon_modules then
+            for i = #g.preferred_beacon_modules, 1, -1 do
+                if game.item_prototypes[g.preferred_beacon_modules[i]] == nil then
+                    table.remove(g.preferred_beacon_modules, i)
+                end
+            end
+        end
     end
     return changed
 end

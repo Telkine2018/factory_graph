@@ -54,9 +54,10 @@ end
 
 ---@param g Graph
 ---@param pmodule_flow LuaGuiElement
-local function set_module_buttons(g, pmodule_flow)
-    if g.preferred_modules then
-        for _, name in pairs(g.preferred_modules) do
+---@param modules string[]
+local function set_module_buttons(g, pmodule_flow, modules)
+    if modules then
+        for _, name in pairs(modules) do
             add_module_button(pmodule_flow, name)
         end
     end
@@ -157,7 +158,7 @@ function settings_panel.create(player_index)
 
     flow.add { type = "label", caption = { np("preferred_modules") } }
     local pmodule_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_modules" }
-    set_module_buttons(g, pmodule_flow)
+    set_module_buttons(g, pmodule_flow, g.preferred_modules)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
     flow.add { type = "choose-elem-button", elem_type = "entity", elem_filters = { { filter = "type", type = "beacon" } },
@@ -167,6 +168,10 @@ function settings_panel.create(player_index)
     flow.add { type = "textfield", numeric = true, text = tostring(g.preferred_beacon_count or 0),
         name = "preferred_beacon_count" }
 
+    flow.add { type = "label", caption = { np("preferred_beacon_modules") } }
+    local pbeacon_module_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_beacon_modules" }
+    set_module_buttons(g, pbeacon_module_flow, g.preferred_beacon_modules)
+    
     local bpanel = frame.add { type = "flow", direction = "horizontal" }
     local b = bpanel.add { type = "button", caption = { np("save") } }
     tools.set_name_handler(b, np("save"))
@@ -293,7 +298,9 @@ local function save(player, frame)
     g.preferred_modules = blist_values(field_table.preferred_modules)
     g.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
-
+    g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
+    
+    
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
     if g.current_layer and g.visibility == commons.visibility_layers then
@@ -371,6 +378,7 @@ tools.on_named_event(np("copy"), defines.events.on_gui_click,
         copy.preferred_modules = blist_values(field_table.preferred_modules)
         copy.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
         copy.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
+        copy.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
         local vars = tools.get_vars(player)
         vars.copy_g = copy
     end
@@ -398,7 +406,10 @@ tools.on_named_event(np("paste"), defines.events.on_gui_click,
         set_machine_buttons(copy, field_table.preferred_machines)
 
         field_table.preferred_modules.clear()
-        set_module_buttons(copy, field_table.preferred_modules)
+        set_module_buttons(copy, field_table.preferred_modules, copy.preferred_modules)
+
+        field_table.preferred_beacon_modules.clear()
+        set_module_buttons(copy, field_table.preferred_beacon_modules, copy.preferred_beacon_modules)
 
         field_table.preferred_beacon.elem_value = copy.preferred_beacon
         field_table.preferred_beacon_count.text =  copy.preferred_beacon_count and tostring(copy.preferred_beacon_count) or ""

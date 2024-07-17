@@ -501,6 +501,7 @@ local saved_graph_fields = {
     "preferred_modules",
     "preferred_beacon",
     "preferred_beacon_count",
+    "preferred_beacon_modules",
     "iovalues",
     "visibility",
     "color_index",
