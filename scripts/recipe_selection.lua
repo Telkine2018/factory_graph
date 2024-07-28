@@ -78,7 +78,6 @@ end
 ---@param recipe_name string?
 ---@param product_name string?
 local function push_history_with_names(player, recipe_name, product_name)
-
     if not recipe_name and not product_name then
         return
     end
@@ -149,7 +148,8 @@ end
 local function clear_history(player)
     local vars = tools.get_vars(player)
     local history = vars.recipe_history
-    if not history then        return
+    if not history then
+        return
     end
     local vars = tools.get_vars(player)
     local history = {}
@@ -486,10 +486,12 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = game.recipe_prototypes[grecipe.name]
-        if recipe then
-            table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
-        else
-            table.insert(sorted_list, { grecipe = grecipe, localised = gutils.get_recipe_name(player, grecipe) })
+        if (not grecipe.hidden) or g.show_hidden then
+            if recipe then
+                table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
+            else
+                table.insert(sorted_list, { grecipe = grecipe, localised = gutils.get_recipe_name(player, grecipe) })
+            end
         end
     end
     if #sorted_list == 0 then return end

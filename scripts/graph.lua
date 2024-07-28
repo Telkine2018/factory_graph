@@ -88,7 +88,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
 
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] then
-            if not recipe.hidden or g.show_hidden then
+            if (not recipe.hidden) or g.show_hidden then
                 local grecipe = g.recipes[name]
                 if not grecipe then
                     grecipe = {
