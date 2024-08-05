@@ -1211,6 +1211,5 @@ local function on_control_click2(e)
     g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
     drawing.draw_layers(g)
 end
-script.on_event(prefix .. "-control-click2", on_control_click2)
 
 return drawing

@@ -527,7 +527,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             local machine = recipe_element.grecipe.machine
             if machine and not machine.count then machine = nil end
 
-            if machine then
+            if machine and machine.machine then
                 local machine_label = translations.get_recipe_name(player_index, machine.machine.name)
                 if machine.count > 0 then
                     table.insert(tooltip_builder, "[font=heading-2][color=#42ff4b]")

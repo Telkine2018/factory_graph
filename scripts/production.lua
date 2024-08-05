@@ -157,9 +157,16 @@ function production.compute_machine(g, grecipe, config)
         machine.productivity = productivity
         machine.consumption = consumption
         machine.pollution = pollution
-        machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
-        machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
-        machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
+
+        if machine.machine then
+            machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
+            machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
+            machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
+        else
+            machine.theorical_craft_s = 0
+            machine.limited_craft_s = 0
+            machine.produced_craft_s = 0
+        end
     end
     ::skip::
     return machine
@@ -272,6 +279,13 @@ function production.compute_matrix(g)
                 local machine = compute_machine(g, grecipe, config)
                 grecipe.machine = machine
                 if machine then
+                    if not machine.machine then
+                        g.production_failed = commons.production_failures.cannot_find_machine
+                        g.production_recipes_failed = {
+                            [recipe_name] = true
+                        }
+                        return
+                    end
                     machines[recipe_name] = machine
                 end
             else

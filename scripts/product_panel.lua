@@ -602,7 +602,7 @@ local function create_product_line(container, machine)
     local b = line1.add {
         type = "choose-elem-button",
         elem_type = "entity",
-        entity = machine.machine.name,
+        entity = machine.machine and machine.machine.name or nil,
         style = green_button,
         tooltip = { np("machine-tooltip") }
     }
@@ -1318,11 +1318,11 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         local machine = grecipe.machine
 
         local parts = { "" }
-        if machine then
+        if machine and machine.machine then
             parts = product_panel.create_parts_tooltip(player, machine.machine)
         end
 
-        if machine then
+        if machine and machine.machine then
             e.element.tooltip = { np("machine-tooltip"), { "", tools.fround(machine.count), " x ", machine.machine.localised_name }, parts }
         else
             e.element.tooltip = { np("machine-tooltip"), "" }

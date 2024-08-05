@@ -14,3 +14,17 @@ ground_tile.walking_sound = nil
 ground_tile.autoplace = nil
 
 data:extend({ ground_tile })
+
+---@param name string
+local function set_minable(name)
+
+    data.raw["container"][name].minable = {
+        mining_time = 0.1,
+        result = name,
+        count = 1
+      }
+end
+
+set_minable(commons.product_symbol_name)
+set_minable(commons.recipe_symbol_name)
+set_minable(commons.unresearched_symbol_name)

@@ -89,7 +89,7 @@ function recipe_panel.create(player_index, grecipe)
     end
 
     local machine = grecipe.machine
-    if machine then
+    if machine and machine.machine then
         if machine.count and machine.count > 0 then
             local label = flow.add { type = "label", caption = { np("machine-normal"), tools.fround(machine.count), machine.machine.localised_name } }
             label.style.bottom_margin = 3

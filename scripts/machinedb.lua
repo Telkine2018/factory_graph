@@ -216,7 +216,6 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local found_machine = machines[found_index]
     local found_machine_module
 
-
     local preferred_beacon_name = g.preferred_beacon
     local preferred_beacon
     local found_beacon_module
