@@ -1212,4 +1212,6 @@ local function on_control_click2(e)
     drawing.draw_layers(g)
 end
 
+script.on_event(prefix .. "-control-click2", on_control_click2)
+
 return drawing

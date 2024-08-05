@@ -152,6 +152,17 @@ function recipe_panel.create(player_index, grecipe)
     local category = recipe.category
     local machines = game.get_filtered_entity_prototypes { { filter = "crafting-category", crafting_category = category } }
 
+    local technologies = game.get_filtered_technology_prototypes { { filter = "unlocks-recipe", recipe = recipe.name } }
+    if technologies and #technologies > 0 then
+        add_line({ np("technology") })
+
+        for _, tech in pairs(technologies) do
+            local name = translations.get_technology_name(player_index, tech.name)
+            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
+            label.style.bottom_margin = 3
+        end
+    end
+
     add_line({ np("craft-in") })
     for _, machine in pairs(machines) do
         local localised = translations.get_entity_name(player.index, machine.name)
@@ -172,18 +183,6 @@ function recipe_panel.create(player_index, grecipe)
             local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] ", localised } }
             label.style.bottom_margin = 3
             ::next_recipe::
-        end
-    end
-
-
-    local technologies = game.get_filtered_technology_prototypes { { filter = "unlocks-recipe", recipe = recipe.name } }
-    if technologies and #technologies > 0 then
-        add_line({ np("technology") })
-
-        for _, tech in pairs(technologies) do
-            local name = translations.get_technology_name(player_index, tech.name)
-            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
-            label.style.bottom_margin = 3
         end
     end
 end

@@ -22,15 +22,6 @@ add({
   consuming = "none"
 })
 
---[[
-add({
-  type = "custom-input",
-  name = modname .. "-alt_l",
-  key_sequence = "ALT + L",
-  consuming = "none"
-})
---]]
-
 add({
   type = "custom-input",
   key_sequence = "CONTROL + mouse-button-1",
@@ -42,6 +33,14 @@ add({
   key_sequence = "SHIFT + mouse-button-1",
   name = prefix .. "-control-click2"
 })
+
+if mods["space-exploration"] then
+  add({
+    type = "custom-input",
+    key_sequence = "mouse-button-2",
+    name = prefix .. "-control-click3"
+  })
+end
 
 ---------------------------------------------
 local function create_symbol(name, filename)

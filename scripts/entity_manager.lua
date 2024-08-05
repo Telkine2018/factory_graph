@@ -294,4 +294,25 @@ tools.on_event(defines.events.on_player_setup_blueprint,
 
 tools.on_event(defines.events.on_gui_closed, on_register_bp)
 
+if script.active_mods["space-exploration"] then
+    script.on_event(commons.prefix .. "-control-click3", 
+    function(e)
+
+        local player = game.players[e.player_index]
+        local surface = player.surface
+
+        if not string.find(surface.name, commons.surface_prefix_filter) then
+            return
+        end
+        local g = gutils.get_graph(player)
+        if not g.selected_recipe then return end
+
+        local entity = g.selected_recipe.entity
+        if entity and entity.valid then
+            do_mine({entity=entity}, true)
+            entity.destroy{raise_destroy=false}
+        end
+    end)
+end
+
 return entity_manager
