@@ -100,7 +100,7 @@ function machinedb.is_machine_enabled(force, machine_name)
         { filter = "has-product-item",
             elem_filters = { { filter = "name", name = item } } } }
     for _, mr in pairs(machine_recipes) do
-        if force.recipes[mr.name].enabled then
+        if not mr.hidden and mr.enabled and force.recipes[mr.name].enabled then
             return true
         end
     end
