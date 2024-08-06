@@ -396,6 +396,7 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
 
     local middle_col = math.floor(colavg / product_count)
     local middle_line = math.floor(lineavg / product_count)
+    local rcount = table_size(connected_recipes)
 
     if colmax - colmin > linemax - linemin then
         if colmax - colmin == 1 then
@@ -410,6 +411,34 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             current_recipe = find_recipe(colmax, linemin)
             draw_product_h(x2, y, x2 > x1)
         else
+            if linemin == linemax and rcount == 2 then
+                for col = colmin + 1, colmax - 1 do
+                    if gutils.get_element_at_position(g, col, linemin) then
+                        goto is_not_empty
+                    end
+                end
+                local key, recipe1 = next(connected_recipes)
+                local _, recipe2 = next(connected_recipes, key)
+
+                local y = grid_size * middle_line + entity_size_middle 
+                local x1 = colmin * grid_size + entity_size 
+                local x2 = colmax * grid_size 
+                    
+                local disp_y = get_routing(g.x_routing, y, x1, x2, product_disp_delta)
+                y = y + disp_y
+                draw_line({ x1, y }, { x2, y })
+
+                if recipe1.col > recipe2.col then
+                    recipe1,recipe2 = recipe2,recipe1
+                end
+                current_recipe = recipe1
+                draw_product_h(x1, y, false)
+                current_recipe = recipe2
+                draw_product_h(x2, y, true)
+                goto enddraw
+            end
+
+            ::is_not_empty::
             local middle_y = grid_size * middle_line + grid_middle + entity_size
             local org_middle_y = middle_y
 
@@ -513,6 +542,7 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             if colmax - colmin > 1 then
                 draw_line({ draw_colmin_x, middle_y }, { draw_colmax_x, middle_y })
             end
+            ::enddraw::
         end
     else
         if linemax - linemin == 1 and colmax == colmin then
@@ -527,6 +557,34 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             current_recipe = find_recipe(colmin, linemax)
             draw_product_v(x, y2, y2 > y1)
         else
+
+            if colmin == colmax and rcount == 2 then
+                for line = linemin + 1, linemax - 1 do
+                    if gutils.get_element_at_position(g, colmin, line) then
+                        goto is_not_empty
+                    end
+                end
+                local key, recipe1 = next(connected_recipes)
+                local _, recipe2 = next(connected_recipes, key)
+
+                local x = grid_size * middle_col + entity_size_middle 
+                local y1 = linemin * grid_size + entity_size 
+                local y2 = linemax * grid_size 
+                    
+                local disp_x = get_routing(g.y_routing, x, y1, y2, product_disp_delta)
+                x = x + disp_x
+                draw_line({ x, y1 }, { x, y2 })
+
+                if recipe1.line > recipe2.line then
+                    recipe1,recipe2 = recipe2,recipe1
+                end
+                current_recipe = recipe1
+                draw_product_v(x, y1, false)
+                current_recipe = recipe2
+                draw_product_v(x, y2, true)
+                goto enddraw
+            end
+::is_not_empty::
             local middle_x = grid_size * middle_col + entity_size + grid_middle
             local org_middle_x = middle_x
             local linemin_y = linemin * grid_size + entity_size + grid_middle
@@ -623,6 +681,7 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             if linemax - linemin > 1 then
                 draw_line({ middle_x, draw_linemin_y }, { middle_x, draw_linemax_y })
             end
+            ::enddraw::
         end
     end
     clear_globals()
@@ -746,7 +805,6 @@ local function redraw_connections(g)
             }
             table.insert(ids, id)
         elseif crecipe.col and crecipe.line then
-
             local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0.4, 0.4, 0.4 },
                 left_top = { p.x - margin, p.y - margin },
@@ -983,8 +1041,8 @@ function drawing.draw_layers(g)
         if grecipe.visible and grecipe.layer then
             local x, y = gutils.get_position(g, grecipe.col, grecipe.line)
             local id = rendering.draw_sprite { sprite = grecipe.layer, surface = g.surface,
-                target = { x + 0.5 + offset, y = y - 0.5 - offset }, 
-                x_scale=scale, y_scale=scale }
+                target = { x + 0.5 + offset, y = y - 0.5 - offset },
+                x_scale = scale, y_scale = scale }
             table.insert(ids, id)
         end
     end
