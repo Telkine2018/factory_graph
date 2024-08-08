@@ -6,6 +6,7 @@ Date: 02. 07. 2024.
     - Add a setting to prefer machines in player inventory
     - Change layer display to keep position when switching with selection display
     - Add beacon modules preferences
+    - Improve link drawing
   Fixes:
     - Fix module selection
     - Fix crash when production failed

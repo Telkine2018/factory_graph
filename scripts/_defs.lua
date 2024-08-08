@@ -119,9 +119,11 @@ local tools = require("scripts.tools")
 
 ---@class GRoutingRange
 ---@field disp_index integer
+---@field disp_max integer
 ---@field limit1 number
 ---@field limit2 number
 ---@field tag integer
+---@field selector number
 
 ---@class GRouting
 ---@field range_index integer

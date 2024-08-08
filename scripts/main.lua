@@ -138,13 +138,29 @@ function on_switch_click(e)
             product_panel.create(e.player_index)
         elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or not e.alt) then
             local vars = tools.get_vars(player)
-            if vars.saved_character then
-                vars.character = vars.saved_character
-                if vars.saved_force_index then
-                    player.force = vars.saved_force_index
+            local character = vars.saved_character
+            if not player.character then
+                if character then
+                    if not character.valid and vars.saved_surface_index and vars.saved_position then
+                        local characters = game.surfaces[vars.saved_surface_index].find_entities_filtered 
+                            { type = "character", position = vars.saved_position, radius = 2 }
+                        if #characters == 0 then goto no_use end
+                        character = characters[1]
+                    end
+                    vars.character = character
+                    if vars.saved_force_index then
+                        player.force = vars.saved_force_index
+                    end
                 end
+
+                if string.find(player.surface.name, commons.surface_prefix_filter) then
+                    main.exit(player)
+                elseif character.surface_index == player.surface_index then
+                    player.associate_character(character)
+                    player.set_controller { type = defines.controllers.character, character = character }
+                end
+                ::no_use::
             end
-            switch_surface(player)
         end
     end
 end
@@ -203,14 +219,18 @@ function main.enter_surface(player, recipe_name)
         surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
     end
 
-    local character = player.character
-    vars.surface = surface
-    vars.extern_surface = player.surface
-    vars.extern_position = player.position
-    vars.extern_force = nil
-    local extern_force = player.force
+    local character        = player.character
+    vars.surface           = surface
+    vars.extern_surface    = player.surface
+    vars.extern_position   = player.position
+    vars.extern_force      = nil
+    vars.extern_cheat_mode = player.cheat_mode
+    local extern_force     = player.force
     if character then
         vars.character = character
+        vars.saved_surface_index = vars.extern_surface.index
+        vars.saved_position = vars.extern_position
+        vars.saved_force_index = player.force_index
         player.disassociate_character(character)
     else
         vars.character = nil
@@ -291,9 +311,15 @@ function main.exit(player)
     local character = vars.character
     if character and character.valid then
         player.teleport(character.position, character.surface, false)
-        player.associate_character(vars.character)
-        player.set_controller { type = defines.controllers.character, character = vars.character }
-        character.cheat_mode = false
+        player.associate_character(character)
+        player.set_controller { type = defines.controllers.character, character = character }
+        if vars.extern_cheat_mode then
+            if vars.extern_cheat_mode ~= character.cheat_mode then
+                character.cheat_mode = vars.extern_cheat_mode
+            end
+        else
+            character.cheat_mode = false
+        end
         vars.character = nil
     elseif vars.extern_position and vars.extern_surface then
         player.teleport(vars.extern_position, vars.extern_surface, false)
@@ -324,12 +350,13 @@ tools.on_event(defines.events.on_player_changed_position,
     function(e)
         local player = game.players[e.player_index]
         local character = player.character
-        if not character or not character.valid then return end
         local vars = tools.get_vars(player)
+        if not character or not character.valid then return end
         vars.saved_character = character
         vars.saved_force_index = player.force_index
+        vars.saved_position = character.position
+        vars.saved_surface_index = character.surface_index
     end)
-
 
 ---@param player LuaPlayer
 local function create_player_button(player)

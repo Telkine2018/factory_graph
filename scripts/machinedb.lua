@@ -100,7 +100,7 @@ function machinedb.is_machine_enabled(force, machine_name)
         { filter = "has-product-item",
             elem_filters = { { filter = "name", name = item } } } }
     for _, mr in pairs(machine_recipes) do
-        if not mr.hidden and mr.enabled and force.recipes[mr.name].enabled then
+        if not mr.hidden and force.recipes[mr.name].enabled then
             return true
         end
     end
@@ -145,6 +145,10 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local preferred_modules        = g.preferred_modules
     local preferred_beacon_modules = g.preferred_beacon_modules
 
+    if not machines or #machines == 0 then
+        return nil
+    end
+
     local inv
     if g.use_machine_in_inventory then
         inv = get_player_inventory(g.player)
@@ -170,7 +174,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local found_index
     local found_order
-    local found_in_inventory = 0
+    local found_in_inventory
     for i = 1, #machines do
         local machine = machines[i]
         local machine_name = machine.name
@@ -190,27 +194,27 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             elseif not found_order then
                 if inv then
                     new_in_inventory = inv.get_item_count(machine_name)
-                end
-                if new_in_inventory > 0 or found_in_inventory == 0 then
+                    if new_in_inventory > 0 then
+                        found_index = i
+                        found_in_inventory = true
+                    elseif not found_in_inventory then
+                        found_index = i
+                    end
+                else
                     found_index = i
-                    found_in_inventory = new_in_inventory
                 end
             end
         end
     end
     if not found_index then
-        if not g.show_only_researched then
-            for i = 1, #machines do
-                if machine_set[machines[i].name] then
-                    found_index = i
-                    break
-                end
+        for i = 1, #machines do
+            if machine_set[machines[i].name] then
+                found_index = i
+                break
             end
-            if not found_index then
-                found_index = 1
-            end
-        else
-            return nil
+        end
+        if not found_index then
+            found_index = #machines
         end
     end
     local found_machine = machines[found_index]
