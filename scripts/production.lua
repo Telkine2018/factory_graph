@@ -61,7 +61,6 @@ production.get_energy = get_energy
 ---@param module LuaItemPrototype
 ---@return {[string]:true}
 function production.add_limitation(g, module)
-
     if not g.module_limitations then
         g.module_limitations = {}
     end
@@ -319,6 +318,9 @@ function production.compute_matrix(g)
 
     local all_recipes = {}
 
+    ---@type {[string]:string[]}
+    local product_to_recipes = {}
+
     for _, machine in pairs(machines) do
         local recipe_name = machine.name
         for _, ingredient in pairs(machine.recipe.ingredients) do
@@ -355,8 +357,17 @@ function production.compute_matrix(g)
             coef = coef + amount
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
+
+            local products = product_to_recipes[pname]
+            if not products then
+                products = {recipe_name}
+                product_to_recipes[pname] = products
+            else
+                table.insert(products, pname)
+            end
         end
     end
+
     local free_recipes
 
     local to_solve = {}
@@ -382,13 +393,61 @@ function production.compute_matrix(g)
     end
     g.bound_products = bound_products
 
+    ---@class SortedEquation
+    ---@field eq {[string]:number}
+    ---@field constant number
+    ---@field product_name string
+    ---@field is_output boolean
+
+    local deferred = {}
+
+    ---@type SortedEquation[]
+    local sorted_list = {}
+    for product_name, eq in pairs(to_solve) do
+        local s = { 
+            eq = eq, 
+            constant = eq_values[product_name], 
+            product_name = product_name,
+            is_output = (not not iovalues[product_name]) or (is_output[product_name] and not is_input[product_name])
+        }
+        table.insert(sorted_list, s)
+    end
+
+    for product_name, recipes in pairs(product_to_recipes) do
+        if is_output[product_name] and not is_input[product_name] then
+            for _, recipe_name in pairs(recipes) do
+                deferred[recipe_name] = true
+            end
+        end
+    end
+
+    table.sort(sorted_list,
+            ---@param s1 SortedEquation
+            ---@param s2 SortedEquation
+            ---@return boolean
+            function(s1, s2) 
+                local result 
+                if s1.is_output then
+                    if s2.is_output then
+                        result = s1.product_name < s2.product_name
+                    else
+                        result = false
+                    end
+                elseif s2.is_output then
+                    result = true
+                else
+                    result = s1.product_name < s2.product_name
+                end
+                return not result
+            end
+        )
     local equation_list = {}
     local constant_list = {}
     local product_name_list = {}
-    for product_name, eq in pairs(to_solve) do
-        table.insert(equation_list, eq)
-        table.insert(constant_list, eq_values[product_name])
-        table.insert(product_name_list, product_name)
+    for _, sorted in pairs(sorted_list) do
+        table.insert(equation_list, sorted.eq)
+        table.insert(constant_list, sorted.constant)
+        table.insert(product_name_list, sorted.product_name)
     end
 
     local function trim(v) return abs(v) > math_precision and v or nil end
@@ -405,12 +464,16 @@ function production.compute_matrix(g)
         local pivot_eq = equation_list[i]
 
         -- find pivot
-        local pivot_var, pivot_value
+        local pivot_var, pivot_value, pivot_deferred
         for var_name, value in pairs(pivot_eq) do
             if value ~= 0 and not name_map[var_name] then
-                if not pivot_value then
+                local var_deferred = deferred[var_name]
+                if not pivot_value or (not var_deferred and pivot_deferred)
+                then
                     pivot_var = var_name
                     pivot_value = value
+                    pivot_deferred = deferred[var_name]
+                elseif var_deferred and not pivot_deferred then
                 elseif abs(value) > abs(pivot_value) then
                     pivot_var = var_name
                     pivot_value = value
@@ -496,27 +559,34 @@ function production.compute_matrix(g)
                 local eq = equation_list[i]
                 local c = constant_list[i]
 
-                local max_var_name, min_value
+                local max_var_name, min_value, min_eqvalue
                 for eqname, eqvalue in pairs(eq) do
                     local free_value = free_values[eqname]
                     if free_value then
                         c = c - free_value * eqvalue
                         if not min_value or min_value > free_value then
-                            min_value = eqvalue
+                            min_value = free_value
                             max_var_name = eqname
+                            min_eqvalue = eqvalue
                         end
                     end
                 end
                 if c < 0 and min_value and min_value > 0 then
-                    local delta = -c / min_value
-                    free_values[max_var_name] = free_values[max_var_name] + delta
-                    change = true
+                    local delta = c / min_eqvalue
+                    local newvalue = free_values[max_var_name] + delta
+                    if newvalue < 0.001 then
+                        newvalue = 0
+                    end
+                    if free_values[max_var_name] ~= newvalue then
+                        free_values[max_var_name] = newvalue
+                        change = true
+                    end
                 end
             end
         end
 
-        for name, value in pairs(free_values) do
-            machine_counts[name] = value
+        for name, _ in pairs(free_recipes) do
+            machine_counts[name] = free_values[name]
         end
     else
         main_var = next(free_recipes)
