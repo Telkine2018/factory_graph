@@ -37,6 +37,7 @@ local tools = require("scripts.tools")
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
 ---@field grid_size integer
+---@field line_gap integer
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
 ---@field always_use_full_selection boolean?

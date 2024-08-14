@@ -265,6 +265,9 @@ function production.compute_matrix(g)
     end
     graph.sort_recipes(connected_recipes)
 
+    for _, grecipe in pairs(g.selection) do
+        grecipe.machine = nil
+    end
 
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
@@ -322,7 +325,7 @@ function production.compute_matrix(g)
     local product_to_recipes = {}
 
     for _, machine in pairs(machines) do
-        local recipe_name = machine.name
+        local recipe_name = machine.recipe.name
         for _, ingredient in pairs(machine.recipe.ingredients) do
             local iname = ingredient.type .. "/" .. ingredient.name
             local eq = equations[iname]
@@ -360,10 +363,10 @@ function production.compute_matrix(g)
 
             local products = product_to_recipes[pname]
             if not products then
-                products = {recipe_name}
+                products = { recipe_name }
                 product_to_recipes[pname] = products
             else
-                table.insert(products, pname)
+                table.insert(products, recipe_name)
             end
         end
     end
@@ -404,9 +407,9 @@ function production.compute_matrix(g)
     ---@type SortedEquation[]
     local sorted_list = {}
     for product_name, eq in pairs(to_solve) do
-        local s = { 
-            eq = eq, 
-            constant = eq_values[product_name], 
+        local s = {
+            eq = eq,
+            constant = eq_values[product_name],
             product_name = product_name,
             is_output = (not not iovalues[product_name]) or (is_output[product_name] and not is_input[product_name])
         }
@@ -422,25 +425,25 @@ function production.compute_matrix(g)
     end
 
     table.sort(sorted_list,
-            ---@param s1 SortedEquation
-            ---@param s2 SortedEquation
-            ---@return boolean
-            function(s1, s2) 
-                local result 
-                if s1.is_output then
-                    if s2.is_output then
-                        result = s1.product_name < s2.product_name
-                    else
-                        result = false
-                    end
-                elseif s2.is_output then
-                    result = true
-                else
+        ---@param s1 SortedEquation
+        ---@param s2 SortedEquation
+        ---@return boolean
+        function(s1, s2)
+            local result
+            if s1.is_output then
+                if s2.is_output then
                     result = s1.product_name < s2.product_name
+                else
+                    result = false
                 end
-                return not result
+            elseif s2.is_output then
+                result = true
+            else
+                result = s1.product_name < s2.product_name
             end
-        )
+            return not result
+        end
+    )
     local equation_list = {}
     local constant_list = {}
     local product_name_list = {}
@@ -555,30 +558,27 @@ function production.compute_matrix(g)
         while change and iter < 4 do
             change = false
             iter = iter + 1
-            for i = 1, #equation_list do
+            for i = #equation_list, 1, -1 do
                 local eq = equation_list[i]
                 local c = constant_list[i]
 
-                local max_var_name, min_value, min_eqvalue
+                local min_free_value, min_eqvalue, min_var_name
                 for eqname, eqvalue in pairs(eq) do
                     local free_value = free_values[eqname]
                     if free_value then
                         c = c - free_value * eqvalue
-                        if not min_value or min_value > free_value then
-                            min_value = free_value
-                            max_var_name = eqname
+                        if not min_free_value or min_free_value < free_value then
+                            min_free_value = free_value
+                            min_var_name = eqname
                             min_eqvalue = eqvalue
                         end
                     end
                 end
-                if c < 0 and min_value and min_value > 0 then
+                if min_free_value then
                     local delta = c / min_eqvalue
-                    local newvalue = free_values[max_var_name] + delta
-                    if newvalue < 0.001 then
-                        newvalue = 0
-                    end
-                    if free_values[max_var_name] ~= newvalue then
-                        free_values[max_var_name] = newvalue
+                    if delta > 0.001 then
+                        local newvalue = min_free_value + delta
+                        free_values[min_var_name] = newvalue
                         change = true
                     end
                 end

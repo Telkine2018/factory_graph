@@ -1258,7 +1258,7 @@ local get_element_at_position = gutils.get_element_at_position
 local set_colline = gutils.set_colline
 
 local org_bound = 0.6
-local log_optim_enabled = true
+local log_optim_enabled = false
 
 ---@param g Graph
 function graph.reorganize_1(g)
@@ -1626,7 +1626,7 @@ end
 
 ---@param g Graph
 function graph.reorganize(g)
-    graph.reorganize_1(g)
+    -- graph.reorganize_1(g)
 end
 
 ---@param player LuaPlayer

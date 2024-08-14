@@ -1,5 +1,6 @@
 local mod_gui = require("mod-gui")
 local dictionary = require("__flib__/dictionary-lite")
+local migration = require("__flib__/migration")
 
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
@@ -142,7 +143,7 @@ function on_switch_click(e)
             if not player.character then
                 if character then
                     if not character.valid and vars.saved_surface_index and vars.saved_position then
-                        local characters = game.surfaces[vars.saved_surface_index].find_entities_filtered 
+                        local characters = game.surfaces[vars.saved_surface_index].find_entities_filtered
                             { type = "character", position = vars.saved_position, radius = 2 }
                         if #characters == 0 then goto no_use end
                         character = characters[1]
@@ -444,13 +445,17 @@ tools.on_configuration_changed(
                 end
                 if data.mod_changes
                     and data.mod_changes.factory_graph
-                    and data.mod_changes.factory_graph.old_version
-                    and data.mod_changes.factory_graph.old_version <= "1.0.3" then
-                    g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
-                    g.surface.clear()
-                else
-                    graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
+                    and data.mod_changes.factory_graph.old_version then
+                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.3") then
+                        g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
+                        g.surface.clear()
+                    end
+                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.7") then
+                        g.line_gap = 0.2
+                        g.always_use_full_selection = false
+                    end
                 end
+                graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
             end
         end
     end)

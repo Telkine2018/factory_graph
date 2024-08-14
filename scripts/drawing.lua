@@ -30,6 +30,19 @@ local entity_size_middle = entity_size / 2
 
 local sprite_arrow1 = prefix .. "-arrow1"
 
+---@type LuaSurface
+local current_surface
+---@type integer[]
+local current_ids
+---@type GProduct
+local current_product
+---@type Color
+local current_color
+---@type GRecipe
+local current_recipe
+---@type Graph
+local current_g
+
 local select_modes = {
     "none",
     "ingredient",
@@ -218,7 +231,7 @@ local function get_routing(routings, range_position, limit1, limit2, disp_delta)
         disp = -disp
     end
     if not disp_delta then
-        disp_delta = default_disp_delta
+        disp_delta = current_g.line_gap or default_disp_delta
     end
     return disp * disp_delta
 end
@@ -307,19 +320,6 @@ local function init_routings()
     routing_index = 1
     routing_table = {}
 end
-
----@type LuaSurface
-local current_surface
----@type integer[]
-local current_ids
----@type GProduct
-local current_product
----@type Color
-local current_color
----@type GRecipe
-local current_recipe
----@type Graph
-local current_g
 
 local function clear_globals()
     current_recipe = null_value

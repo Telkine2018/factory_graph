@@ -81,6 +81,14 @@ function product_panel.create(player_index)
         close_button_tooltip = np("close_button_tooltip"),
         title_menu_func      = function(flow)
             local b
+
+            b = flow.add {
+                type = "button",
+                tooltip = { np("tag_used_tooltip") },
+                caption = { np("tag_used") },
+            }
+            tools.set_name_handler(b, np("tag_used"))
+
             b = flow.add {
                 type = "button",
                 tooltip = { np("unselect_tooltip") },
@@ -249,13 +257,15 @@ function product_panel.create_product_tables(player)
     end
 
     local g = gutils.get_graph(player)
-    local recipes = g.recipes
+    local recipes = g.selection
+    --[[
     if g.use_connected_recipes and not g.require_full_selection then
         recipes = gutils.get_connected_recipes(g, g.iovalues)
         if not next(recipes) then
             recipes = g.recipes
         end
     end
+    --]]
     g.require_full_selection             = nil
     local inputs, outputs, intermediates = gutils.get_product_flow(g, recipes)
 
@@ -1495,6 +1505,26 @@ tools.on_named_event(np("unselect"), defines.events.on_gui_click,
             end
         end
         graph.refresh(g.player)
+        gutils.fire_selection_change(g)
+    end)
+
+tools.on_named_event(np("tag_used"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[product_panel_name]
+        if not frame then return end
+
+        local g = gutils.get_graph(player)
+        local layer = g.current_layer
+        for _, grecipe in pairs(g.recipes) do
+            if grecipe.machine and grecipe.machine.count > 0 then
+                grecipe.layer = layer
+            else
+                grecipe.layer = nil
+            end
+        end
+        graph.refresh(g.player, true)
         gutils.fire_selection_change(g)
     end)
 
