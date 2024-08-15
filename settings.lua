@@ -24,6 +24,13 @@ data:extend(
 			name = prefix .. "-saving-auto",
 			setting_type = "runtime-per-user",
 			default_value = true
+		},
+		{
+			type = "string-setting",
+			setting_type = "runtime-global",
+			name = prefix .. "-auto_layout",
+			allowed_values = { "standard", "htree", "htreei", "vtree", "vtreei"},
+			default_value = "htree"
 		}
 
 })

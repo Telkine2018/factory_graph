@@ -2,9 +2,10 @@
 Version: 1.0.7
 Date: 14. 08. 2024.
   Changes:
-    - Add command to set layer to used products (can have filtered display)
-    - Add graph setting to set line gap
+    - Add command to set layer to used products (involved in production), you can choose layed display to hide other recipes and also recompute layout
+    - Add graph setting to set line gap (gap between two adjacent lines)
     - Improve drawing
+    - Add new graphic layout computations in settings, based on a tree whose roots are the targeted products (non zero value in production panel)
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.6
 Date: 02. 07. 2024.

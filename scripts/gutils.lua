@@ -350,7 +350,7 @@ end
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
----@return integer
+---@return table<string, GProduct>
 function gutils.get_product_flow(g, recipes)
     ---@type table<string, GProduct>
     local inputs
@@ -358,22 +358,22 @@ function gutils.get_product_flow(g, recipes)
     local outputs
     ---@type table<string, GProduct>
     local intermediates
+    ---@type table<string, GProduct>
+    local all
 
     inputs = {}
     outputs = {}
     intermediates = {}
-    local selection = g.selection
-    if not selection then selection = {} end
-    local recipe_count = 0
+    all = {}
     if recipes then
         for _, recipe in pairs(recipes) do
             if recipe.visible and not recipe.is_product then
                 for _, ingredient in pairs(recipe.ingredients) do
                     local name = ingredient.name
                     inputs[name] = ingredient
+                    all[name] = ingredient
                 end
             end
-            recipe_count = recipe_count + 1
         end
         for _, recipe in pairs(recipes) do
             if recipe.visible and not recipe.is_product then
@@ -385,11 +385,12 @@ function gutils.get_product_flow(g, recipes)
                     elseif not intermediates[name] then
                         outputs[name] = product
                     end
+                    all[name] = product
                 end
             end
         end
     end
-    return inputs, outputs, intermediates, recipe_count
+    return inputs, outputs, intermediates, all
 end
 
 local line_margin = 5
@@ -592,9 +593,11 @@ end
 ---@param line integer
 function gutils.set_colline(g, grecipe, col, line)
     local gcol
-    gcol = g.gcols[grecipe.col]
-    if gcol then
-        gcol.line_set[grecipe.line] = nil
+    if grecipe.col then
+        gcol = g.gcols[grecipe.col]
+        if gcol then
+            gcol.line_set[grecipe.line] = nil
+        end
     end
 
     gcol = g.gcols[col]

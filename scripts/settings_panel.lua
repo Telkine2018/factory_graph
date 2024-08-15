@@ -320,9 +320,11 @@ local function save(player, frame)
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
+    --[[
     if g.current_layer and g.visibility == commons.visibility_layers then
         visible_layers[g.current_layer] = true
     end
+    --]]
     for i = 1, #visible_layers_flow.children do
         local b = visible_layers_flow.children[i]
         local signal = b.elem_value --[[@as SignalID]]
@@ -353,8 +355,10 @@ local function save(player, frame)
 
     g.visible_layers = visible_layers
     if layer_change or need_selection_change then
-        -- graph.deferred_update(player, { do_layout = true, center_on_graph = true })
-        gutils.fire_selection_change(g)
+        graph.deferred_update(player, { 
+            do_redraw = true, 
+            center_on_graph = false, 
+            selection_changed = true })
     else
         gutils.fire_production_data_change(g)
     end

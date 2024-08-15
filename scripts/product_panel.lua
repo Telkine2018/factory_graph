@@ -681,6 +681,12 @@ function product_panel.update_error_panel(g, error_panel)
         local machine = g.recipes[name].machine
         if machine then
             table.insert(failed_machines, machine)
+        else
+            table.insert(failed_machines, {
+                name = name,
+                grecipe = g.recipes[name],
+                noshow_constraints = true
+            })
         end
     end
     if #failed_machines == 0 then
@@ -746,24 +752,26 @@ function product_panel.update_error_panel(g, error_panel)
             end
         end
 
-        line1.add { type = "label", caption = { np("error_recipe_constraints") } }
-        for _, product in pairs(current.products) do
-            if not g.iovalues[product.name] then
-                local signal = tools.sprite_to_signal(product.name)
-                local b
-                ---@cast signal -nil
-                if signal.type == "item" then
-                    b = line1.add { type = "choose-elem-button", elem_type = "item", item = signal.name }
-                else
-                    b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
+        if not machine.noshow_constraints then
+            line1.add { type = "label", caption = { np("error_recipe_constraints") } }
+            for _, product in pairs(current.products) do
+                if not g.iovalues[product.name] then
+                    local signal = tools.sprite_to_signal(product.name)
+                    local b
+                    ---@cast signal -nil
+                    if signal.type == "item" then
+                        b = line1.add { type = "choose-elem-button", elem_type = "item", item = signal.name }
+                    else
+                        b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
+                    end
+
+                    local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+                    set_output_value(g, product.name, qtlabel)
+
+                    tools.set_name_handler(b, np("error-unlock-product"), { product_name = product.name })
+                    b.style.size = 30
+                    b.locked = true
                 end
-
-                local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-                set_output_value(g, product.name, qtlabel)
-
-                tools.set_name_handler(b, np("error-unlock-product"), { product_name = product.name })
-                b.style.size = 30
-                b.locked = true
             end
         end
     end

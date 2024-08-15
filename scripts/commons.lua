@@ -45,7 +45,8 @@ local commons = {
         invalid_soluce = "invalid_soluce",
         too_many_free_variables = "too_many_free_variables",
         too_many_constraints = "too_many_constraints",
-        cannot_find_machine = "cannot_find_machine"
+        cannot_find_machine = "cannot_find_machine",
+        use_handcraft_recipe = "use_handcraft_recipe"
     },
     generate_with_lab_tiles = true
 

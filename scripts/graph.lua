@@ -579,8 +579,7 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
 end
 
 ---@param g Graph
----@param old_layout boolean?
-function graph.do_layout(g, old_layout)
+function graph.standard_layout(g)
     -- Processed product
     ---@type {[string]:GProduct}
     local processed_products = {}
@@ -588,11 +587,11 @@ function graph.do_layout(g, old_layout)
     ---@type GCol[]
     local gcols = {}
     g.gcols = gcols
+    g.product_line = 1
+    g.recipe_order = 1
 
     ---@type {[string]:GRecipe}
     local remaining_recipes = {}
-    g.product_line = 1
-    g.recipe_order = 1
 
     if log_enabled then
         log("------- Start layout ----------")
@@ -795,13 +794,9 @@ function graph.do_layout(g, old_layout)
     end
     log("------- End layout ----------")
 
-    --graph.reverse_equalize_recipes(g)
-    --graph.equalize_recipes(g)
-
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
 
-    --    graph.reverse_equalize_recipes(g)
     graph.sort_recipes(g.selection)
 end
 
@@ -979,21 +974,17 @@ end
 
 ---@param player LuaPlayer
 ---@param keep_location boolean?
----@param old_layout boolean?
-function graph.refresh(player, keep_location, old_layout)
+---@param keep_player_location boolean?
+function graph.refresh(player, keep_location, keep_player_location)
     local g = gutils.get_graph(player)
     gutils.compute_visibility(g, keep_location)
     drawing.delete_content(g, keep_location)
     if not keep_location then
-        graph.do_layout(g, old_layout)
-    else
-        if not old_layout then
-            graph.reorganize(g)
-        end
+        graph.do_layout(g)
     end
     graph.create_recipe_objects(g)
     drawing.redraw_selection(player)
-    if not keep_location and player.surface_index == g.surface.index then
+    if not keep_player_location and not keep_location and player.surface_index == g.surface.index then
         gutils.recenter(g)
     end
 end
@@ -1257,376 +1248,243 @@ end
 local get_element_at_position = gutils.get_element_at_position
 local set_colline = gutils.set_colline
 
-local org_bound = 0.6
-local log_optim_enabled = false
+---@class DisplayTreeNode
+---@field recipe_name string
+---@field grecipe GRecipe
+---@field parent DisplayTreeNode
+---@field children table<string, DisplayTreeNode>
+---@field height integer
+---@field top integer
+---@field depth integer
 
 ---@param g Graph
-function graph.reorganize_1(g)
-    ---@type GRecipe[]
-    local recipes = {}
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and recipe.col then
-            table.insert(recipes, recipe)
-        end
-    end
-    local bary_count = #recipes
-    if bary_count > 100 then
+---@param horizontal boolean
+---@param invert boolean
+function graph.tree_layout(g, horizontal, invert)
+    local _, outputs, _, to_process = gutils.get_product_flow(g, g.selection)
+
+    ---@type table<string, boolean>
+    local processed_products = {}
+
+    ---@type DisplayTreeNode[]
+    local node_table = {}
+
+    if table_size(to_process) == 0 then
         return
     end
-    if bary_count <= 1 then
-        return
-    end
 
-    local radius = math.ceil(2 * math.sqrt(bary_count))
-    local bary_col = 0
-    local bary_line = 0
-    for _, recipe in pairs(recipes) do
-        if recipe.visible and recipe.col then
-            bary_line = bary_line + recipe.line
-            bary_col = bary_col + recipe.col
-            recipe.pos_locked = false
-        end
-    end
+    local node_index = 1
+    local processed_recipes = {}
 
-    bary_line = bary_line / bary_count
-    bary_col = bary_col / bary_count
-    table.sort(recipes,
-        function(r1, r2)
-            return math.abs(r1.col - bary_col) + math.abs(r1.line - bary_line) <
-                math.abs(r2.col - bary_col) + math.abs(r2.line - bary_line)
-        end)
-
-
-    local max_iter = 8
-    for i = 1, max_iter do
-        local change_count = 0
-        if log_optim_enabled then
-            log("----- iteration=" .. i .. " ----")
-        end
-        for _, grecipe in pairs(recipes) do
-            grecipe.pos_locked = nil
-        end
-
-        local start = 1
-        local iend = #recipes
-        local istep = 1
-        if i % 2 == 0 then
-            start = iend
-            iend = 1
-            istep = -1
-        end
-        for index = start, iend, istep do
-            local grecipe = recipes[index]
-            local m_coli = 0
-            local m_linei = 0
-            local m_counti = 0
-
-            local m_colp = 0
-            local m_linep = 0
-            local m_countp = 0
-            local recipep
-
-            for _, ingredient in pairs(grecipe.ingredients) do
-                for _, irecipe in pairs(ingredient.product_of) do
-                    if irecipe.visible and irecipe.name ~= grecipe.name then
-                        m_counti = m_counti + 1
-                        m_coli = m_coli + irecipe.col
-                        m_linei = m_linei + irecipe.line
-                    end
-                end
-            end
-
-            for _, product in pairs(grecipe.products) do
-                for _, precipe in pairs(product.ingredient_of) do
-                    if precipe.visible and precipe.name ~= grecipe.name then
-                        m_countp = m_countp + 1
-                        m_colp = m_colp + precipe.col
-                        m_linep = m_linep + precipe.line
-                        recipep = precipe
-                    end
-                end
-            end
-
-            local m_count = m_counti + m_countp
-            if m_count > 0 then
-                local m_col = (m_coli + m_colp) / m_count
-                local m_line = (m_linei + m_linep) / m_count
-
-                local dcol = math.floor(m_col - grecipe.col)
-                local dline = math.floor(m_line - grecipe.line)
-
-                m_col = math.floor(m_col + 0.5)
-                m_line = math.floor(m_line + 0.5)
-
-                if math.abs(dcol) < 1 and math.abs(dline) < 1 then
-                    dcol = m_col - grecipe.col
-                    dline = m_line - grecipe.line
-                end
-
-                ---@param col integer
-                ---@param line integer
-                ---@param mode string
-                ---@return boolean
-                local function check_and_set(col, line, mode)
-                    local found = get_element_at_position(g, col, line)
-                    if not found then
-                        if log_optim_enabled then
-                            log("(" .. mode .. ")," .. grecipe.name .. " [" .. grecipe.col .. "," .. grecipe.line .. "] => [" .. col .. "," .. line .. "]")
-                        end
-                        set_colline(g, grecipe, col, line)
-                        change_count = change_count + 1
-                        return true
-                    elseif found == grecipe then
-                        if log_optim_enabled then
-                            log("(" .. mode .. ")," .. grecipe.name .. " [" .. grecipe.col .. "," .. grecipe.line .. "] => Stay")
-                        end
-                        return true
-                    end
-                    return false
-                end
-
-                local function apply_delta()
-                    if m_countp == 1 then
-                        if check_and_set(m_colp - 1, m_linep, "<:p") then
-                            recipep.pos_locked = true
-                            return true
-                        elseif check_and_set(m_colp, m_linep - 1, "^:p") then
-                            recipep.pos_locked = true
-                            return true
-                        elseif check_and_set(m_colp, m_linep + 1, "v:p") then
-                            recipep.pos_locked = true
-                            return true
-                        elseif check_and_set(m_colp + 1, m_linep, ">:p") then
-                            recipep.pos_locked = true
-                            return true
-                        end
-                    end
-
-                    if check_and_set(m_col, m_line, "Bary") then
-                        return true
-                    end
-
-                    if not grecipe.pos_locked and m_counti == 1 then
-                        if check_and_set(m_coli + 1, m_linei, ">:i") then
-                            return true
-                        elseif check_and_set(m_coli, m_linei + 1, "v:i") then
-                            return true
-                        elseif check_and_set(m_coli, m_linei - 1, "^:i") then
-                            return true
-                        elseif check_and_set(m_coli - 1, m_linei, "<:i") then
-                            return true
-                        end
-                    end
-
-                    if dcol >= org_bound then
-                        dcol = 1
-                    elseif dcol <= -org_bound then
-                        dcol = -1
-                    else
-                        dcol = 0
-                    end
-                    if dline >= org_bound then
-                        dline = 1
-                    elseif dline <= -org_bound then
-                        dline = -1
-                    else
-                        dline = 0
-                    end
-                    local col = grecipe.col + dcol
-                    local line = grecipe.line + dline
-
-
-                    if check_and_set(col, line, "Delta") then
-                        return true
-                    elseif dcol ~= 0 then
-                        if check_and_set(col, grecipe.line, "line") then
-                            return true
-                        elseif dline ~= 0 and check_and_set(grecipe.col, line, "line") then
-                            return true
-                        end
-                    end
-                    return false
-                end
-
-                apply_delta()
-                --[[
-                if not apply_delta() then
-                    dcol = bary_col - grecipe.col
-                    dline = bary_line - grecipe.line
-                    apply_delta()
-                end
-                --]]
-            end
-        end
-
-        if change_count == 0 then
-            return
-        end
-    end
-end
-
----@class RecipeNode
----@field name string
----@field recipe GRecipe
----@field col number
----@field line number
----@field dcol number
----@field dline number
----@field distances table<string, number>
-
----@param g Graph
-function graph.reorganize_2(g)
-    ---@type table<string, RecipeNode>
-    local nodes = {}
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and recipe.col then
-            nodes[recipe.name] = {
-                name = recipe.name,
-                recipe = recipe,
-                col = recipe.col,
-                line = recipe.line,
-                distances = {}
-            }
-        end
-    end
-
-    for _, node in pairs(nodes) do
-        for _, ingredient in pairs(node.recipe.ingredients) do
-            for _, precipe in pairs(ingredient.product_of) do
-                if precipe.name ~= node.name then
-                    local source_node = nodes[precipe.name]
-                    if source_node then
-                        node.distances[precipe.name] = 1
-                    end
-                end
-            end
-        end
-        for _, product in pairs(node.recipe.products) do
-            for _, irecipe in pairs(product.ingredient_of) do
-                if irecipe.name ~= node.name then
-                    local target_node = nodes[irecipe.name]
-                    if target_node then
-                        node.distances[irecipe.name] = 1
-                    end
-                end
-            end
-        end
-    end
-
-    --- compute all distance
-    while (true) do
-        local has_changes
-        for name, node in pairs(nodes) do
-            for dname, dist in pairs(node.distances) do
-                local dest_node = nodes[dname]
-
-                local changes
-                for dname2, dist2 in pairs(dest_node.distances) do
-                    if dname2 ~= name then
-                        local d = dist + dist2
-                        local current = node.distances[dname2]
-                        if not current or current > d then
-                            if not changes then
-                                changes = { [dname2] = d }
-                            elseif not changes[dname2] or changes[dname2] > d then
-                                changes[dname2] = d
+    local function build_tree()
+        while node_index <= #node_table do
+            local current = node_table[node_index]
+            node_index = node_index + 1
+            for _, ingredient in pairs(current.grecipe.ingredients) do
+                if not processed_products[ingredient.name] then
+                    processed_products[ingredient.name] = true
+                    to_process[ingredient.name] = nil
+                    for pname, precipe in pairs(ingredient.product_of) do
+                        if precipe.visible and not processed_recipes[pname] then
+                            ---@type DisplayTreeNode
+                            local newnode = {
+                                recipe_name = pname,
+                                grecipe = precipe,
+                                parent = current,
+                                depth = current.depth + 1
+                            }
+                            table.insert(node_table, newnode)
+                            processed_recipes[pname] = true
+                            if current.children then
+                                current.children[pname] = newnode
+                            else
+                                current.children = { [pname] = newnode }
                             end
                         end
                     end
-                    if changes then
-                        for dname, dist in pairs(changes) do
-                            node.distances[dname] = dist
-                            has_changes = true
-                        end
-                    end
                 end
             end
-        end
-        if not has_changes then
-            break
         end
     end
 
-    for loop_index = 1, 4 do
-        for _, node in pairs(nodes) do
-            node.dcol = 0
-            node.dline = 0
+    ---@param product GProduct
+    local function add_root(product)
+        if processed_products[product.name] then
+            return
         end
-
-        local max_diff = 0
-        for _, node in pairs(nodes) do
-            for dname, dist in pairs(node.distances) do
-                local target = nodes[dname]
-                local dcol = target.col - node.col
-                local dline = target.line - node.line
-                local currentd = math.sqrt(dcol * dcol + dline * dline)
-                local ucol, uline
-                if currentd == 0 then
-                    ucol  = 1
-                    uline = 0
-                else
-                    ucol = dcol / currentd
-                    uline = dline / currentd
-                end
-                local diff = (currentd - dist) * 0.5 / (dist * dist)
-                local adiff = math.abs(diff)
-                if adiff > max_diff then
-                    max_diff = adiff
-                end
-                node.dcol = node.dcol + diff * ucol
-                node.dline = node.dline + diff * uline
+        processed_products[product.name] = true
+        to_process[product.name] = nil
+        for pname, precipe in pairs(product.product_of) do
+            if precipe.visible and not processed_recipes[pname] then
+                ---@type DisplayTreeNode
+                local newnode = {
+                    recipe_name = pname,
+                    grecipe = precipe,
+                    depth = 1
+                }
+                processed_recipes[pname] = true
+                table.insert(node_table, newnode)
             end
         end
+    end
 
-        local coef = 1
-        if max_diff > 1.2 then
-            coef = 1.2 / max_diff
+    local sorted_table = {}
+    for _, product in pairs(to_process) do
+        if type(g.iovalues[product.name]) == "number" or outputs[product.name] then
+            table.insert(sorted_table, product)
         end
+    end
 
-        for _, node in pairs(nodes) do
-            node.dcol = node.dcol * coef
-            node.dline = node.dline * coef
-            node.col = node.col + node.dcol
-            node.line = node.line + node.dline
+    table.sort(sorted_table, 
+    ---@param p1 GProduct
+    ---@param p2 GProduct
+    function(p1, p2)
+        local s1 = tools.sprite_to_signal(p1.name)
+        local s2 = tools.sprite_to_signal(p2.name)
+        local order1, order2
+        ---@cast s1 -nil
+        ---@cast s2 -nil
+        if s1.type == "item" then
+            local proto = game.item_prototypes[s1.name]
+            order1 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+        elseif s1.type == "fluid" then
+            local proto = game.fluid_prototypes[s1.name]
+            order1 = proto.subgroup.order .. " " .. proto.order
+        end
+        if s2.type == "item" then
+            local proto = game.item_prototypes[s2.name]
+            order2 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+        elseif s2.type == "fluid" then
+            local proto = game.fluid_prototypes[s2.name]
+            order2 = proto.subgroup.order .. " " .. proto.order
+        end
+        return order1 < order2
+    end)
+
+    for _, product in pairs(sorted_table) do
+        if type(g.iovalues[product.name]) == "number" then
+            add_root(product)
+            build_tree()
+        end
+    end
+
+    for _, product in pairs(sorted_table) do
+        add_root(product)
+        build_tree()
+    end
+
+    --- Process other product
+    while table_size(to_process) > 0 do
+        ---@type GProduct
+        local found
+        local found_partial
+        for pname, product in pairs(to_process) do
+            local is_complete = true
+            local is_partial = false
+            for recipe_name, recipe in pairs(product.ingredient_of) do
+                for _, ingredient in pairs(recipe.ingredients) do
+                    if not processed_products[ingredient] then
+                        is_complete = false
+                    else
+                        is_partial = true
+                    end
+                end
+            end
+            if is_complete then
+                found = product
+                break
+            elseif not found_partial and is_partial then
+                found = product
+                found_partial = is_partial
+            elseif not found then
+                found = product
+                found_partial = is_partial
+            end
+        end
+        if not found then
+            break
+        end
+        add_root(found)
+        build_tree()
+    end
+
+    for i = #node_table, 1, -1 do
+        local node = node_table[i]
+
+        node.height = 1
+        if node.children then
+            local height = 0
+            for _, child in pairs(node.children) do
+                height = height + child.height
+            end
+            node.height = height
+        end
+    end
+
+    local tree_top = 0
+    local tree_height = 0
+    local tree_depth = 0
+    for i = 1, #node_table do
+        local node = node_table[i]
+        if node.depth > tree_depth then
+            tree_depth = node.depth
+        end
+        if not node.parent then
+            node.top = tree_top
+            tree_top = tree_top + node.height
+            tree_height = tree_height + node.height
+        end
+        if node.children then
+            local top = node.top
+            for _, child in pairs(node.children) do
+                child.top = top
+                top = top + child.height
+            end
         end
     end
 
     g.gcols = {}
+    g.product_line = 1
+    g.recipe_order = 1
 
-    for _, node in pairs(nodes) do
-        local col = math.floor(node.col)
-        local line = math.floor(node.line)
-
-        ---@param col integer
-        ---@param line integer
-        ---@return boolean
-        local function test_location(col, line)
-            local elt = get_element_at_position(g, col, line)
-            if not elt then
-                set_colline(g, node.recipe, col, line)
-                return true
+    if horizontal then
+        for _, node in pairs(node_table) do
+            local line = node.top + math.floor(node.height / 2)
+            local col = node.depth
+            if invert then
+                col = tree_depth - col
             end
-            return false
+
+            set_colline(g, node.grecipe, col, line)
         end
+    else
+        for _, node in pairs(node_table) do
+            local col = node.top + math.floor(node.height / 2)
+            local line = node.depth
+            if invert then
+                line = tree_depth - line
+            end
 
-
-        if test_location(col, line) then goto skip end
-
-        local line_delta = 1
-        local col_delta = 1
-        while true do
-            if test_location(col, line + line_delta) then goto skip end
-            if test_location(col, line - line_delta) then goto skip end
-            if test_location(col + col_delta, line) then goto skip end
-            if test_location(col - col_delta, line) then goto skip end
+            set_colline(g, node.grecipe, col, line)
         end
-        ::skip::
     end
+
+    graph.sort_recipes(g.selection)
 end
 
----@param g Graph
-function graph.reorganize(g)
-    -- graph.reorganize_1(g)
+function graph.do_layout(g)
+    local mode = settings.global["factory_graph-auto_layout"].value
+    if mode == "standard" then
+        graph.standard_layout(g)
+    elseif mode == "htree" then
+        graph.tree_layout(g, true, false)
+    elseif mode == "htreei" then
+        graph.tree_layout(g, true, true)
+    elseif mode == "vtree" then
+        graph.tree_layout(g, false, false)
+    elseif mode == "vtreei" then
+        graph.tree_layout(g, false, true)
+    end
 end
 
 ---@param player LuaPlayer

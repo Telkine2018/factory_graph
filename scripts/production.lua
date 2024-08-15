@@ -291,6 +291,9 @@ function production.compute_matrix(g)
                     machines[recipe_name] = machine
                 end
             else
+                failed = commons.production_failures.use_handcraft_recipe
+                g.production_failed = failed
+                g.production_recipes_failed = {[recipe_name]=true}
                 return
             end
         end

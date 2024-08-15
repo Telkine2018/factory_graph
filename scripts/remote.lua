@@ -39,7 +39,7 @@ local function get_ingredients(player_index)
     local product_outputs = g.product_outputs or {}
     local product_inputs = g.product_inputs or {}
 
-    local inputs, _,_ = gutils.get_product_flow(g, g.selection)
+    local inputs = gutils.get_product_flow(g, g.selection)
     if not inputs then return nil end
 
     local result = {}
