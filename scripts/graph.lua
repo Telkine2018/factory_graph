@@ -210,13 +210,34 @@ end
 ---@param except_names table<string, any>
 function graph.delete_product_recipes(g, except_names)
     for product_name, product in pairs(g.products) do
+        local recipe = g.recipes[product_name]
         if not except_names[product_name] then
-            local recipe = g.recipes[product_name]
             if recipe then
                 product.product_of[product_name] = nil
                 g.recipes[product_name] = nil
                 g.selection[product_name] = nil
             end
+        else
+            recipe.visible = true
+            g.selection[recipe.name] = recipe
+        end
+    end
+end
+
+---@param g Graph
+---@param except_names table<string, any>
+function graph.invisible_product_recipes(g, except_names)
+    for product_name, product in pairs(g.products) do
+        local recipe = g.recipes[product_name]
+        if not except_names[product_name] then
+            if recipe then
+                recipe.visible = nil
+                g.selection[recipe.name] = nil
+            end
+        else
+            recipe.visible = true
+            g.selection[recipe.name] = recipe
+            product.product_of[recipe.name] = recipe
         end
     end
 end
@@ -225,9 +246,14 @@ end
 ---@param product_name string
 function graph.get_product_recipe(g, product_name)
     local recipe = g.recipes[product_name]
-    if recipe then return recipe end
-
     local product = g.products[product_name]
+    if recipe then 
+        recipe.visible = true
+        g.selection[recipe.name] = recipe
+        product.product_of[recipe.name] = recipe
+        return recipe 
+    end
+
     recipe = {
         name = product_name,
         ingredients = {},
@@ -1300,7 +1326,7 @@ local set_colline = gutils.set_colline
 ---@param g Graph
 ---@param settings {horizontal:boolean?, invert:boolean?, show_products:boolean?}
 function graph.tree_layout(g, settings)
-    local inputs, outputs, intemediates, to_process, recipes = gutils.get_product_flow(g, g.recipes)
+    local inputs, outputs, intermediates, to_process, recipes = gutils.get_product_flow(g, g.recipes)
 
     if g.show_products then
         ---@param product_name string
@@ -1311,7 +1337,7 @@ function graph.tree_layout(g, settings)
             g.selection[grecipe.name] = grecipe
         end
 
-        graph.delete_product_recipes(g, inputs)
+        graph.invisible_product_recipes(g, {})
         for product_name, _ in pairs(inputs) do
             add_product(product_name)
         end
@@ -1324,14 +1350,14 @@ function graph.tree_layout(g, settings)
                         goto skip
                     end
                 end
-                if inputs[ioname] or outputs[ioname] or intemediates[ioname] then
+                if inputs[ioname] or outputs[ioname] or intermediates[ioname] then
                     add_product(ioname)
                 end
                 ::skip::
             end
         end
     else
-        graph.delete_product_recipes(g, {})
+        graph.invisible_product_recipes(g, {})
     end
 
     local horizontal = settings.horizontal

@@ -53,7 +53,11 @@ local function do_mine(e, to_cursor)
         grecipe.entity = nil
     end
 
-    graph.deferred_update(player, { selection_changed = true })
+    if g.layout_on_selection then
+        graph.deferred_update(player, { selection_changed = true, do_layout = true })
+    else
+        graph.deferred_update(player, { selection_changed = true })
+    end
 
     if e.buffer then
         e.buffer.clear()
@@ -148,7 +152,11 @@ local function on_build(entity, e, revive)
         drawing.clear_selection(g)
         graph.create_recipe_object(g, grecipe)
     end
-    graph.deferred_update(player, { selection_changed = true })
+    if g.layout_on_selection then
+        graph.deferred_update(player, { selection_changed = true, do_layout = true })
+    else
+        graph.deferred_update(player, { selection_changed = true })
+    end
 end
 
 ---@param ev EventData.on_robot_built_entity
@@ -295,24 +303,23 @@ tools.on_event(defines.events.on_player_setup_blueprint,
 tools.on_event(defines.events.on_gui_closed, on_register_bp)
 
 if script.active_mods["space-exploration"] then
-    script.on_event(commons.prefix .. "-control-click3", 
-    function(e)
+    script.on_event(commons.prefix .. "-control-click3",
+        function(e)
+            local player = game.players[e.player_index]
+            local surface = player.surface
 
-        local player = game.players[e.player_index]
-        local surface = player.surface
+            if not string.find(surface.name, commons.surface_prefix_filter) then
+                return
+            end
+            local g = gutils.get_graph(player)
+            if not g.selected_recipe then return end
 
-        if not string.find(surface.name, commons.surface_prefix_filter) then
-            return
-        end
-        local g = gutils.get_graph(player)
-        if not g.selected_recipe then return end
-
-        local entity = g.selected_recipe.entity
-        if entity and entity.valid then
-            do_mine({entity=entity}, true)
-            entity.destroy{raise_destroy=false}
-        end
-    end)
+            local entity = g.selected_recipe.entity
+            if entity and entity.valid then
+                do_mine({ entity = entity }, true)
+                entity.destroy { raise_destroy = false }
+            end
+        end)
 end
 
 return entity_manager

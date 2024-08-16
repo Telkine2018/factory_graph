@@ -2,7 +2,7 @@
 Version: 1.0.9
 Date: 17. 08. 2024.
   Changes:
-    - Add products on graph - Ctrl-Click on a product to open recipe list
+    - Add a checkbox to show input products on the graph - Ctrl-Click on a product to open the recipe list
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.8
 Date: 16. 08. 2024.
