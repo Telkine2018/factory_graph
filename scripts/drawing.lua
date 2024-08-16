@@ -464,6 +464,9 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
     ---@param recipes {[string]:GRecipe}
     local function analyze_recipes(recipes)
         for _, recipe in pairs(recipes) do
+            if not recipe.col then
+                recipe.visible = nil
+            end
             if recipe.visible then
                 if not colmax then
                     colmax = recipe.col
@@ -858,7 +861,7 @@ local function draw_select_ingredients(g, ids, base_recipe)
 
         local set = { [base_recipe.name] = true }
         for _, recipe in pairs(ingredient.product_of) do
-            if recipe.visible then
+            if recipe.visible and recipe.col then
                 if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
                     goto cont
                 elseif not set[recipe.name] then
@@ -885,7 +888,7 @@ local function draw_select_products(g, ids, base_recipe)
 
         if not g.selection[product.name] and not product.ingredient_of[base_recipe.name] then
             for _, recipe in pairs(product.ingredient_of) do
-                if recipe.visible then
+                if recipe.visible and recipe.col then
                     if is_in_selection and g.selection[recipe.name] and recipe ~= base_recipe then
                         goto cont
                     else
@@ -1090,14 +1093,16 @@ local function highlight_recipes(g, recipes, color)
     local ids = g.highlighted_recipes_ids
     ---@cast ids -nil
     for _, grecipe in pairs(recipes) do
-        local margin = 0.6
-        local p = { x = grid_size * grecipe.col + 0.5, y = grid_size * grecipe.line + 0.5 }
-        id = rendering.draw_rectangle { surface = g.surface, color = color,
-            left_top = { p.x - margin, p.y - margin },
-            right_bottom = { p.x + margin, p.y + margin },
-            width = 3
-        }
-        table.insert(ids, id)
+        if grecipe.visible and grecipe.col then
+            local margin = 0.6
+            local p = { x = grid_size * grecipe.col + 0.5, y = grid_size * grecipe.line + 0.5 }
+            id = rendering.draw_rectangle { surface = g.surface, color = color,
+                left_top = { p.x - margin, p.y - margin },
+                right_bottom = { p.x + margin, p.y + margin },
+                width = 3
+            }
+            table.insert(ids, id)
+        end
     end
 end
 

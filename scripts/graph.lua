@@ -243,8 +243,12 @@ function graph.remove_unused(g)
         if not product.used then
             to_remove_products[product.name] = product
             g.iovalues[product.name] = nil
-            g.product_outputs[product.name] = nil
-            g.product_inputs[product.name] = nil
+            if g.product_outputs then
+                g.product_outputs[product.name] = nil
+            end
+            if g.product_inputs then
+                g.product_inputs[product.name] = nil
+            end
         else
             product.used = nil
         end
@@ -1261,7 +1265,7 @@ local set_colline = gutils.set_colline
 ---@param horizontal boolean
 ---@param invert boolean
 function graph.tree_layout(g, horizontal, invert)
-    local _, outputs, _, to_process = gutils.get_product_flow(g, g.selection)
+    local _, outputs, _, to_process, recipes = gutils.get_product_flow(g, g.recipes)
 
     ---@type table<string, boolean>
     local processed_products = {}
@@ -1335,31 +1339,31 @@ function graph.tree_layout(g, horizontal, invert)
         end
     end
 
-    table.sort(sorted_table, 
-    ---@param p1 GProduct
-    ---@param p2 GProduct
-    function(p1, p2)
-        local s1 = tools.sprite_to_signal(p1.name)
-        local s2 = tools.sprite_to_signal(p2.name)
-        local order1, order2
-        ---@cast s1 -nil
-        ---@cast s2 -nil
-        if s1.type == "item" then
-            local proto = game.item_prototypes[s1.name]
-            order1 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
-        elseif s1.type == "fluid" then
-            local proto = game.fluid_prototypes[s1.name]
-            order1 = proto.subgroup.order .. " " .. proto.order
-        end
-        if s2.type == "item" then
-            local proto = game.item_prototypes[s2.name]
-            order2 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
-        elseif s2.type == "fluid" then
-            local proto = game.fluid_prototypes[s2.name]
-            order2 = proto.subgroup.order .. " " .. proto.order
-        end
-        return order1 < order2
-    end)
+    table.sort(sorted_table,
+        ---@param p1 GProduct
+        ---@param p2 GProduct
+        function(p1, p2)
+            local s1 = tools.sprite_to_signal(p1.name)
+            local s2 = tools.sprite_to_signal(p2.name)
+            local order1, order2
+            ---@cast s1 -nil
+            ---@cast s2 -nil
+            if s1.type == "item" then
+                local proto = game.item_prototypes[s1.name]
+                order1 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+            elseif s1.type == "fluid" then
+                local proto = game.fluid_prototypes[s1.name]
+                order1 = proto.subgroup.order .. " " .. proto.order
+            end
+            if s2.type == "item" then
+                local proto = game.item_prototypes[s2.name]
+                order2 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+            elseif s2.type == "fluid" then
+                local proto = game.fluid_prototypes[s2.name]
+                order2 = proto.subgroup.order .. " " .. proto.order
+            end
+            return order1 < order2
+        end)
 
     for _, product in pairs(sorted_table) do
         if type(g.iovalues[product.name]) == "number" then
@@ -1378,10 +1382,10 @@ function graph.tree_layout(g, horizontal, invert)
         ---@type GProduct
         local found
         local found_partial
-        for pname, product in pairs(to_process) do
+        for _, product in pairs(to_process) do
             local is_complete = true
             local is_partial = false
-            for recipe_name, recipe in pairs(product.ingredient_of) do
+            for _, recipe in pairs(product.ingredient_of) do
                 for _, ingredient in pairs(recipe.ingredients) do
                     if not processed_products[ingredient] then
                         is_complete = false
@@ -1469,12 +1473,12 @@ function graph.tree_layout(g, horizontal, invert)
         end
     end
 
-    graph.sort_recipes(g.selection)
+    graph.sort_recipes(recipes)
 end
 
 function graph.do_layout(g)
     local mode = settings.global["factory_graph-auto_layout"].value
-    if mode == "standard" then
+    if mode == "standard" or g.visibility == commons.visibility_all then
         graph.standard_layout(g)
     elseif mode == "htree" then
         graph.tree_layout(g, true, false)

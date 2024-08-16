@@ -337,7 +337,7 @@ function gutils.get_connected_productions(grecipe, result)
 
     for _, product in pairs(grecipe.products) do
         for _, precipe in pairs(product.ingredient_of) do
-            if precipe.visible then
+            if precipe.visible and precipe.col then
                 result[precipe.name] = precipe
             end
         end
@@ -351,6 +351,7 @@ end
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
+---@return table<string, GRecipe>
 function gutils.get_product_flow(g, recipes)
     ---@type table<string, GProduct>
     local inputs
@@ -365,9 +366,11 @@ function gutils.get_product_flow(g, recipes)
     outputs = {}
     intermediates = {}
     all = {}
+    local used_recipes = {}
     if recipes then
         for _, recipe in pairs(recipes) do
             if recipe.visible and not recipe.is_product then
+                used_recipes[recipe.name] = recipe
                 for _, ingredient in pairs(recipe.ingredients) do
                     local name = ingredient.name
                     inputs[name] = ingredient
@@ -377,6 +380,7 @@ function gutils.get_product_flow(g, recipes)
         end
         for _, recipe in pairs(recipes) do
             if recipe.visible and not recipe.is_product then
+                used_recipes[recipe.name] = recipe
                 for _, product in pairs(recipe.products) do
                     local name = product.name
                     if inputs[name] then
@@ -390,7 +394,7 @@ function gutils.get_product_flow(g, recipes)
             end
         end
     end
-    return inputs, outputs, intermediates, all
+    return inputs, outputs, intermediates, all, used_recipes
 end
 
 local line_margin = 5
