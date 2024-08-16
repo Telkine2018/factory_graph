@@ -35,6 +35,7 @@ local commons = {
     production_compute_event = "production_compute",
     production_data_change_event = "production_data_change",
     graph_selection_change_event = "graph_selection_change",
+    open_recipe_selection = "open_recipe_selection",
 
     math_precision = 0.000001,
     production_failures = {

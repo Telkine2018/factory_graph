@@ -96,6 +96,15 @@ function command.open(player)
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "label", caption = { np("show_products") } }
+    hflow.add { type = "checkbox",
+        name = np("show_products"),
+        tooltip = { np("show_products_tooltip") },
+        state = not not g.show_products
+    }
+    hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("add") }, name = np("add"), tooltip = { np("add_tooltip") } }
     hflow.add { type = "button", caption = { np("production") }, name = np("production"), tooltip = { np("production_tooltip") } }
     hflow.style.bottom_margin = 5
@@ -166,6 +175,11 @@ function command.update_display(player)
     if not g then return end
 
     vis.selected_index = g.visibility
+    
+    local show_products = tools.get_child(frame, np("show_products"))
+    if show_products then
+        show_products.state = not not g.show_products
+    end
 end
 
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
@@ -222,6 +236,19 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
     function(e)
         saving.create(e.player_index)
     end)
+
+tools.on_named_event(np("show_products"), defines.events.on_gui_checked_state_changed,
+    ---@param e EventData.on_gui_checked_state_changed
+    function(e)
+        local element = e.element
+        if not(element and element.valid) then return end
+
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        g.show_products = element.state
+        graph.refresh(player, false, true)
+    end
+)
 
 graph.update_command_display = command.update_display
 

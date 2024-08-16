@@ -533,7 +533,6 @@ function msettings.report(player)
     label.style.width = 100
     label.style.horizontal_align = "right"
 ]]
-
 end
 
 ---@param e EventData.on_lua_shortcut
@@ -545,9 +544,15 @@ local function on_control_click(e)
         return
     end
     local g = gutils.get_graph(player)
-    if not g.selected_recipe then return end
+    local grecipe = g.selected_recipe
+    if not grecipe then return end
 
-    msettings.create(player.index, g.selected_recipe)
+    if not grecipe.is_product then
+        msettings.create(player.index, grecipe)
+    else
+        local product = g.products[grecipe.name]
+        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, only_product = true })
+    end
 end
 script.on_event(prefix .. "-control-click", on_control_click)
 

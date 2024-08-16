@@ -298,7 +298,20 @@ end
 function gutils.filter_enabled_recipe(recipes)
     local new_recipes = {}
     for key, recipe in pairs(recipes) do
-        if recipe.enabled then
+        if recipe.enabled and not recipe.is_product then
+            new_recipes[key] = recipe
+        end
+    end
+    return new_recipes
+end
+
+---@generic KEY
+---@param recipes table<KEY, GRecipe>
+---@return table<KEY, GRecipe>
+function gutils.filter_non_product_recipe(recipes)
+    local new_recipes = {}
+    for key, recipe in pairs(recipes) do
+        if not recipe.is_product then
             new_recipes[key] = recipe
         end
     end
@@ -511,13 +524,14 @@ local saved_graph_fields = {
     "visibility",
     "color_index",
     "current_layer",
-    "visible_layers"
+    "visible_layers",
+    "show_products"
+    
 }
 
 local saved_reciped_fields = {
     "name",
-    "production_config",
-    "line",
+    "production_config", "line",
     "col",
     "layer"
 }

@@ -47,6 +47,7 @@ local tools = require("scripts.tools")
 ---@field autosave_on_graph_switching boolean?
 ---@field current_layer string?
 ---@field visible_layers {[string]:boolean}
+---@field show_products boolean?
 
 ---@class GraphProduction
 ---@field use_connected_recipes boolean             @ true if connected reciped use

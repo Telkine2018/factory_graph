@@ -48,7 +48,8 @@ function graph.new(surface)
         layout_on_selection = true,
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
-        world_zoom_level = 2
+        world_zoom_level = 2,
+        line_gap = 0.2
     }
 end
 
@@ -203,6 +204,41 @@ function graph.update_recipes(g, recipes, excluded_categories)
 
     changed = graph.remove_unused(g) or changed
     return changed
+end
+
+---@param g Graph
+---@param except_names table<string, any>
+function graph.delete_product_recipes(g, except_names)
+    for product_name, product in pairs(g.products) do
+        if not except_names[product_name] then
+            local recipe = g.recipes[product_name]
+            if recipe then
+                product.product_of[product_name] = nil
+                g.recipes[product_name] = nil
+                g.selection[product_name] = nil
+            end
+        end
+    end
+end
+
+---@param g Graph
+---@param product_name string
+function graph.get_product_recipe(g, product_name)
+    local recipe = g.recipes[product_name]
+    if recipe then return recipe end
+
+    local product = g.products[product_name]
+    recipe = {
+        name = product_name,
+        ingredients = {},
+        products = { product },
+        is_product = true,
+        visible = true,
+        used = true
+    }
+    g.recipes[product_name] = recipe
+    product.product_of[product_name] = recipe
+    return recipe
 end
 
 ---@param g Graph
@@ -1262,10 +1298,44 @@ local set_colline = gutils.set_colline
 ---@field depth integer
 
 ---@param g Graph
----@param horizontal boolean
----@param invert boolean
-function graph.tree_layout(g, horizontal, invert)
-    local _, outputs, _, to_process, recipes = gutils.get_product_flow(g, g.recipes)
+---@param settings {horizontal:boolean?, invert:boolean?, show_products:boolean?}
+function graph.tree_layout(g, settings)
+    local inputs, outputs, intemediates, to_process, recipes = gutils.get_product_flow(g, g.recipes)
+
+    if g.show_products then
+        ---@param product_name string
+        local function add_product(product_name)
+            local grecipe = graph.get_product_recipe(g, product_name)
+            recipes[grecipe.name] = grecipe
+            grecipe.visible = true
+            g.selection[grecipe.name] = grecipe
+        end
+
+        graph.delete_product_recipes(g, inputs)
+        for product_name, _ in pairs(inputs) do
+            add_product(product_name)
+        end
+        for ioname, value in pairs(g.iovalues) do
+            if value == true or (type(value) == "number" and value < 0) then
+                if value == true and g.product_outputs and g.product_inputs then
+                    local output = g.product_outputs[ioname]
+                    local input = g.product_inputs[ioname]
+                    if output and input and output > input then
+                        goto skip
+                    end
+                end
+                if inputs[ioname] or outputs[ioname] or intemediates[ioname] then
+                    add_product(ioname)
+                end
+                ::skip::
+            end
+        end
+    else
+        graph.delete_product_recipes(g, {})
+    end
+
+    local horizontal = settings.horizontal
+    local invert = settings.invert
 
     ---@type table<string, boolean>
     local processed_products = {}
@@ -1481,13 +1551,13 @@ function graph.do_layout(g)
     if mode == "standard" or g.visibility == commons.visibility_all then
         graph.standard_layout(g)
     elseif mode == "htree" then
-        graph.tree_layout(g, true, false)
+        graph.tree_layout(g, { horizontal = true, invert = false })
     elseif mode == "htreei" then
-        graph.tree_layout(g, true, true)
+        graph.tree_layout(g, { horizontal = true, invert = true })
     elseif mode == "vtree" then
-        graph.tree_layout(g, false, false)
+        graph.tree_layout(g, { horizontal = false, invert = false })
     elseif mode == "vtreei" then
-        graph.tree_layout(g, false, true)
+        graph.tree_layout(g, { horizontal = false, invert = true })
     end
 end
 

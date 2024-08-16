@@ -1156,7 +1156,6 @@ local function draw_connected_by_product(g, recipe, product)
     end
 end
 
-
 ---@param player LuaPlayer
 ---@param entity LuaEntity
 ---@param grecipe GRecipe

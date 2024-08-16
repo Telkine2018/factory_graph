@@ -61,7 +61,7 @@ function saving.create(player_index)
         close_button_tooltip = np("close_button_tooltip"),
         create_inner_frame   = true
     }
-    local height = player.mod_settings["factory_graph-saving-height"].value --[[@as int]]
+    local height                           = player.mod_settings["factory_graph-saving-height"].value --[[@as int]]
 
     local frame, inner_frame               = tools.create_standard_panel(player, params)
     frame.style.minimal_width              = 400

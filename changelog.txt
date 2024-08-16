@@ -1,6 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.9
+Date: 17. 08. 2024.
+  Changes:
+    - Add products on graph - Ctrl-Click on a product to open recipe list
+---------------------------------------------------------------------------------------------------
 Version: 1.0.8
-Date: 18. 08. 2024.
+Date: 16. 08. 2024.
   Bugfixes:
     - Fix crash on migration
     - Fix display on select all recipes

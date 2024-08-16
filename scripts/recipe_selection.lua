@@ -51,6 +51,8 @@ function load_initial_recipes(g, product, recipe, only_product)
         recipes[recipe.name] = nil
         if g.show_only_researched then
             recipes = gutils.filter_enabled_recipe(recipes)
+        else
+            recipes = gutils.filter_non_product_recipe(recipes)
         end
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
@@ -65,6 +67,8 @@ function load_initial_recipes(g, product, recipe, only_product)
         end
         if g.show_only_researched then
             recipes = gutils.filter_enabled_recipe(recipes)
+        else
+            recipes = gutils.filter_non_product_recipe(recipes)
         end
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
@@ -343,6 +347,8 @@ local function do_search_text(player)
     end
     if g.show_only_researched then
         recipes = gutils.filter_enabled_recipe(recipes)
+    else
+        recipes = gutils.filter_non_product_recipe(recipes)
     end
 
     recipe_selection.show_recipes(player, recipes)
@@ -405,13 +411,15 @@ local function set_recipes_to_selection(player)
         if name and cb then
             if cb.state then
                 local grecipe = g.recipes[name]
-                g.selection[name] = grecipe
-                recipes[name] = grecipe
-                if not grecipe.visible then
-                    not_visible[name] = grecipe
-                end
-                if g.visibility == commons.visibility_layers then
-                    grecipe.layer = g.current_layer
+                if grecipe then
+                    g.selection[name] = grecipe
+                    recipes[name] = grecipe
+                    if not grecipe.visible then
+                        not_visible[name] = grecipe
+                    end
+                    if g.visibility == commons.visibility_layers then
+                        grecipe.layer = g.current_layer
+                    end
                 end
             else
                 g.selection[name] = nil
@@ -820,6 +828,8 @@ function recipe_selection.process_query(player, name)
     end
     if g.show_only_researched then
         recipes = gutils.filter_enabled_recipe(recipes)
+    else
+        recipes = gutils.filter_non_product_recipe(recipes)
     end
     recipe_selection.show_recipes(player, recipes)
 end
@@ -973,6 +983,12 @@ tools.register_user_event(commons.selection_change_event, function(data)
 
     recipe_selection.display_remaining(g, remaining_pane)
 end)
+
+tools.register_user_event(commons.open_recipe_selection, function(data)
+    local g = data.g
+    recipe_selection.open(g, data.product, data.recipe, data.only_product)
+end)
+
 
 drawing.open_recipe_selection = recipe_selection.open
 graph.update_recipe_selection = recipe_selection.update_recipes
