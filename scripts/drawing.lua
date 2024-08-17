@@ -43,6 +43,8 @@ local current_recipe
 ---@type Graph
 local current_g
 
+local topo_left_top, topo_right_top, topo_left_bottom, topo_right_bottom, topo_direct
+
 local select_modes = {
     "none",
     "ingredient",
@@ -153,6 +155,8 @@ local routing_line   = 0
 ---@type integer
 local routing_mode   = routing_normal
 
+local adjust_coef    = 0.01
+
 ---@param routings RoutingSet
 ---@param range_position number
 ---@param limit1 number
@@ -211,11 +215,23 @@ local function get_routing(routings, range_position, limit1, limit2, disp_delta)
             limit1, limit2 = limit2, limit1
         end
         local selector
+
+        local offset
         if routings == routing_graph.x_routing then
             selector = routing_line
+            offset = adjust_coef * routing_col
+            if topo_direct then
+                offset = -offset
+            end
         else
+            -- local disp_x = get_routing(g.y_routing, x, middle_y, y)
             selector = routing_col
+            offset = adjust_coef * routing_line
+            if topo_direct then
+                offset = -offset
+            end
         end
+        selector = selector + offset
         local range = { limit1 = limit1, limit2 = limit2, tag = routing_tag, selector = selector }
         table.insert(routing.ranges, range)
         table.insert(routing_table, range)
@@ -330,7 +346,6 @@ local function clear_globals()
     current_g = null_value
 end
 
-
 ---@param x number
 ---@param y number
 ---@param positive boolean
@@ -441,7 +456,7 @@ end
 ---@param g Graph
 ---@param ids integer[]
 ---@param product GProduct
----@param connected_recipes GProduct
+---@param connected_recipes {[string]:GRecipe}
 ---@param color Color
 ---@param dash boolean?
 local function draw_recipe_connections(g, ids, product, connected_recipes, color, dash)
@@ -538,6 +553,28 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
     if linemin == linemax and colmax - colmin > 1 then
         routing_line = routing_line + 0.1
     end
+
+    topo_left_top, topo_right_top, topo_left_bottom, topo_right_bottom = 0, 0, 0, 0
+    for _, recipe in pairs(connected_recipes) do
+        if recipe.col < routing_col then
+            if recipe.line < routing_line then
+                topo_left_top = topo_left_top + 1
+            else
+                topo_left_bottom = topo_left_bottom + 1
+            end
+        else
+            if recipe.line < routing_line then
+                topo_right_top = topo_right_top + 1
+            else
+                topo_right_bottom = topo_right_bottom + 1
+            end
+        end
+    end
+    topo_direct = topo_left_top >= topo_right_top 
+        and topo_left_top >= topo_left_bottom
+        and topo_right_bottom >= topo_right_top 
+        and topo_right_bottom >= topo_left_bottom
+
     routing_line = routing_line - 0.001 * routing_col
     routing_col = routing_col - 0.001 * routing_line
 
