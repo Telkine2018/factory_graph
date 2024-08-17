@@ -36,13 +36,45 @@ end
 ---@param machine ProductionMachine
 ---@param ingredient Ingredient
 ---@return number
-local function get_ingredient_amout(machine, ingredient)
+local function get_ingredient_amount(machine, ingredient)
     local amount = ingredient.amount * machine.limited_craft_s
     return amount
 end
 
+---@param machine ProductionMachine
+---@return number
+local function get_energy(machine)
+    if not machine or not machine.machine then return 0 end
+    local percent = machine.consumption
+    if percent < -0.8 then
+        percent = -0.8
+    end
+    local energy = machine.machine.max_energy_usage * machine.count * (1 + percent) * 60
+    return energy
+end
+
 production.get_product_amount = get_product_amount
-production.get_ingredient_amout = get_ingredient_amout
+production.get_ingredient_amount = get_ingredient_amount
+production.get_energy = get_energy
+
+---@param g Graph
+---@param module LuaItemPrototype
+---@return {[string]:true}
+function production.add_limitation(g, module)
+    if not g.module_limitations then
+        g.module_limitations = {}
+    end
+    local module_name = module.name
+    local limitation_map = g.module_limitations[module_name]
+    if not limitation_map then
+        limitation_map = {}
+        g.module_limitations[module_name] = limitation_map
+        for _, name in pairs(module.limitations) do
+            limitation_map[name] = true
+        end
+    end
+    return limitation_map
+end
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -102,17 +134,7 @@ function production.compute_machine(g, grecipe, config)
                 local effects = module.module_effects
 
                 if module.limitations and #module.limitations > 0 then
-                    if not g.module_limitations then
-                        g.module_limitations = {}
-                    end
-                    local limitation_map = g.module_limitations[module_name]
-                    if not limitation_map then
-                        limitation_map = {}
-                        g.module_limitations[module_name] = limitation_map
-                        for _, name in pairs(module.limitations) do
-                            limitation_map[name] = true
-                        end
-                    end
+                    local limitation_map = production.add_limitation(g, module)
                     if not limitation_map[recipe_name] then
                         goto skip
                     end
@@ -134,9 +156,16 @@ function production.compute_machine(g, grecipe, config)
         machine.productivity = productivity
         machine.consumption = consumption
         machine.pollution = pollution
-        machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
-        machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
-        machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
+
+        if machine.machine then
+            machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
+            machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
+            machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
+        else
+            machine.theorical_craft_s = 0
+            machine.limited_craft_s = 0
+            machine.produced_craft_s = 0
+        end
     end
     ::skip::
     return machine
@@ -154,6 +183,7 @@ function production.compute_products(g, machines)
 
     g.product_inputs = product_inputs
     g.product_outputs = product_outputs
+    g.total_energy = 0
 
     --- compute products
     for _, machine in pairs(machines) do
@@ -168,7 +198,7 @@ function production.compute_products(g, machines)
                         coef = 0
                     end
 
-                    local amount = get_ingredient_amout(machine, ingredient)
+                    local amount = get_ingredient_amount(machine, ingredient)
                     if abs(amount) >= math_precision then
                         local total = amount * machine_count
                         product_inputs[iname] = coef + total
@@ -188,6 +218,10 @@ function production.compute_products(g, machines)
                         local total = amount * machine_count
                         product_outputs[pname] = coef + total
                     end
+                end
+
+                if machine.grecipe.visible then
+                    g.total_energy = g.total_energy + get_energy(machine)
                 end
             end
         end
@@ -209,16 +243,31 @@ function production.compute_matrix(g)
         grecipe.machine = nil
     end
 
+    local has_neg_value
+    if g.iovalues then
+        for _, v in pairs(g.iovalues) do
+            if type(v) == "number" and v < 0 then
+                has_neg_value = true
+            end
+        end
+    else
+        return
+    end
+
     ---@type {[string]:GRecipe}
     local connected_recipes
-    if g.unrestricted_production then
+    g.use_connected_recipes = false
+    if g.always_use_full_selection or has_neg_value then
         connected_recipes = g.selection --[[@as {[string]:GRecipe}]]
     else
         connected_recipes = gutils.get_connected_recipes(g, g.iovalues)
+        g.use_connected_recipes = true
     end
-
     graph.sort_recipes(connected_recipes)
 
+    for _, grecipe in pairs(g.selection) do
+        grecipe.machine = nil
+    end
 
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
@@ -232,9 +281,19 @@ function production.compute_matrix(g)
                 local machine = compute_machine(g, grecipe, config)
                 grecipe.machine = machine
                 if machine then
+                    if not machine.machine then
+                        g.production_failed = commons.production_failures.cannot_find_machine
+                        g.production_recipes_failed = {
+                            [recipe_name] = true
+                        }
+                        return
+                    end
                     machines[recipe_name] = machine
                 end
             else
+                failed = commons.production_failures.use_handcraft_recipe
+                g.production_failed = failed
+                g.production_recipes_failed = {[recipe_name]=true}
                 return
             end
         end
@@ -265,8 +324,11 @@ function production.compute_matrix(g)
 
     local all_recipes = {}
 
+    ---@type {[string]:string[]}
+    local product_to_recipes = {}
+
     for _, machine in pairs(machines) do
-        local recipe_name = machine.name
+        local recipe_name = machine.recipe.name
         for _, ingredient in pairs(machine.recipe.ingredients) do
             local iname = ingredient.type .. "/" .. ingredient.name
             local eq = equations[iname]
@@ -301,8 +363,17 @@ function production.compute_matrix(g)
             coef = coef + amount
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
+
+            local products = product_to_recipes[pname]
+            if not products then
+                products = { recipe_name }
+                product_to_recipes[pname] = products
+            else
+                table.insert(products, recipe_name)
+            end
         end
     end
+
     local free_recipes
 
     local to_solve = {}
@@ -328,13 +399,61 @@ function production.compute_matrix(g)
     end
     g.bound_products = bound_products
 
+    ---@class SortedEquation
+    ---@field eq {[string]:number}
+    ---@field constant number
+    ---@field product_name string
+    ---@field is_output boolean
+
+    local deferred = {}
+
+    ---@type SortedEquation[]
+    local sorted_list = {}
+    for product_name, eq in pairs(to_solve) do
+        local s = {
+            eq = eq,
+            constant = eq_values[product_name],
+            product_name = product_name,
+            is_output = (not not iovalues[product_name]) or (is_output[product_name] and not is_input[product_name])
+        }
+        table.insert(sorted_list, s)
+    end
+
+    for product_name, recipes in pairs(product_to_recipes) do
+        if is_output[product_name] and not is_input[product_name] then
+            for _, recipe_name in pairs(recipes) do
+                deferred[recipe_name] = true
+            end
+        end
+    end
+
+    table.sort(sorted_list,
+        ---@param s1 SortedEquation
+        ---@param s2 SortedEquation
+        ---@return boolean
+        function(s1, s2)
+            local result
+            if s1.is_output then
+                if s2.is_output then
+                    result = s1.product_name < s2.product_name
+                else
+                    result = false
+                end
+            elseif s2.is_output then
+                result = true
+            else
+                result = s1.product_name < s2.product_name
+            end
+            return not result
+        end
+    )
     local equation_list = {}
     local constant_list = {}
     local product_name_list = {}
-    for product_name, eq in pairs(to_solve) do
-        table.insert(equation_list, eq)
-        table.insert(constant_list, eq_values[product_name])
-        table.insert(product_name_list, product_name)
+    for _, sorted in pairs(sorted_list) do
+        table.insert(equation_list, sorted.eq)
+        table.insert(constant_list, sorted.constant)
+        table.insert(product_name_list, sorted.product_name)
     end
 
     local function trim(v) return abs(v) > math_precision and v or nil end
@@ -351,12 +470,16 @@ function production.compute_matrix(g)
         local pivot_eq = equation_list[i]
 
         -- find pivot
-        local pivot_var, pivot_value
+        local pivot_var, pivot_value, pivot_deferred
         for var_name, value in pairs(pivot_eq) do
             if value ~= 0 and not name_map[var_name] then
-                if not pivot_value then
+                local var_deferred = deferred[var_name]
+                if not pivot_value or (not var_deferred and pivot_deferred)
+                then
                     pivot_var = var_name
                     pivot_value = value
+                    pivot_deferred = deferred[var_name]
+                elseif var_deferred and not pivot_deferred then
                 elseif abs(value) > abs(pivot_value) then
                     pivot_var = var_name
                     pivot_value = value
@@ -438,31 +561,35 @@ function production.compute_matrix(g)
         while change and iter < 4 do
             change = false
             iter = iter + 1
-            for i = 1, #equation_list do
+            for i = #equation_list, 1, -1 do
                 local eq = equation_list[i]
                 local c = constant_list[i]
 
-                local max_var_name, min_value
+                local min_free_value, min_eqvalue, min_var_name
                 for eqname, eqvalue in pairs(eq) do
                     local free_value = free_values[eqname]
                     if free_value then
                         c = c - free_value * eqvalue
-                        if not min_value or min_value > free_value then
-                            min_value = eqvalue
-                            max_var_name = eqname
+                        if not min_free_value or min_free_value < free_value then
+                            min_free_value = free_value
+                            min_var_name = eqname
+                            min_eqvalue = eqvalue
                         end
                     end
                 end
-                if c < 0 and min_value and min_value > 0 then
-                    local delta = -c / min_value
-                    free_values[max_var_name] = free_values[max_var_name] + delta
-                    change = true
+                if min_free_value then
+                    local delta = c / min_eqvalue
+                    if delta > 0.001 then
+                        local newvalue = min_free_value + delta
+                        free_values[min_var_name] = newvalue
+                        change = true
+                    end
                 end
             end
         end
 
-        for name, value in pairs(free_values) do
-            machine_counts[name] = value
+        for name, _ in pairs(free_recipes) do
+            machine_counts[name] = free_values[name]
         end
     else
         main_var = next(free_recipes)
@@ -509,7 +636,7 @@ function production.compute_matrix(g)
             elseif maxv then
                 main_value = maxv
             end
-            if not main_value then
+            if not main_value or main_value < 0 then
                 failed = commons.production_failures.too_many_constraints
                 failed_recipes[main_var] = true
             else
@@ -610,7 +737,7 @@ function production.compute_linear(g, machines)
                 requested[gproduct.name] = (requested[gproduct.name] or 0) - amount
             end
             for index, ingredient in pairs(grecipe.ingredients) do
-                local amount = max_count * production.get_ingredient_amout(machine, machine.recipe.ingredients[index])
+                local amount = max_count * production.get_ingredient_amount(machine, machine.recipe.ingredients[index])
                 requested[ingredient.name] = (requested[ingredient.name] or 0) + amount
             end
         end

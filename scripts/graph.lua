@@ -15,7 +15,7 @@ local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
-local log_enabled = true
+local log_enabled = false
 
 local floor = math.floor
 local ceil = math.ceil
@@ -43,7 +43,13 @@ function graph.new(surface)
         iovalues = {},
         show_hidden = false,
         show_only_researched = false,
-        visibility = commons.visibility_all
+        always_use_full_selection = true,
+        visibility = commons.visibility_all,
+        layout_on_selection = true,
+        autosave_on_graph_switching = true,
+        graph_zoom_level = 0.5,
+        world_zoom_level = 2,
+        line_gap = 0.2
     }
 end
 
@@ -68,10 +74,12 @@ end
 ---@param g Graph
 ---@param recipes table<string, LuaRecipe>
 ---@param excluded_categories {[string]:boolean}?
+---@return boolean
 function graph.update_recipes(g, recipes, excluded_categories)
     if not excluded_categories then
         excluded_categories = {}
     end
+    local changed
     g.excluded_categories = excluded_categories
 
     for _, gproduct in pairs(g.products) do
@@ -81,7 +89,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
 
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] then
-            if not recipe.hidden or g.show_hidden then
+            if (not recipe.hidden) or g.show_hidden then
                 local grecipe = g.recipes[name]
                 if not grecipe then
                     grecipe = {
@@ -92,6 +100,28 @@ function graph.update_recipes(g, recipes, excluded_categories)
                         order = 1
                     }
                     g.recipes[name] = grecipe
+                    changed = true
+                else
+                    grecipe.machine = nil
+                    local pconfig = grecipe.production_config
+                    if pconfig then
+                        ---@type boolean?
+                        local failed = pconfig.machine_name and not game.entity_prototypes[pconfig.machine_name]
+                        failed = failed or (pconfig.beacon_name and not game.entity_prototypes[pconfig.beacon_name])
+                        if pconfig.machine_modules then
+                            for _, module in pairs(pconfig.machine_modules) do
+                                failed = failed or (module and not game.item_prototypes[module])
+                            end
+                        end
+                        if pconfig.beacon_modules then
+                            for _, module in pairs(pconfig.beacon_modules) do
+                                failed = failed or (module and not game.item_prototypes[module])
+                            end
+                        end
+                        if failed then
+                            grecipe.production_config = nil
+                        end
+                    end
                 end
                 grecipe.used = true
                 if recipe.enabled then
@@ -150,7 +180,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
     end
 
     for _, product in pairs(g.products) do
-        if product.is_root then
+        if product.used and product.is_root then
             local name = product.name
             local grecipe = product.root_recipe
             if not grecipe then
@@ -172,7 +202,69 @@ function graph.update_recipes(g, recipes, excluded_categories)
         end
     end
 
-    graph.remove_unused(g)
+    changed = graph.remove_unused(g) or changed
+    return changed
+end
+
+---@param g Graph
+---@param except_names table<string, any>
+function graph.delete_product_recipes(g, except_names)
+    for product_name, product in pairs(g.products) do
+        local recipe = g.recipes[product_name]
+        if not except_names[product_name] then
+            if recipe then
+                product.product_of[product_name] = nil
+                g.recipes[product_name] = nil
+                g.selection[product_name] = nil
+            end
+        else
+            recipe.visible = true
+            g.selection[recipe.name] = recipe
+        end
+    end
+end
+
+---@param g Graph
+---@param except_names table<string, any>
+function graph.invisible_product_recipes(g, except_names)
+    for product_name, product in pairs(g.products) do
+        local recipe = g.recipes[product_name]
+        if not except_names[product_name] then
+            if recipe then
+                recipe.visible = nil
+                g.selection[recipe.name] = nil
+            end
+        else
+            recipe.visible = true
+            g.selection[recipe.name] = recipe
+            product.product_of[recipe.name] = recipe
+        end
+    end
+end
+
+---@param g Graph
+---@param product_name string
+function graph.get_product_recipe(g, product_name)
+    local recipe = g.recipes[product_name]
+    local product = g.products[product_name]
+    if recipe then 
+        recipe.visible = true
+        g.selection[recipe.name] = recipe
+        product.product_of[recipe.name] = recipe
+        return recipe 
+    end
+
+    recipe = {
+        name = product_name,
+        ingredients = {},
+        products = { product },
+        is_product = true,
+        visible = true,
+        used = true
+    }
+    g.recipes[product_name] = recipe
+    product.product_of[product_name] = recipe
+    return recipe
 end
 
 ---@param g Graph
@@ -190,32 +282,40 @@ function graph.remove_unused(g)
         g.selected_recipe = nil
     end
 
-    local to_remove = {}
-    for _, recipe in pairs(g.recipes) do
-        if not recipe.used then
-            to_remove[recipe.name] = true
+    ---@type table<string, GRecipe>
+    local to_remove_recipes = {}
+    for _, grecipe in pairs(g.recipes) do
+        if not grecipe.used then
+            to_remove_recipes[grecipe.name] = grecipe
         else
-            recipe.used = nil
+            grecipe.used = nil
         end
     end
-    for name in pairs(to_remove) do
+    for name, grecipe in pairs(to_remove_recipes) do
+        if grecipe.entity and grecipe.entity.valid then
+            grecipe.entity.destroy()
+        end
         g.recipes[name] = nil
         g.selection[name] = nil
         changed = true
     end
 
-    to_remove = {}
+    local to_remove_products = {}
     for _, product in pairs(g.products) do
         if not product.used then
-            to_remove[product.name] = true
+            to_remove_products[product.name] = product
             g.iovalues[product.name] = nil
-            g.product_outputs[product.name] = nil
-            g.product_inputs[product.name] = nil
+            if g.product_outputs then
+                g.product_outputs[product.name] = nil
+            end
+            if g.product_inputs then
+                g.product_inputs[product.name] = nil
+            end
         else
             product.used = nil
         end
     end
-    for name in pairs(to_remove) do
+    for name in pairs(to_remove_products) do
         g.products[name] = nil
         changed = true
     end
@@ -235,6 +335,13 @@ function graph.remove_unused(g)
             for i = #g.preferred_modules, 1, -1 do
                 if game.item_prototypes[g.preferred_modules[i]] == nil then
                     table.remove(g.preferred_modules, i)
+                end
+            end
+        end
+        if g.preferred_beacon_modules then
+            for i = #g.preferred_beacon_modules, 1, -1 do
+                if game.item_prototypes[g.preferred_beacon_modules[i]] == nil then
+                    table.remove(g.preferred_beacon_modules, i)
                 end
             end
         end
@@ -314,10 +421,11 @@ function graph.layout_recipe(g, grecipe)
     local max_col
     local gcols = g.gcols
 
+    local gname = grecipe.name
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
-                if irecipe.visible then
+                if irecipe.visible and irecipe.name ~= gname then
                     local col = irecipe.col
                     if col then
                         if not max_col or col > max_col then
@@ -348,7 +456,7 @@ function graph.layout_recipe(g, grecipe)
     if count == 0 then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
-                if irecipe.visible and irecipe.line then
+                if irecipe.visible and irecipe.line and irecipe.name ~= gname then
                     line = line + irecipe.line
                     count = count + 1
                 end
@@ -358,7 +466,7 @@ function graph.layout_recipe(g, grecipe)
     if count == 0 then
         for _, product in pairs(grecipe.products) do
             for _, precipe in pairs(product.ingredient_of) do
-                if precipe.visible and precipe.line then
+                if precipe.visible and precipe.line and precipe.name ~= gname then
                     line = line + precipe.line
                     count = count + 1
                 end
@@ -442,13 +550,13 @@ function graph.insert_recipe(g, grecipe)
     local center_line, center_col, count = 0, 0, 0
 
     for _, ingredient in pairs(grecipe.ingredients) do
-        local col1, line1, count1 = gutils.compute_sum(ingredient.product_of)
+        local col1, line1, count1 = gutils.compute_sum(ingredient.product_of, grecipe.name)
         center_col = center_col + col1
         center_line = center_line + line1
         count = count + count1
     end
     for _, product in pairs(grecipe.products) do
-        local col1, line1, count1 = gutils.compute_sum(product.ingredient_of)
+        local col1, line1, count1 = gutils.compute_sum(product.ingredient_of, grecipe.name)
         center_col = center_col + col1
         center_line = center_line + line1
         count = count + count1
@@ -465,7 +573,6 @@ end
 ---@param g Graph
 ---@param grecipe GRecipe
 function graph.remove_recipe_visibility(g, grecipe)
-
     if grecipe.line then
         local gcols = g.gcols[grecipe.col]
         if gcols then
@@ -538,7 +645,7 @@ function graph.insert_recipe_at_position(g, grecipe, start_col, start_line)
 end
 
 ---@param g Graph
-function graph.do_layout(g)
+function graph.standard_layout(g)
     -- Processed product
     ---@type {[string]:GProduct}
     local processed_products = {}
@@ -546,11 +653,11 @@ function graph.do_layout(g)
     ---@type GCol[]
     local gcols = {}
     g.gcols = gcols
+    g.product_line = 1
+    g.recipe_order = 1
 
     ---@type {[string]:GRecipe}
     local remaining_recipes = {}
-    g.product_line = 1
-    g.recipe_order = 1
 
     if log_enabled then
         log("------- Start layout ----------")
@@ -570,7 +677,7 @@ function graph.do_layout(g)
         end
     end
 
-    local inputs, outputs, intermediates, recipe_count = gutils.get_product_flow(g, true)
+    local inputs = gutils.get_product_flow(g, g.recipes)
     local gcol = {
         col = 1,
         line_set = {}
@@ -752,9 +859,9 @@ function graph.do_layout(g)
         end
     end
     log("------- End layout ----------")
+
     graph.reverse_equalize_recipes(g)
     graph.equalize_recipes(g)
-    --    graph.reverse_equalize_recipes(g)
 
     graph.sort_recipes(g.selection)
 end
@@ -928,11 +1035,13 @@ function graph.create_recipe_objects(g)
     for _, grecipe in pairs(g.recipes) do
         create_recipe_object(g, grecipe)
     end
+    drawing.draw_layers(g)
 end
 
 ---@param player LuaPlayer
 ---@param keep_location boolean?
-function graph.refresh(player, keep_location)
+---@param keep_player_location boolean?
+function graph.refresh(player, keep_location, keep_player_location)
     local g = gutils.get_graph(player)
     gutils.compute_visibility(g, keep_location)
     drawing.delete_content(g, keep_location)
@@ -941,20 +1050,99 @@ function graph.refresh(player, keep_location)
     end
     graph.create_recipe_objects(g)
     drawing.redraw_selection(player)
-    if not keep_location and player.surface_index == g.surface.index then
+    if not keep_player_location and not keep_location and player.surface_index == g.surface.index then
         gutils.recenter(g)
     end
 end
 
 ---@param player LuaPlayer
+---@param data RedrawRequest?
+function graph.deferred_update(player, data)
+    local redraw_queue = global.redraw_queue
+    if not redraw_queue then
+        redraw_queue = {}
+        global.redraw_queue = redraw_queue
+    end
+    if not data then
+        data = {
+            selection_changed = true
+        }
+    end
+    local previous_data = redraw_queue[player.index]
+    if previous_data then
+        for key, value in pairs(data) do
+            previous_data[key] = data[key]
+        end
+    else
+        redraw_queue[player.index] = data
+    end
+end
+
+tools.on_event(defines.events.on_tick,
+    function(e)
+        ---@type {[integer]:RedrawRequest}
+        local redraw_queue = global.redraw_queue
+        if not redraw_queue then
+            return
+        end
+        global.redraw_queue = nil
+        for player_index, data in pairs(redraw_queue) do
+            local g = gutils.get_graph(game.players[player_index])
+            if data.do_layout then
+                drawing.clear_selection(g)
+                gutils.compute_visibility(g)
+                drawing.delete_content(g)
+                graph.do_layout(g)
+                graph.create_recipe_objects(g)
+            elseif data.do_redraw then
+                drawing.clear_selection(g)
+                local position_missing = gutils.compute_visibility(g, true)
+                if not position_missing then
+                    drawing.delete_content(g, true)
+                    graph.create_recipe_objects(g)
+                else
+                    drawing.delete_content(g)
+                    graph.do_layout(g)
+                    graph.create_recipe_objects(g)
+                end
+            end
+            drawing.redraw_selection(game.players[player_index])
+            if data.selection_changed then
+                gutils.fire_selection_change(g)
+                if not data.no_recipe_selection_update then
+                    graph.update_recipe_selection(g.player)
+                end
+            end
+            if data.center_on_recipe then
+                if g.player.surface_index == g.surface.index then
+                    gutils.move_to_recipe(g.player, data.center_on_recipe)
+                end
+            elseif data.center_on_graph then
+                if g.player.surface_index == g.surface.index then
+                    gutils.recenter(g)
+                end
+            end
+            if data.draw_target and data.center_on_recipe then
+                local grecipe = g.recipes[data.center_on_recipe]
+                if grecipe then
+                    drawing.draw_target(g, grecipe)
+                end
+            end
+            drawing.draw_layers(g)
+            if data.update_command then
+                graph.update_command_display(g.player)
+            end
+            if data.update_product_list then
+                tools.fire_user_event(commons.production_compute_event, { g = g })
+            end
+        end
+    end
+)
+
+---@param player LuaPlayer
 function graph.unselect(player)
     local g = gutils.get_graph(player)
-    g.selection = {}
-    g.iovalues = {}
-    g.color_index = 0
-    for _, gproduct in pairs(g.products) do
-        gproduct.color = nil
-    end
+    gutils.clear(g)
     graph.refresh(player)
     gutils.fire_production_data_change(g)
 end
@@ -968,7 +1156,10 @@ function graph.load_saving(g, data)
         local current = g.recipes[grecipe.name]
         if current then
             selection[grecipe.name] = current
-            set_recipe_location(g, current, grecipe.col, grecipe.line)
+            current.layer = tools.check_sprite(grecipe.layer)
+            if grecipe.col then
+                set_recipe_location(g, current, grecipe.col, grecipe.line)
+            end
         end
     end
     g.selection = selection
@@ -989,15 +1180,13 @@ function graph.load_saving(g, data)
         end
     end
 
-    if g.visibility == commons.visibility_selection and
-        data.config.visibility == commons.visibility_selection then
-        gutils.compute_visibility(g, true)
-        graph.create_recipe_objects(g)
-        drawing.redraw_selection(g.player)
-        gutils.recenter(g)
-    else
-        graph.refresh(g.player)
-    end
+    g.visibility = data.config.visibility
+    graph.deferred_update(g.player, {
+        selection_changed = true,
+        do_redraw = true,
+        center_on_graph = true,
+        update_command = true
+    })
     gutils.fire_selection_change(g)
 end
 
@@ -1120,6 +1309,290 @@ function graph.create_sorted_recipe_table(set)
     end
     table.sort(sort_table, function(r1, r2) return r1.sort_level < r2.sort_level end)
     return sort_table
+end
+
+local get_element_at_position = gutils.get_element_at_position
+local set_colline = gutils.set_colline
+
+---@class DisplayTreeNode
+---@field recipe_name string
+---@field grecipe GRecipe
+---@field parent DisplayTreeNode
+---@field children table<string, DisplayTreeNode>
+---@field height integer
+---@field top integer
+---@field depth integer
+
+---@param g Graph
+---@param settings {horizontal:boolean?, invert:boolean?, show_products:boolean?}
+function graph.tree_layout(g, settings)
+    local inputs, outputs, intermediates, to_process, recipes = gutils.get_product_flow(g, g.recipes)
+
+    if g.show_products then
+        ---@param product_name string
+        local function add_product(product_name)
+            local grecipe = graph.get_product_recipe(g, product_name)
+            recipes[grecipe.name] = grecipe
+            grecipe.visible = true
+            g.selection[grecipe.name] = grecipe
+        end
+
+        graph.invisible_product_recipes(g, {})
+        for product_name, _ in pairs(inputs) do
+            add_product(product_name)
+        end
+        for ioname, value in pairs(g.iovalues) do
+            if value == true or (type(value) == "number" and value < 0) then
+                if value == true and g.product_outputs and g.product_inputs then
+                    local output = g.product_outputs[ioname]
+                    local input = g.product_inputs[ioname]
+                    if output and input and output > input then
+                        goto skip
+                    end
+                end
+                if inputs[ioname] or outputs[ioname] or intermediates[ioname] then
+                    add_product(ioname)
+                end
+                ::skip::
+            end
+        end
+    else
+        graph.invisible_product_recipes(g, {})
+    end
+
+    local horizontal = settings.horizontal
+    local invert = settings.invert
+
+    ---@type table<string, boolean>
+    local processed_products = {}
+
+    ---@type DisplayTreeNode[]
+    local node_table = {}
+
+    if table_size(to_process) == 0 then
+        return
+    end
+
+    local node_index = 1
+    local processed_recipes = {}
+
+    local function build_tree()
+        while node_index <= #node_table do
+            local current = node_table[node_index]
+            node_index = node_index + 1
+            for _, ingredient in pairs(current.grecipe.ingredients) do
+                if not processed_products[ingredient.name] then
+                    processed_products[ingredient.name] = true
+                    to_process[ingredient.name] = nil
+                    for pname, precipe in pairs(ingredient.product_of) do
+                        if precipe.visible and not processed_recipes[pname] then
+                            ---@type DisplayTreeNode
+                            local newnode = {
+                                recipe_name = pname,
+                                grecipe = precipe,
+                                parent = current,
+                                depth = current.depth + 1
+                            }
+                            table.insert(node_table, newnode)
+                            processed_recipes[pname] = true
+                            if current.children then
+                                current.children[pname] = newnode
+                            else
+                                current.children = { [pname] = newnode }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    ---@param product GProduct
+    local function add_root(product)
+        if processed_products[product.name] then
+            return
+        end
+        processed_products[product.name] = true
+        to_process[product.name] = nil
+        for pname, precipe in pairs(product.product_of) do
+            if precipe.visible and not processed_recipes[pname] then
+                ---@type DisplayTreeNode
+                local newnode = {
+                    recipe_name = pname,
+                    grecipe = precipe,
+                    depth = 1
+                }
+                processed_recipes[pname] = true
+                table.insert(node_table, newnode)
+            end
+        end
+    end
+
+    local sorted_table = {}
+    for _, product in pairs(to_process) do
+        if type(g.iovalues[product.name]) == "number" or outputs[product.name] then
+            table.insert(sorted_table, product)
+        end
+    end
+
+    table.sort(sorted_table,
+        ---@param p1 GProduct
+        ---@param p2 GProduct
+        function(p1, p2)
+            local s1 = tools.sprite_to_signal(p1.name)
+            local s2 = tools.sprite_to_signal(p2.name)
+            local order1, order2
+            ---@cast s1 -nil
+            ---@cast s2 -nil
+            if s1.type == "item" then
+                local proto = game.item_prototypes[s1.name]
+                order1 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+            elseif s1.type == "fluid" then
+                local proto = game.fluid_prototypes[s1.name]
+                order1 = proto.subgroup.order .. " " .. proto.order
+            end
+            if s2.type == "item" then
+                local proto = game.item_prototypes[s2.name]
+                order2 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
+            elseif s2.type == "fluid" then
+                local proto = game.fluid_prototypes[s2.name]
+                order2 = proto.subgroup.order .. " " .. proto.order
+            end
+            return order1 < order2
+        end)
+
+    for _, product in pairs(sorted_table) do
+        if type(g.iovalues[product.name]) == "number" then
+            add_root(product)
+            build_tree()
+        end
+    end
+
+    for _, product in pairs(sorted_table) do
+        add_root(product)
+        build_tree()
+    end
+
+    --- Process other product
+    while table_size(to_process) > 0 do
+        ---@type GProduct
+        local found
+        local found_partial
+        for _, product in pairs(to_process) do
+            local is_complete = true
+            local is_partial = false
+            for _, recipe in pairs(product.ingredient_of) do
+                for _, ingredient in pairs(recipe.ingredients) do
+                    if not processed_products[ingredient] then
+                        is_complete = false
+                    else
+                        is_partial = true
+                    end
+                end
+            end
+            if is_complete then
+                found = product
+                break
+            elseif not found_partial and is_partial then
+                found = product
+                found_partial = is_partial
+            elseif not found then
+                found = product
+                found_partial = is_partial
+            end
+        end
+        if not found then
+            break
+        end
+        add_root(found)
+        build_tree()
+    end
+
+    for i = #node_table, 1, -1 do
+        local node = node_table[i]
+
+        node.height = 1
+        if node.children then
+            local height = 0
+            for _, child in pairs(node.children) do
+                height = height + child.height
+            end
+            node.height = height
+        end
+    end
+
+    local tree_top = 0
+    local tree_height = 0
+    local tree_depth = 0
+    for i = 1, #node_table do
+        local node = node_table[i]
+        if node.depth > tree_depth then
+            tree_depth = node.depth
+        end
+        if not node.parent then
+            node.top = tree_top
+            tree_top = tree_top + node.height
+            tree_height = tree_height + node.height
+        end
+        if node.children then
+            local top = node.top
+            for _, child in pairs(node.children) do
+                child.top = top
+                top = top + child.height
+            end
+        end
+    end
+
+    g.gcols = {}
+    g.product_line = 1
+    g.recipe_order = 1
+
+    if horizontal then
+        for _, node in pairs(node_table) do
+            local line = node.top + math.floor(node.height / 2)
+            local col = node.depth
+            if invert then
+                col = tree_depth - col
+            end
+
+            set_colline(g, node.grecipe, col, line)
+        end
+    else
+        for _, node in pairs(node_table) do
+            local col = node.top + math.floor(node.height / 2)
+            local line = node.depth
+            if invert then
+                line = tree_depth - line
+            end
+
+            set_colline(g, node.grecipe, col, line)
+        end
+    end
+
+    graph.sort_recipes(recipes)
+end
+
+function graph.do_layout(g)
+    local mode = settings.global["factory_graph-auto_layout"].value
+    if mode == "standard" or g.visibility == commons.visibility_all then
+        graph.standard_layout(g)
+    elseif mode == "htree" then
+        graph.tree_layout(g, { horizontal = true, invert = false })
+    elseif mode == "htreei" then
+        graph.tree_layout(g, { horizontal = true, invert = true })
+    elseif mode == "vtree" then
+        graph.tree_layout(g, { horizontal = false, invert = false })
+    elseif mode == "vtreei" then
+        graph.tree_layout(g, { horizontal = false, invert = true })
+    end
+end
+
+---@param player LuaPlayer
+function graph.update_command_display(player)
+end
+
+---@param player LuaPlayer
+function graph.update_recipe_selection(player)
 end
 
 return graph

@@ -1,5 +1,6 @@
 local mod_gui = require("mod-gui")
 local dictionary = require("__flib__/dictionary-lite")
+local migration = require("__flib__/migration")
 
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
@@ -8,9 +9,11 @@ local prefix = commons.prefix
 
 local gutils = require("scripts.gutils")
 local graph = require("scripts.graph")
+local drawing = require("scripts.drawing")
 local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
 local product_panel = require("scripts.product_panel")
+local saving = require("scripts.saving")
 
 local main = {}
 
@@ -67,7 +70,8 @@ local excluded_categories = {
 }
 
 ---@param player any
-function main.enter(player)
+---@param recipe_name string?
+function main.enter(player, recipe_name)
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         return
     end
@@ -76,7 +80,7 @@ function main.enter(player)
     end
 
     local vars = tools.get_vars(player)
-    local surface = main.enter_surface(player)
+    local surface = main.enter_surface(player, recipe_name)
     if not vars.graph then
         local g = graph.new(surface)
         g.player = player
@@ -90,61 +94,93 @@ function main.enter(player)
 end
 
 ---@param player LuaPlayer
-local function switch_surface(player)
+---@param recipe_name string?
+local function switch_surface(player, recipe_name)
     if not string.find(player.surface.name, commons.surface_prefix_filter) then
-        main.enter(player)
+        main.enter(player, recipe_name)
     else
         main.exit(player)
     end
 end
 
 ---@param e EventData.on_lua_shortcut
-local function on_switch_surface(e)
+local function on_switch_surface_by_key(e)
     local player = game.players[e.player_index]
-    switch_surface(player)
+    local selected = player.selected
+    local recipe
+    if selected then
+        local type = selected.type
+        if type == "assembling-machine" or type == "furnace" then
+            recipe = selected.get_recipe()
+            if not recipe and type == "furnace" then
+                recipe = selected.previous_recipe
+            end
+        end
+    end
+    local recipe_name = recipe and recipe.name
+
+    switch_surface(player, recipe_name)
 end
 
-script.on_event(prefix .. "-alt_k", on_switch_surface)
+script.on_event(prefix .. "-alt_k", on_switch_surface_by_key)
 
 ---@param e EventData.on_gui_click
 function on_switch_click(e)
-
     if e.button == defines.mouse_button_type.left then
         local player = game.players[e.player_index]
-        if not e.control and not e.shift then
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
             switch_surface(player)
-        else
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
             player.cursor_stack.clear()
             player.cursor_stack.set_stack(prefix .. "-selection_tool")
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift or e.alt) then
+            local g = gutils.get_graph(player)
+            if not g then return end
+            product_panel.create(e.player_index)
+        elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or not e.alt) then
+            local vars = tools.get_vars(player)
+            local character = vars.saved_character
+            if not player.character then
+                if character then
+                    if not character.valid and vars.saved_surface_index and vars.saved_position then
+                        local characters = game.surfaces[vars.saved_surface_index].find_entities_filtered
+                            { type = "character", position = vars.saved_position, radius = 2 }
+                        if #characters == 0 then goto no_use end
+                        character = characters[1]
+                    end
+                    vars.character = character
+                    if vars.saved_force_index then
+                        player.force = vars.saved_force_index
+                    end
+                end
+
+                if string.find(player.surface.name, commons.surface_prefix_filter) then
+                    main.exit(player)
+                elseif character.surface_index == player.surface_index then
+                    player.associate_character(character)
+                    player.set_controller { type = defines.controllers.character, character = character }
+                end
+                ::no_use::
+            end
         end
     end
 end
+
 tools.on_gui_click(prefix .. "_switch", on_switch_click)
 
-
---[[
----@param e EventData.on_lua_shortcut
-local function test_click(e)
-    local player = game.players[e.player_index]
-    local surface = player.surface
-
-    if string.sub(surface.name, 1, #surface_prefix) ~= surface_prefix then
-        return
-    end
-end
-script.on_event(prefix .. "-click", test_click)
-]]
 
 local tile_name = commons.tile_name
 
 ---@param player LuaPlayer
+---@param recipe_name string?
 ---@return LuaSurface
-function main.enter_surface(player)
+function main.enter_surface(player, recipe_name)
     local vars = tools.get_vars(player)
 
     if not game.tile_prototypes[tile_name] then
         tile_name = "lab-dark-2"
     end
+
     local surface_name = surface_prefix .. player.index
     local surface = game.surfaces[surface_name]
 
@@ -163,19 +199,15 @@ function main.enter_surface(player)
                 tile = {
                     treat_missing_as_default = false,
                     settings = {
-                        [tile_name] = {
-                            frequency = 6,
-                            size = 6,
-                            richness = 6
-                        }
+                        [tile_name] = {}
                     }
                 },
                 decorative = { treat_missing_as_default = false, frequency = "none" }
             },
             property_expression_names = {
                 cliffiness = 0,
-                ["tile:water:probability"] = -1000,
-                ["tile:deep-water:probability"] = -1000,
+                ["tile:water:probability"] = -10000,
+                ["tile:deep-water:probability"] = -10000,
                 ["tile:" .. tile_name .. ":probability"] = "inf"
             }
         }
@@ -185,14 +217,28 @@ function main.enter_surface(player)
         surface.daytime = 0
         surface.freeze_daytime = true
         surface.show_clouds = false
+        surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
     end
 
-    local character = player.character
-    vars.character = character
-    vars.surface = surface
-    vars.extern_position = player.position
-    ---@cast character -nil
-    player.disassociate_character(character)
+    local character        = player.character
+    vars.surface           = surface
+    vars.extern_surface    = player.surface
+    vars.extern_position   = player.position
+    vars.extern_force      = nil
+    vars.extern_cheat_mode = player.cheat_mode
+    local extern_force     = player.force
+    if character then
+        vars.character = character
+        vars.saved_surface_index = vars.extern_surface.index
+        vars.saved_position = vars.extern_position
+        vars.saved_force_index = player.force_index
+        player.disassociate_character(character)
+    else
+        vars.character = nil
+        if vars.saved_force_index then
+            player.force = vars.saved_force_index
+        end
+    end
     local controller_type
     controller_type = defines.controllers.ghost
     controller_type = defines.controllers.spectator
@@ -202,31 +248,90 @@ function main.enter_surface(player)
     local g = gutils.get_graph(player)
     ---@type MapPosition
     local player_position = { 0, 0 }
+    local grecipe
+    if recipe_name then
+        grecipe = g.recipes[recipe_name]
+        if grecipe.visible then
+            player_position = gutils.get_recipe_position(g, grecipe)
+            g.player_position = nil
+        else
+            grecipe = nil
+        end
+    end
+
     if g and g.player_position then
         player_position = g.player_position
+        local zoom = g.graph_zoom_level
+        if zoom then
+            if zoom < 0.2 then
+                zoom = 0.2
+            elseif zoom > 5 then
+                zoom = 5
+            end
+            player.zoom = zoom
+        end
     end
-    player.teleport(player_position, surface)
+    player.teleport(player_position, surface, false)
+    vars.extern_force = extern_force
+    if grecipe then
+        drawing.draw_target(g, grecipe)
+        local zoom = g.graph_zoom_level or 2
+        player.zoom = zoom
+    end
     return surface
 end
 
 ---@param player LuaPlayer
 function main.exit(player)
     local vars = tools.get_vars(player)
-    local character = vars.character
+    local g = gutils.get_graph(player)
 
-    if character then
-        local g = gutils.get_graph(player)
-        local extern_position = vars.extern_position
-        if not extern_position then
-            extern_position = character.position
+    if not g then return end
+    if g.surface.index ~= player.surface_index then return end
+
+    local extern_position = vars.extern_position
+    if not extern_position and vars.character then
+        extern_position = vars.character.position
+    end
+
+    local zoom = g.world_zoom_level
+    if zoom then
+        if zoom < 0.2 then
+            zoom = 0.2
+        elseif zoom > 5 then
+            zoom = 5
         end
-        g.player_position = player.position
-        player.teleport(extern_position, character.surface, true)
+        player.zoom = zoom
+    end
+
+    if vars.extern_force then
+        player.force = vars.extern_force
+    end
+    g.player_position = player.position
+
+    local character = vars.character
+    if character and character.valid then
+        player.teleport(character.position, character.surface, false)
+        player.associate_character(character)
+        player.set_controller { type = defines.controllers.character, character = character }
+        if vars.extern_cheat_mode then
+            if vars.extern_cheat_mode ~= character.cheat_mode then
+                character.cheat_mode = vars.extern_cheat_mode
+            end
+        else
+            character.cheat_mode = false
+        end
+        vars.character = nil
+    elseif vars.extern_position and vars.extern_surface then
+        player.teleport(vars.extern_position, vars.extern_surface, false)
+    elseif vars.extern_position then
+        player.teleport(vars.extern_position, "Nauvis", false)
+    elseif vars.extern_position then
+        player.teleport({ 0, 0 }, "Nauvis", false)
     end
 end
 
 tools.on_event(defines.events.on_player_changed_surface,
-
     ---@param e EventData.on_player_changed_surface
     function(e)
         local player = game.players[e.player_index]
@@ -234,19 +339,25 @@ tools.on_event(defines.events.on_player_changed_surface,
         local g = gutils.get_graph(player)
         if not g then return end
 
+        vars.extern_force = nil
         if e.surface_index == g.surface.index then
             tools.close_panels(player)
             command.close(player)
-            local character = vars.character
-            if vars.character then
-                player.teleport(character.position, character.surface)
-                player.associate_character(vars.character)
-                player.set_controller { type = defines.controllers.character, character = vars.character }
-                vars.character = nil
-            end
         end
     end)
 
+tools.on_event(defines.events.on_player_changed_position,
+    ---@param e EventData.on_player_changed_position
+    function(e)
+        local player = game.players[e.player_index]
+        local character = player.character
+        local vars = tools.get_vars(player)
+        if not character or not character.valid then return end
+        vars.saved_character = character
+        vars.saved_force_index = player.force_index
+        vars.saved_position = character.position
+        vars.saved_surface_index = character.surface_index
+    end)
 
 ---@param player LuaPlayer
 local function create_player_button(player)
@@ -260,7 +371,7 @@ local function create_player_button(player)
             type = "sprite-button",
             name = button_name,
             sprite = prefix .. "_switch",
-            tooltip = {np("switch_tooltip")}
+            tooltip = { np("switch_tooltip") }
         }
         button.style.width = 40
         button.style.height = 40
@@ -276,42 +387,111 @@ local function picker_dolly_install()
     end
 end
 
-tools.on_init(function() 
+tools.on_init(function()
     picker_dolly_install()
 end)
 
-tools.on_event(defines.events.on_player_created, 
----@param e EventData.on_player_created
-function(e)
-    local player = game.players[e.player_index]
-    create_player_button(player)
-end)
-
-tools.on_configuration_changed(function(data)
-    picker_dolly_install()
-    for _, player in pairs(game.players) do
+tools.on_event(defines.events.on_player_created,
+    ---@param e EventData.on_player_created
+    function(e)
+        local player = game.players[e.player_index]
         create_player_button(player)
+    end)
 
-        ---@type Graph
-        local g = tools.get_vars(player).graph
-        if g then
-            if not g.grid_size then
-                g.grid_size = commons.grid_size
+tools.on_configuration_changed(
+---@param data ConfigurationChangedData
+    function(data)
+        picker_dolly_install()
+        for _, player in pairs(game.players) do
+            create_player_button(player)
+
+            local vars = tools.get_vars(player)
+
+            ---@type Graph
+            local g = vars.graph
+            if g then
+                if not g.grid_size then
+                    g.grid_size = commons.grid_size
+                end
+                if not g.color_index then
+                    g.color_index = 0
+                end
+                local has_command = player.gui.left[command.frame_name] ~= nil
+                tools.close_panels(player)
+                tools.close_panel(player, prefix .. "-product-panel.frame")
+                if has_command then
+                    command.open(player)
+                end
+                local recipes = player.force.recipes
+                graph.update_recipes(g, recipes, g.excluded_categories)
+
+                local need_refresh
+                for _, grecipe in pairs(g.recipes) do
+                    if grecipe.visible and (not grecipe.line and not grecipe.col) then
+                        need_refresh = true
+                    end
+                    grecipe.layer = tools.check_sprite(grecipe.layer)
+                end
+                g.current_layer = tools.check_sprite(g.current_layer)
+                if g.visible_layers then
+                    for layer in pairs(g.visible_layers) do
+                        if not tools.check_sprite(layer) then
+                            g.visible_layers = {}
+                            g.visibility = commons.visibility_selection
+                            need_refresh = true
+                            break
+                        end
+                    end
+                end
+                if data.mod_changes
+                    and data.mod_changes.factory_graph
+                    and data.mod_changes.factory_graph.old_version then
+                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.3") then
+                        g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
+                        g.surface.clear()
+                    end
+                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.7") then
+                        g.line_gap = 0.2
+                        g.always_use_full_selection = false
+                    end
+                end
+                graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
             end
-            if not g.color_index then
-                g.color_index = 0
-            end
-            local has_command = player.gui.left[command.frame_name] ~= nil
-            tools.close_panels(player)
-            tools.close_panel(player, prefix .. "-product-panel.frame")
-            if has_command then
-                command.open(player)
-            end
-            local recipes = player.force.recipes
-            graph.update_recipes(g, recipes, g.excluded_categories)
         end
+    end)
+
+tools.on_event(defines.events.on_surface_cleared,
+    ---@param e EventData.on_surface_cleared
+    function(e)
+        local surface = game.surfaces[e.surface_index]
+        if not string.find(surface.name, commons.surface_prefix_filter) then
+            return
+        end
+        local player_index = tonumber(string.sub(surface.name, #commons.surface_prefix + 1))
+        local player = game.players[player_index]
+        graph.deferred_update(player, { selection_changed = true, do_redraw = true })
     end
-end)
+)
+
+local tile_name = commons.tile_name
+
+tools.on_event(defines.events.on_chunk_generated,
+    ---@param e EventData.on_chunk_generated
+    function(e)
+        local surface = e.surface
+        if not string.find(surface.name, commons.surface_prefix_filter) then
+            return
+        end
+        local tiles = {}
+        local xstart = e.position.x * 32
+        local ystart = e.position.y * 32
+        for y = 0, 31 do
+            for x = 0, 31 do
+                table.insert(tiles, { position = { xstart + x, ystart + y }, name = tile_name })
+            end
+        end
+        surface.set_tiles(tiles, false)
+    end)
 
 tools.on_load(function()
     picker_dolly_install()
@@ -383,7 +563,6 @@ tools.on_event(defines.events.on_research_reversed,
 
 ---@param e EventData.on_player_selected_area
 local function import_entities(e, clear)
-
     local player = game.players[e.player_index]
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         return
@@ -392,29 +571,40 @@ local function import_entities(e, clear)
     if e.item ~= prefix .. "-selection_tool" then return end
 
     local g = gutils.get_graph(player)
+    if not g then
+        main.enter(player)
+        g = gutils.get_graph(player)
+    end
 
     if g.visibility == commons.visibility_all then
         g.visibility = commons.visibility_selection
+        command.update_display(player)
     end
-    
+
     if clear then
+        gutils.clear(g)
         g.selection = {}
-        g.iovalues = {}
+        saving.clear_current(player)
     end
-    for _,entity in pairs(e.entities) do
+    for _, entity in pairs(e.entities) do
         ---@cast entity LuaEntity
-        local recipe = entity.get_recipe()
-        if not recipe and entity.type == "furnace" then
-            recipe = entity.previous_recipe 
-        end
-        if recipe then
-            g.selection[recipe.name] = g.recipes[recipe.name]
+        if entity.type == "assembling-machine" or entity.type == "furnace" then
+            local recipe = entity.get_recipe()
+            if not recipe and entity.type == "furnace" then
+                recipe = entity.previous_recipe
+            end
+            if recipe then
+                g.selection[recipe.name] = g.recipes[recipe.name]
+            end
         end
     end
     graph.refresh(player)
     gutils.fire_selection_change(g)
     player.cursor_stack.clear();
-    switch_surface(player)
+    if player.surface.index ~= g.surface.index then
+        switch_surface(player)
+    end
+    gutils.recenter(g)
 end
 
 ---@param e EventData.on_player_selected_area
@@ -432,5 +622,18 @@ tools.on_event(defines.events.on_player_selected_area, on_player_selected_area)
 tools.on_event(defines.events.on_player_alt_selected_area,
     on_player_alt_selected_area)
 
+
+---@param player LuaPlayer
+---@param value integer?
+function main.set_speed(player, value)
+    if not value then
+        value = 0
+    end
+    player.force.character_running_speed_modifier = value
+    player.force.manual_crafting_speed_modifier   = value
+end
+
+gutils.exit = main.exit
+gutils.enter = main.enter
 
 return main

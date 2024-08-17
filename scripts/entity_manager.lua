@@ -52,8 +52,12 @@ local function do_mine(e, to_cursor)
         graph.remove_recipe_visibility(g, grecipe)
         grecipe.entity = nil
     end
-    drawing.redraw_selection(g.player)
-    gutils.fire_selection_change(g)
+
+    if g.layout_on_selection then
+        graph.deferred_update(player, { selection_changed = true, do_layout = true })
+    else
+        graph.deferred_update(player, { selection_changed = true })
+    end
 
     if e.buffer then
         e.buffer.clear()
@@ -90,7 +94,9 @@ local function on_build(entity, e, revive)
 
     local surface_name = surface.name
     if not string.find(surface_name, commons.surface_prefix_filter) then
-        entity.destroy()
+        if entity.name ~= "entity-ghost" then
+            entity.destroy()
+        end
         return
     end
 
@@ -100,19 +106,25 @@ local function on_build(entity, e, revive)
     if not g then return end
 
     local recipe_name
-    local is_ghost
+    local tags
+    local selected = true
     if entity.name == "entity-ghost" then
-        if entity.tags then
+        tags = entity.tags
+        if tags then
             recipe_name = entity.tags.recipe_name --[[@as string]]
-            is_ghost = true
+            selected = tags.selected --[[@as boolean]]
         end
     elseif e.stack then
-        recipe_name = e.stack.tags.recipe_name --[[@as string]]
+        tags = e.stack.tags
+        if tags then
+            recipe_name = tags.recipe_name --[[@as string]]
+            selected = tags.selected --[[@as boolean]]
+        end
     end
 
     entity.destroy()
-    if not recipe_name then 
-        return 
+    if not recipe_name then
+        return
     end
 
     local grecipe = g.recipes[recipe_name]
@@ -127,18 +139,23 @@ local function on_build(entity, e, revive)
     end
     graph.insert_recipe_at_position(g, grecipe, col, line)
     grecipe.visible = true
-    g.selection[recipe_name] = grecipe
+    if selected ~= false then
+        g.selection[recipe_name] = grecipe
+    end
     if grecipe.entity and grecipe.entity.valid then
         drawing.clear_selection(g)
         local x, y = gutils.get_position(g, grecipe.col, grecipe.line)
         grecipe.entity.teleport { x, y }
-        drawing.redraw_selection(g.player)
     else
         grecipe.entity = nil
 
         drawing.clear_selection(g)
         graph.create_recipe_object(g, grecipe)
-        drawing.redraw_selection(g.player)
+    end
+    if g.layout_on_selection then
+        graph.deferred_update(player, { selection_changed = true, do_layout = true })
+    else
+        graph.deferred_update(player, { selection_changed = true })
     end
 end
 
@@ -201,7 +218,8 @@ local function register_mapping(bp, mapping, g)
             if entity and entity.valid then
                 local grecipe = g.entity_map[entity.unit_number]
                 if grecipe then
-                    bp.set_blueprint_entity_tags(index, { recipe_name = grecipe.name })
+                    local selected = g.selection[grecipe.name] ~= nil
+                    bp.set_blueprint_entity_tags(index, { recipe_name = grecipe.name, selected = selected })
                 end
             end
         end
@@ -220,7 +238,8 @@ local function register_mapping(bp, mapping, g)
                         local entity = entities[1]
                         local grecipe = g.entity_map[entity.unit_number]
                         if grecipe then
-                            bp.set_blueprint_entity_tags(index, { recipe_name = grecipe.name })
+                            local selected = g.selection[grecipe.name] ~= nil
+                            bp.set_blueprint_entity_tags(index, { recipe_name = grecipe.name, selected = selected })
                         end
                     end
                 end
@@ -282,5 +301,25 @@ tools.on_event(defines.events.on_player_setup_blueprint,
     end)
 
 tools.on_event(defines.events.on_gui_closed, on_register_bp)
+
+if script.active_mods["space-exploration"] then
+    script.on_event(commons.prefix .. "-control-click3",
+        function(e)
+            local player = game.players[e.player_index]
+            local surface = player.surface
+
+            if not string.find(surface.name, commons.surface_prefix_filter) then
+                return
+            end
+            local g = gutils.get_graph(player)
+            if not g.selected_recipe then return end
+
+            local entity = g.selected_recipe.entity
+            if entity and entity.valid then
+                do_mine({ entity = entity }, true)
+                entity.destroy { raise_destroy = false }
+            end
+        end)
+end
 
 return entity_manager

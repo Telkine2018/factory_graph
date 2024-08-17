@@ -22,20 +22,25 @@ add({
   consuming = "none"
 })
 
---[[
 add({
   type = "custom-input",
-  name = modname .. "-alt_l",
-  key_sequence = "ALT + L",
-  consuming = "none"
+  key_sequence = "CONTROL + mouse-button-1",
+  name = prefix .. "-control-click"
 })
 
 add({
   type = "custom-input",
-  key_sequence = "mouse-button-1",
-  name = prefix .. "-click"
+  key_sequence = "SHIFT + mouse-button-1",
+  name = prefix .. "-control-click2"
 })
---]]
+
+if mods["space-exploration"] then
+  add({
+    type = "custom-input",
+    key_sequence = "mouse-button-2",
+    name = prefix .. "-control-click3"
+  })
+end
 
 ---------------------------------------------
 local function create_symbol(name, filename)
@@ -63,12 +68,12 @@ local function create_symbol(name, filename)
   }
   entity.minable = {
     mining_time = 0.1,
-    result = commons.recipe_symbol_name,
+    result = name,
     count = 1
   }
   entity.next_upgrade = nil
-  entity.flags = {"not-in-made-in", "player-creation"}
-  
+  entity.flags = { "not-in-made-in", "player-creation" }
+
   entity.name = name
   add(entity)
   return entity
@@ -212,6 +217,46 @@ sprite = {
 add(sprite)
 
 add {
+  type = "sprite",
+  name = prefix .. "_backward-black",
+  filename = png("backward-black"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_backward-white",
+  filename = png("backward-white"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_forward-black",
+  filename = png("forward-black"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_forward-white",
+  filename = png("forward-white"),
+  width = 32,
+  height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_delete",
+  filename = png("delete"),
+  width = 64,
+  height = 64
+}
+
+add {
   type = "custom-input",
   name = prefix .. "-up",
   key_sequence = "SHIFT + UP"
@@ -248,7 +293,27 @@ add {
   icon = png("item/recipe-symbol"),
   icon_size = 32,
   place_result = commons.recipe_symbol_name,
-  flags = {"hidden","not-stackable", "only-in-cursor"}
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
+}
+
+add {
+  name = commons.product_symbol_name,
+  type = "item-with-tags",
+  stack_size = 1,
+  icon = png("item/product-symbol"),
+  icon_size = 32,
+  place_result = commons.product_symbol_name,
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
+}
+
+add {
+  name = commons.unresearched_symbol_name,
+  type = "item-with-tags",
+  stack_size = 1,
+  icon = png("item/unresearched-symbol"),
+  icon_size = 32,
+  place_result = commons.unresearched_symbol_name,
+  flags = { "hidden", "not-stackable", "only-in-cursor" }
 }
 
 add {
@@ -257,19 +322,19 @@ add {
   name = prefix .. "-selection_tool",
   icon = png("icon32"),
   icon_size = 32,
-  selection_color = {r = 0, g = 0, b = 1},
-  alt_selection_color = {r = 1, g = 0, b = 0},
-  selection_mode = {"same-force", "any-entity"},
-  alt_selection_mode = {"same-force", "any-entity"},
+  selection_color = { r = 0, g = 0, b = 1 },
+  alt_selection_color = { r = 1, g = 0, b = 0 },
+  selection_mode = { "same-force", "any-entity" },
+  alt_selection_mode = { "same-force", "any-entity" },
   selection_cursor_box_type = "entity",
   alt_selection_cursor_box_type = "entity",
-  flags = {"hidden", "not-stackable", "only-in-cursor", "spawnable"},
+  flags = { "hidden", "not-stackable", "only-in-cursor", "spawnable" },
   subgroup = "other",
   stack_size = 1,
   stackable = false,
   show_in_library = false,
-  entity_type_filters = {"assembling-machine", "furnace"},
-  alt_entity_type_filters = {"assembling-machine", "furnace"}
+  entity_type_filters = { "assembling-machine", "furnace" },
+  alt_entity_type_filters = { "assembling-machine", "furnace" }
 }
 
 data:extend(declarations)

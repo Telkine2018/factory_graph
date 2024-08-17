@@ -26,21 +26,37 @@ local tools = require("scripts.tools")
 ---@field rs_location GuiLocation?
 ---@field selector_id integer?                      @ selector rectangle id
 ---@field selector_product_name_id integer?         @ selector text id
----@field product_outputs {[string]:number}
----@field product_inputs {[string]:number}
----@field production_failed LocalisedString?
----@field production_recipes_failed {[string]:boolean}
----@field bound_products {[string]:boolean}
 ---@field recipe_order integer
 ---@field player_position MapPosition
 ---@field module_limitations {[string]:({[string]:true})}
 ---@field excluded_categories {[string]:boolean}?
+---@field require_full_selection boolean?
+---@field move_recipe GRecipe?
+---@field layer_ids integer[]?
+
+---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
 ---@field grid_size integer
+---@field line_gap integer
 ---@field show_hidden boolean?
 ---@field show_only_researched boolean?
----@field unrestricted_production boolean?
----@field move_recipe GRecipe?
+---@field always_use_full_selection boolean?
+---@field layout_on_selection boolean?
+---@field graph_zoom_level number?
+---@field world_zoom_level number?
+---@field autosave_on_graph_switching boolean?
+---@field current_layer string?
+---@field visible_layers {[string]:boolean}
+---@field show_products boolean?
+
+---@class GraphProduction
+---@field use_connected_recipes boolean             @ true if connected reciped use
+---@field product_outputs {[string]:number}
+---@field product_inputs {[string]:number}
+---@field production_failed LocalisedString?
+---@field production_recipes_failed {[string]:boolean}
+---@field total_energy number
+---@field bound_products {[string]:boolean}
 
 ---@class GraphConfig
 ---@field visibility integer?
@@ -49,10 +65,12 @@ local tools = require("scripts.tools")
 ---@field preferred_modules string[]
 ---@field preferred_beacon string?
 ---@field preferred_beacon_count integer
+---@field preferred_beacon_modules string[]
 ---@field iovalues {[string]:number|boolean}
 ---@field color_index integer
+---@field use_machine_in_inventory boolean?
 
----@class Graph : GraphRuntime, GraphConfig
+---@class Graph : GraphRuntime, GraphConfig, GraphProduction, GraphSettings
 
 ---@class GElement
 ---@field name string     @ name of product or recipe
@@ -79,6 +97,8 @@ local tools = require("scripts.tools")
 ---@field visible boolean?
 ---@field is_void boolean?
 ---@field is_recursive boolean?
+---@field layer string?
+---@field pos_locked boolean?
 
 ---@class GSortNode
 ---@field sort_level integer?
@@ -101,9 +121,11 @@ local tools = require("scripts.tools")
 
 ---@class GRoutingRange
 ---@field disp_index integer
+---@field disp_max integer
 ---@field limit1 number
 ---@field limit2 number
 ---@field tag integer
+---@field selector number
 
 ---@class GRouting
 ---@field range_index integer
@@ -153,6 +175,7 @@ local tools = require("scripts.tools")
 ---@field icon2 string?
 ---@field label string
 ---@field json string 
+---@field pinned boolean?
 
 ---@class SavingData
 ---@field config GraphConfig
@@ -164,3 +187,14 @@ local tools = require("scripts.tools")
 
 ---@class RemoteConfig
 ---@field recipes {[string]:RemoteRecipe}
+
+---@class RedrawRequest
+---@field selection_changed boolean?
+---@field do_layout boolean?
+---@field do_redraw boolean?
+---@field center_on_recipe string?   @ recipe to center on
+---@field center_on_graph boolean?
+---@field draw_target  boolean?
+---@field update_command  boolean?
+---@field no_recipe_selection_update boolean?
+---@field update_product_list boolean?

@@ -95,35 +95,35 @@ end
 ---@param name string
 ---@return string?
 function translations.get_recipe_name(player_index, name)
-    return translations.get_translation(player_index, "recipe_name", name)
+    return translations.get_translation(player_index, "recipe_name", name) or ""
 end
 
 ---@param player_index integer
 ---@param name string
 ---@return string?
 function translations.get_recipe_description(player_index, name)
-    return translations.get_translation(player_index, "recipe_description", name)
+    return translations.get_translation(player_index, "recipe_description", name) or ""
 end
 
 ---@param player_index integer
 ---@param name string
 ---@return string?
 function translations.get_fluid_name(player_index, name)
-    return translations.get_translation(player_index, "fluid_name", name)
+    return translations.get_translation(player_index, "fluid_name", name) or ""
 end
 
 ---@param player_index integer
 ---@param name string
 ---@return string?
 function translations.get_fluid_description(player_index, name)
-    return translations.get_translation(player_index, "fluid_description", name)
+    return translations.get_translation(player_index, "fluid_description", name) or ""
 end
 
 ---@param player_index integer
 ---@param name string
 ---@return string?
 function translations.get_item_name(player_index, name)
-    return translations.get_translation(player_index, "item_name", name)
+    return translations.get_translation(player_index, "item_name", name) or ""
 end
 
 ---@param player_index integer
@@ -137,14 +137,14 @@ end
 ---@param name string
 ---@return string?
 function translations.get_entity_name(player_index, name)
-    return translations.get_translation(player_index, "entity_name", name)
+    return translations.get_translation(player_index, "entity_name", name) or ""
 end
 
 ---@param player_index integer
 ---@param name string
 ---@return string?
 function translations.get_technology_name(player_index, name)
-    return translations.get_translation(player_index, "technology_name", name)
+    return translations.get_translation(player_index, "technology_name", name) or ""
 end
 
 ---@param player_index integer

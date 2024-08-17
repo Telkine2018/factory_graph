@@ -36,6 +36,7 @@ local sprite_button_size = 30
 ---@return table<string, GRecipe>?
 function load_initial_recipes(g, product, recipe, only_product)
     local recipes = {}
+
     if product and recipe then
         if product.product_of[recipe.name] then
             for name, i_recipe in pairs(product.ingredient_of) do
@@ -50,6 +51,8 @@ function load_initial_recipes(g, product, recipe, only_product)
         recipes[recipe.name] = nil
         if g.show_only_researched then
             recipes = gutils.filter_enabled_recipe(recipes)
+        else
+            recipes = gutils.filter_non_product_recipe(recipes)
         end
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
@@ -64,6 +67,8 @@ function load_initial_recipes(g, product, recipe, only_product)
         end
         if g.show_only_researched then
             recipes = gutils.filter_enabled_recipe(recipes)
+        else
+            recipes = gutils.filter_non_product_recipe(recipes)
         end
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
@@ -73,14 +78,122 @@ function load_initial_recipes(g, product, recipe, only_product)
     return recipes
 end
 
+---@param player LuaPlayer
+---@param recipe_name string?
+---@param product_name string?
+local function push_history_with_names(player, recipe_name, product_name)
+    if not recipe_name and not product_name then
+        return
+    end
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        history = {}
+        vars.recipe_history = history
+        vars.recipe_history_index = 0
+    end
+
+    local index = vars.recipe_history_index
+    if index > 0 then
+        local top = history[index]
+        if top.recipe_name == recipe_name and top.product_name == product_name then
+            return
+        end
+    end
+
+    --[[
+        history: [h1 h2]
+        index: 1
+    ]]
+    while #history > index do
+        table.remove(history, index + 1)
+    end
+    while #history > 20 do
+        table.remove(history, 1)
+        index = index - 1
+    end
+
+    table.insert(history, { product_name = product_name, recipe_name = recipe_name })
+    index = index + 1
+    vars.recipe_history_index = index
+end
+
+---@param player LuaPlayer
+---@param gproduct GProduct?
+---@param grecipe GRecipe?
+local function push_history(player, gproduct, grecipe)
+    local recipe_name = grecipe and grecipe.name
+    local product_name = gproduct and gproduct.name
+
+    push_history_with_names(player, recipe_name, product_name)
+end
+
+---@param player LuaPlayer
+local function backward_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        return
+    end
+
+    local index = vars.recipe_history_index
+    if index < 2 then return end
+
+    index = index - 1
+    local top = history[index]
+    vars.recipe_history_index = index
+    local g = gutils.get_graph(player)
+    local gproduct = top.product_name and g.products[top.product_name]
+    local grecipe = top.recipe_name and g.recipes[top.recipe_name]
+    recipe_selection.open(g, gproduct, grecipe, false, true)
+end
+
+---@param player LuaPlayer
+local function clear_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        return
+    end
+    local vars = tools.get_vars(player)
+    local history = {}
+    vars.recipe_history = history
+    vars.recipe_history_index = 0
+end
+
+---@param player LuaPlayer
+local function forward_history(player)
+    local vars = tools.get_vars(player)
+    local history = vars.recipe_history
+    if not history then
+        return
+    end
+
+    local index = vars.recipe_history_index
+    if index >= #history then return end
+
+    index = index + 1
+    local top = history[index]
+    vars.recipe_history_index = index
+    local g = gutils.get_graph(player)
+    local gproduct = top.product_name and g.products[top.product_name]
+    local grecipe = top.recipe_name and g.recipes[top.recipe_name]
+    recipe_selection.open(g, gproduct, grecipe)
+end
+
+
 ---@param g Graph
 ---@param product GProduct?
 ---@param recipe GRecipe?
 ---@param only_product boolean?
-function recipe_selection.open(g, product, recipe, only_product)
+---@param nohistory boolean?
+function recipe_selection.open(g, product, recipe, only_product, nohistory)
     local player = g.player
     local player_index = player.index
 
+    if not nohistory then
+        push_history(player, product, recipe)
+    end
     g.rs_product = product
     g.rs_recipe = recipe
 
@@ -102,7 +215,27 @@ function recipe_selection.open(g, product, recipe, only_product)
         create_inner_frame   = true,
         close_button_name    = np("close"),
         close_button_tooltip = { np("close-tooltip") },
-        is_draggable         = true
+        is_draggable         = true,
+        title_menu_func      = function(titleflow)
+            local b = titleflow.add {
+                type = "sprite-button",
+                name = "backward",
+                style = "frame_action_button",
+                mouse_button_filter = { "left" },
+                sprite = prefix .. "_backward-white",
+                hovered_sprite = prefix .. "_backward-black"
+            }
+            tools.set_name_handler(b, np("backward"))
+            local b = titleflow.add {
+                type = "sprite-button",
+                name = "forward",
+                style = "frame_action_button",
+                mouse_button_filter = { "left" },
+                sprite = prefix .. "_forward-white",
+                hovered_sprite = prefix .. "_forward-black"
+            }
+            tools.set_name_handler(b, np("forward"))
+        end
     }
     local frame, inner_frame                   = tools.create_standard_panel(player, params)
 
@@ -158,14 +291,25 @@ function recipe_selection.open(g, product, recipe, only_product)
     b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
 
     local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
-    scroll.style.maximal_height = 700
+    scroll.style.height = 400
+    scroll.style.minimal_width = 500
     scroll.style.horizontally_stretchable = true
 
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
     recipe_table.style.horizontally_stretchable = true
 
+    local remaining_frame = frame.add {
+        type = "frame",
+        direction = "vertical",
+        style = "inside_shallow_frame_with_padding"
+    }
+    local remaining_pane = remaining_frame.add { type = "table", column_count = 14, name = "remaining_pane" }
+    remaining_pane.style.horizontally_stretchable = true
+    remaining_pane.style.minimal_height = 30
+    recipe_selection.display_remaining(g, remaining_pane)
+
     if recipes and table_size(recipes) > 0 then
-        recipe_selection.display(player, recipes, recipe_table)
+        recipe_selection.display_recipes(player, recipes, recipe_table)
     end
 
     if g.rs_location then
@@ -203,6 +347,8 @@ local function do_search_text(player)
     end
     if g.show_only_researched then
         recipes = gutils.filter_enabled_recipe(recipes)
+    else
+        recipes = gutils.filter_non_product_recipe(recipes)
     end
 
     recipe_selection.show_recipes(player, recipes)
@@ -218,7 +364,7 @@ function recipe_selection.show_recipes(player, recipes)
     if not recipe_table then return end
 
     recipe_table.clear()
-    recipe_selection.display(player, recipes, recipe_table)
+    recipe_selection.display_recipes(player, recipes, recipe_table)
 end
 
 tools.on_named_event(np("search_button"), defines.events.on_gui_click,
@@ -260,20 +406,24 @@ local function set_recipes_to_selection(player)
     local not_visible = {}
     ---@cast recipe_table -nil
     for _, line in pairs(recipe_table.children) do
-        local name = line.tags.recipe_name
+        local name = line.tags.recipe_name --[[@as string]]
         local cb = line[cb_name]
         if name and cb then
             if cb.state then
                 local grecipe = g.recipes[name]
-                g.selection[name] = grecipe
-                recipes[name] = grecipe
-                if not grecipe.visible then
-                    not_visible[name] = grecipe
+                if grecipe then
+                    g.selection[name] = grecipe
+                    recipes[name] = grecipe
+                    if not grecipe.visible then
+                        not_visible[name] = grecipe
+                    end
+                    if g.visibility == commons.visibility_layers then
+                        grecipe.layer = g.current_layer
+                    end
                 end
             else
                 g.selection[name] = nil
             end
-            gutils.fire_selection_change(g)
         end
     end
     return recipes, not_visible
@@ -285,14 +435,25 @@ tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
         local g = gutils.get_graph(player)
 
         local _, not_visible = set_recipes_to_selection(player)
-
         for _, grecipe in pairs(not_visible) do
             grecipe.visible = true
             graph.insert_recipe(g, grecipe)
         end
         graph.create_recipe_objects(g)
-        gutils.select_current_recipe(g, g.rs_recipe)
-        drawing.redraw_selection(player)
+        if g.rs_recipe and g.rs_recipe.visible then
+            gutils.select_current_recipe(g, g.rs_recipe)
+        end
+        local recipe_name
+        if e.element.state then
+            recipe_name = e.element.tags.recipe_name --[[@as string]]
+        end
+        graph.deferred_update(player, {
+            selection_changed = true,
+            do_layout = g.layout_on_selection,
+            center_on_recipe = recipe_name,
+            draw_target = true,
+            no_recipe_selection_update = true
+        })
     end)
 
 ---@param player_index integer|uint32
@@ -307,10 +468,24 @@ function recipe_selection.close(player_index)
     end
 end
 
+---@param g Graph
+---@param remaining_pane LuaGuiElement
+function recipe_selection.display_remaining(g, remaining_pane)
+    remaining_pane.clear()
+    local inputs = gutils.get_product_flow(g, g.selection)
+    for _, gproduct in pairs(inputs) do
+        if not gproduct.is_root then
+            local b = gutils.create_product_button(remaining_pane, gproduct.name)
+            b.style.size = sprite_button_size
+            tools.set_name_handler(b, np("remaining"), { product_name = gproduct.name })
+        end
+    end
+end
+
 ---@param player LuaPlayer
 ---@param recipes table<string, GRecipe>
 ---@param recipe_table LuaGuiElement
-function recipe_selection.display(player, recipes, recipe_table)
+function recipe_selection.display_recipes(player, recipes, recipe_table)
     local player_index = player.index
     ---@cast player_index integer
     local g = gutils.get_graph(player)
@@ -319,10 +494,12 @@ function recipe_selection.display(player, recipes, recipe_table)
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = game.recipe_prototypes[grecipe.name]
-        if recipe then
-            table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
-        else
-            table.insert(sorted_list, { grecipe = grecipe, localised = gutils.get_recipe_name(player, grecipe) })
+        if (not grecipe.hidden) or g.show_hidden then
+            if recipe then
+                table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
+            else
+                table.insert(sorted_list, { grecipe = grecipe, localised = gutils.get_recipe_name(player, grecipe) })
+            end
         end
     end
     if #sorted_list == 0 then return end
@@ -358,7 +535,7 @@ function recipe_selection.display(player, recipes, recipe_table)
             local machine = recipe_element.grecipe.machine
             if machine and not machine.count then machine = nil end
 
-            if machine then
+            if machine and machine.machine then
                 local machine_label = translations.get_recipe_name(player_index, machine.machine.name)
                 if machine.count > 0 then
                     table.insert(tooltip_builder, "[font=heading-2][color=#42ff4b]")
@@ -393,11 +570,11 @@ function recipe_selection.display(player, recipes, recipe_table)
                 end
                 local amount
                 if machine then
-                    amount = tools.fround(production.get_ingredient_amout(machine, i) * machine.count)
+                    amount = tools.fround(production.get_ingredient_amount(machine, i) * machine.count)
                 else
                     amount = i.amount
                 end
-                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tostring(amount) .. " x " .. label)
+                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tools.fround(amount) .. " x " .. label)
                 table.insert(i_table, { name = name, tooltip = label })
             end
             table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
@@ -433,7 +610,7 @@ function recipe_selection.display(player, recipes, recipe_table)
                         amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
                     end
                     if p.probability and p.probability < 1 then
-                        amount = amount .. "(" .. tostring(p.probability * 100) .. "%)"
+                        amount = amount .. "(" .. tostring(tools.fround(p.probability * 100)) .. "%)"
                     end
                 end
                 table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
@@ -473,12 +650,16 @@ function recipe_selection.display(player, recipes, recipe_table)
             end
             local arrow = recipe_line.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
             arrow.style.top_margin = 6
+            local product_set = {}
             for _, def in pairs(p_table) do
-                local b = gutils.create_product_button(recipe_line, def.name)
-                b.style = product_button_style
-                b.style.size = sprite_button_size
-                b.style.margin = 0
-                tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
+                if not product_set[def.name] then
+                    product_set[def.name] = true
+                    local b = gutils.create_product_button(recipe_line, def.name)
+                    b.style = product_button_style
+                    b.style.size = sprite_button_size
+                    b.style.margin = 0
+                    tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
+                end
             end
             recipe_line.style.horizontally_stretchable = true
         else
@@ -494,6 +675,27 @@ function recipe_selection.display(player, recipes, recipe_table)
             recipe_table.add { type = "label", caption = "" }
         end
     end
+end
+
+---@param player LuaPlayer
+function recipe_selection.update_recipes(player)
+    local g = gutils.get_graph(player)
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local recipe_table = tools.get_child(frame, "recipe_table")
+    if not recipe_table then return end
+
+    local recipes = {}
+    for _, line in pairs(recipe_table.children) do
+        local recipe_name = line.tags.recipe_name --[[@as string]]
+        local grecipe = g.recipes[recipe_name]
+        if grecipe then
+            recipes[recipe_name] = grecipe
+        end
+    end
+    recipe_table.clear()
+    recipe_selection.display_recipes(player, recipes, recipe_table)
 end
 
 tools.on_gui_click(np("close"),
@@ -626,6 +828,8 @@ function recipe_selection.process_query(player, name)
     end
     if g.show_only_researched then
         recipes = gutils.filter_enabled_recipe(recipes)
+    else
+        recipes = gutils.filter_non_product_recipe(recipes)
     end
     recipe_selection.show_recipes(player, recipes)
 end
@@ -647,6 +851,7 @@ tools.on_named_event(np("choose_item"), defines.events.on_gui_elem_changed,
         end
 
         name = "item/" .. name
+        push_history_with_names(player, nil, name)
         recipe_selection.process_query(player, name)
     end)
 
@@ -667,6 +872,7 @@ tools.on_named_event(np("choose_fluid"), defines.events.on_gui_elem_changed,
         end
 
         name = "fluid/" .. name
+        push_history_with_names(player, nil, name)
         recipe_selection.process_query(player, name)
     end)
 
@@ -682,16 +888,18 @@ tools.on_gui_click(np("select-all"),
 
         ---@cast recipe_table -nil
         for _, line in pairs(recipe_table.children) do
-            local name = line.tags.recipe_name
+            local name = line.tags.recipe_name --[[@as string]]
             local cb = line[cb_name]
             if name and cb then
                 local grecipe = g.recipes[name]
                 g.selection[name] = grecipe
                 cb.state = true
+                if g.visibility == commons.visibility_layers then
+                    grecipe.layer = g.current_layer
+                end
             end
         end
-        graph.refresh(player)
-        gutils.fire_selection_change(g)
+        graph.deferred_update(player, { do_layout = true, center_on_graph = true, no_recipe_selection_update = true })
     end)
 
 
@@ -731,6 +939,58 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
         recipe_selection.close(player.index)
     end)
 
+tools.on_named_event(np("backward"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.alt or e.shift) then
+            backward_history(game.players[e.player_index])
+        elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.alt or e.shift) then
+            clear_history(game.players[e.player_index])
+        end
+    end)
+
+tools.on_named_event(np("forward"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.alt or e.shift) then
+            forward_history(game.players[e.player_index])
+        end
+    end)
+
+tools.on_named_event(np("remaining"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        local product_name = e.element.tags.product_name --[[@as string]]
+        if not product_name then return end
+        local gproduct = g.products[product_name]
+        if not gproduct then return end
+        recipe_selection.open(g, gproduct, nil, true)
+    end)
+
+
+tools.register_user_event(commons.selection_change_event, function(data)
+    ---@type Graph
+    local g = data.g
+    local player = g.player
+
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local remaining_pane = tools.get_child(frame, "remaining_pane")
+    if not remaining_pane then return end
+
+    recipe_selection.display_remaining(g, remaining_pane)
+end)
+
+tools.register_user_event(commons.open_recipe_selection, function(data)
+    local g = data.g
+    recipe_selection.open(g, data.product, data.recipe, data.only_product)
+end)
+
 
 drawing.open_recipe_selection = recipe_selection.open
+graph.update_recipe_selection = recipe_selection.update_recipes
+
 return recipe_selection

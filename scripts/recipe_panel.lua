@@ -89,7 +89,7 @@ function recipe_panel.create(player_index, grecipe)
     end
 
     local machine = grecipe.machine
-    if machine then
+    if machine and machine.machine then
         if machine.count and machine.count > 0 then
             local label = flow.add { type = "label", caption = { np("machine-normal"), tools.fround(machine.count), machine.machine.localised_name } }
             label.style.bottom_margin = 3
@@ -104,10 +104,12 @@ function recipe_panel.create(player_index, grecipe)
         for _, p in pairs(recipe.ingredients) do
             local caption
             if machine and machine.count and machine.count > 0 then
+                local per_machine = production.get_ingredient_amount(machine, p)
                 caption = { np("ingredient"),
-                    tools.fround(production.get_ingredient_amout(machine, p) * machine.count),
+                    tools.fround(per_machine* machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
-                    gutils.get_product_name(player, p.type .. "/" .. p.name)
+                    gutils.get_product_name(player, p.type .. "/" .. p.name),
+                    "(" .. tools.fround(per_machine) .. "/m)"
                 }
             else
                 caption = get_product_label(player_index, p)
@@ -126,11 +128,12 @@ function recipe_panel.create(player_index, grecipe)
             local caption
 
             if machine and machine.count and machine.count > 0 then
+                local per_machine = production.get_product_amount(machine, p)
                 caption = { np("product"),
-                    tools.fround(production.get_product_amount(machine, p) * machine.count),
+                    tools.fround(per_machine * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name),
-
+                    "(" .. tools.fround(per_machine) .. "/m)"
                 }
             else
                 caption = get_product_label(player_index, p)
@@ -148,6 +151,17 @@ function recipe_panel.create(player_index, grecipe)
 
     local category = recipe.category
     local machines = game.get_filtered_entity_prototypes { { filter = "crafting-category", crafting_category = category } }
+
+    local technologies = game.get_filtered_technology_prototypes { { filter = "unlocks-recipe", recipe = recipe.name } }
+    if technologies and #technologies > 0 then
+        add_line({ np("technology") })
+
+        for _, tech in pairs(technologies) do
+            local name = translations.get_technology_name(player_index, tech.name)
+            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
+            label.style.bottom_margin = 3
+        end
+    end
 
     add_line({ np("craft-in") })
     for _, machine in pairs(machines) do
@@ -169,18 +183,6 @@ function recipe_panel.create(player_index, grecipe)
             local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] ", localised } }
             label.style.bottom_margin = 3
             ::next_recipe::
-        end
-    end
-
-
-    local technologies = game.get_filtered_technology_prototypes { { filter = "unlocks-recipe", recipe = recipe.name } }
-    if technologies and #technologies > 0 then
-        add_line({ np("technology") })
-
-        for _, tech in pairs(technologies) do
-            local name = translations.get_technology_name(player_index, tech.name)
-            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
-            label.style.bottom_margin = 3
         end
     end
 end

@@ -40,7 +40,8 @@ end
 
 local visibility_items = {
     { np("visibility_all") },
-    { np("visibility_selection") }
+    { np("visibility_selection") },
+    { np("visibility_layers") }
 }
 
 ---@param player LuaPlayer
@@ -95,17 +96,26 @@ function command.open(player)
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
+    hflow.add { type = "label", caption = { np("show_products") } }
+    hflow.add { type = "checkbox",
+        name = np("show_products"),
+        tooltip = { np("show_products_tooltip") },
+        state = not not g.show_products
+    }
+    hflow.style.bottom_margin = 5
+
+    hflow = inner_frame.add { type = "flow", direction = "horizontal" }
     hflow.add { type = "button", caption = { np("add") }, name = np("add"), tooltip = { np("add_tooltip") } }
     hflow.add { type = "button", caption = { np("production") }, name = np("production"), tooltip = { np("production_tooltip") } }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("settings") }, name = np("settings"), tooltip= {np("settings_tooltip")} }
-    hflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip= {np("save_tooltip")} }
+    hflow.add { type = "button", caption = { np("settings") }, name = np("settings"), tooltip = { np("settings_tooltip") } }
+    hflow.add { type = "button", caption = { np("save") }, name = np("save"), tooltip = { np("save_tooltip") } }
     hflow.style.bottom_margin = 5
 
     hflow = inner_frame.add { type = "flow", direction = "horizontal" }
-    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all") , tooltip= {np("unselect_tooltip")} }
+    hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all"), tooltip = { np("unselect_tooltip") } }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
     hflow.style.bottom_margin = 5
 end
@@ -137,16 +147,51 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
     function(e)
         local player = game.players[e.player_index]
         local g = gutils.get_graph(player)
+        local old_visibility = g.visibility
         g.visibility = e.element.selected_index
-        graph.refresh(player)
-        gutils.recenter(g)
+        if old_visibility == commons.visibility_all or g.visibility == commons.visibility_all then
+            graph.deferred_update(player, {
+                do_layout = true,
+                center_on_graph = true
+            })
+        else
+            graph.deferred_update(player, {
+                do_redraw = true,
+                update_product_list = true
+            })
+        end
+        gutils.fire_selection_change(g)
     end)
 
+---@param player LuaPlayer
+function command.update_display(player)
+    local frame = player.gui.left[command_frame_name]
+    if not frame then return end
+
+    local vis = tools.get_child(frame, np("visibility"))
+    if not vis then return end
+
+    local g = gutils.get_graph(player)
+    if not g then return end
+
+    vis.selected_index = g.visibility
+    
+    local show_products = tools.get_child(frame, np("show_products"))
+    if show_products then
+        show_products.state = not not g.show_products
+    end
+end
+
 tools.on_named_event(np("refresh"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
     function(e)
         local player = game.players[e.player_index]
-        graph.refresh(player)
         local g = gutils.get_graph(player)
+    
+        if not(e.control or e.shift or e.alt) then
+            graph.refresh(player, false, true)
+        elseif e.control and not( e.shift or e.alt) then
+        end
         gutils.fire_production_data_change(g)
     end)
 
@@ -168,7 +213,15 @@ tools.on_named_event(np("settings"), defines.events.on_gui_click,
 tools.on_named_event(np("unselect_all"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
-        graph.unselect(game.players[e.player_index])
+        local player = game.players[e.player_index]
+
+        if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
+            graph.unselect(player)
+            saving.clear_current(player)
+        elseif not (e.button ~= defines.mouse_button_type.right or e.control or e.shift or e.alt) then
+            local g = gutils.get_graph(player)
+            drawing.unmark_all(g)
+        end
     end)
 
 ---@param player LuaPlayer
@@ -183,5 +236,20 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
     function(e)
         saving.create(e.player_index)
     end)
+
+tools.on_named_event(np("show_products"), defines.events.on_gui_checked_state_changed,
+    ---@param e EventData.on_gui_checked_state_changed
+    function(e)
+        local element = e.element
+        if not(element and element.valid) then return end
+
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        g.show_products = element.state
+        graph.refresh(player, false, true)
+    end
+)
+
+graph.update_command_display = command.update_display
 
 return command

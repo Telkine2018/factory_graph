@@ -100,7 +100,7 @@ function machinedb.is_machine_enabled(force, machine_name)
         { filter = "has-product-item",
             elem_filters = { { filter = "name", name = item } } } }
     for _, mr in pairs(machine_recipes) do
-        if force.recipes[mr.name].enabled then
+        if not mr.hidden and force.recipes[mr.name].enabled then
             return true
         end
     end
@@ -108,6 +108,24 @@ function machinedb.is_machine_enabled(force, machine_name)
 end
 
 local is_machine_enabled = machinedb.is_machine_enabled
+
+---@param player LuaPlayer
+---@return LuaInventory?
+local function get_player_inventory(player)
+    ---@type LuaEntity
+    local character = player.character
+    local vars = tools.get_vars(player)
+    if not character and vars.saved_character and vars.saved_character.valid then
+        character = vars.saved_character
+    end
+
+    ---@type LuaInventory?
+    local inv
+    if character then
+        return character.get_main_inventory()
+    end
+    return nil
+end
 
 ---@param g Graph
 ---@param recipe_name string
@@ -121,16 +139,29 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     end
 
     machinedb.initialize()
-    local machines           = machinedb.category_to_machines[recipe.category]
+    local machines                 = machinedb.category_to_machines[recipe.category]
 
-    local preferred_machines = g.preferred_machines
-    local preferred_modules  = g.preferred_modules
+    local preferred_machines       = g.preferred_machines
+    local preferred_modules        = g.preferred_modules
+    local preferred_beacon_modules = g.preferred_beacon_modules
+
+    if not machines or #machines == 0 then
+        return nil
+    end
+
+    local inv
+    if g.use_machine_in_inventory then
+        inv = get_player_inventory(g.player)
+    end
 
     if not preferred_machines then
         preferred_machines = {}
     end
     if not preferred_modules then
         preferred_modules = {}
+    end
+    if not preferred_beacon_modules then
+        preferred_beacon_modules = {}
     end
 
     ---@type {[string]:integer}
@@ -143,6 +174,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local found_index
     local found_order
+    local found_in_inventory
     for i = 1, #machines do
         local machine = machines[i]
         local machine_name = machine.name
@@ -153,34 +185,40 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
         if enabled or machine_set[machine_name] then
             local new_order = machine_set[machine_name]
+            local new_in_inventory = 0
             if new_order then
                 if not found_order or (found_order and new_order < found_order) then
                     found_order = new_order
                     found_index = i
                 end
             elseif not found_order then
-                found_index = i
+                if inv then
+                    new_in_inventory = inv.get_item_count(machine_name)
+                    if new_in_inventory > 0 then
+                        found_index = i
+                        found_in_inventory = true
+                    elseif not found_in_inventory then
+                        found_index = i
+                    end
+                else
+                    found_index = i
+                end
             end
         end
     end
     if not found_index then
-        if not g.show_only_researched then
-            for i = 1, #machines do
-                if machine_set[machines[i].name] then
-                    found_index = i
-                    break
-                end
+        for i = 1, #machines do
+            if machine_set[machines[i].name] then
+                found_index = i
+                break
             end
-            if not found_index then
-                found_index = 1
-            end
-        else
-            return nil
+        end
+        if not found_index then
+            found_index = #machines
         end
     end
     local found_machine = machines[found_index]
     local found_machine_module
-
 
     local preferred_beacon_name = g.preferred_beacon
     local preferred_beacon
@@ -191,7 +229,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     for _, module_name in pairs(preferred_modules) do
         local module = machinedb.modules[module_name]
-        if module.limitations and not module.limitations[recipe_name] then
+        if not module or (module.limitations and not module.limitations[recipe_name]) then
             goto skip
         end
 
@@ -202,23 +240,42 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         if effects.speed and not allowed_effects.speed then goto skip end
         if effects.consumption and not allowed_effects.consumption then goto skip end
 
-        if not found_machine_module then
-            found_machine_module = module_name
-        end
-        if not preferred_beacon then
-            break
-        end
-
-        allowed_effects = preferred_beacon.allowed_effects
-        ---@cast allowed_effects -nil
-        if effects.productivity and not allowed_effects.productivity then goto skip end
-        if effects.speed and not allowed_effects.speed then goto skip end
-        if effects.consumption and not allowed_effects.consumption then goto skip end
-
-        found_beacon_module = module_name
+        found_machine_module = module_name
         break
-
         ::skip::
+    end
+
+
+    if preferred_beacon then
+        for _, module_name in pairs(preferred_beacon_modules) do
+            local module = machinedb.modules[module_name]
+            if not module or (module.limitations and not module.limitations[recipe_name]) then
+                goto skip
+            end
+
+            local effects = module.effects
+
+            local allowed_effects = found_machine.allowed_effects
+            if effects.productivity and not allowed_effects.productivity then goto skip end
+            if effects.speed and not allowed_effects.speed then goto skip end
+            if effects.consumption and not allowed_effects.consumption then goto skip end
+
+
+            allowed_effects = preferred_beacon.allowed_effects
+            ---@cast allowed_effects -nil
+            if effects.productivity and not allowed_effects.productivity then goto skip end
+            if effects.speed and not allowed_effects.speed then goto skip end
+            if effects.consumption and not allowed_effects.consumption then goto skip end
+
+            found_beacon_module = module_name
+            break
+
+            ::skip::
+        end
+    end
+
+    if not found_machine then
+        return nil
     end
 
     ---@type ProductionConfig

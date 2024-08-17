@@ -50,7 +50,7 @@ function gutils.get_recipe_name(player, grecipe)
             localised_name = translations.get_fluid_name(player.index, string.sub(grecipe.name, 7))
         end
     else
-        localised_name = translations.get_recipe_name(player.index, grecipe.name)
+        localised_name = translations.get_recipe_name(player.index, grecipe.name) or ""
     end
     return localised_name
 end
@@ -59,6 +59,9 @@ end
 ---@param name string
 ---@return LocalisedString
 function gutils.get_product_name(player, name)
+    ---@type LocalisedString
+    local localised_name
+
     if match(name, "^item/") then
         localised_name = translations.get_item_name(player.index, string.sub(name, 6))
     else -- fluid
@@ -87,10 +90,9 @@ end
 function gutils.get_colline(g, x, y)
     local grid_size = g.grid_size
     local col = math.floor((x - 0.5 + grid_size / 2) / grid_size)
-    local line = math.floor((y - 0.5 + grid_size / 2) / grid_size )
-    return col,line
+    local line = math.floor((y - 0.5 + grid_size / 2) / grid_size)
+    return col, line
 end
-
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -185,14 +187,18 @@ function gutils.select_current_recipe(g, recipe)
     if not recipe then return false end
     if g.selection[recipe.name] then return false end
     g.selection[recipe.name] = recipe
-    gutils.fire_selection_change(g)
+    if g.visibility == commons.visibility_layers then
+        recipe.layer = g.current_layer
+    end
     return true
 end
 
 ---@param g Graph
 ---@param keep_position boolean?
+---@return boolean
 function gutils.compute_visibility(g, keep_position)
     local show_only_researched = g.show_only_researched
+    local position_missing = false
     if g.visibility == commons.visibility_selection then
         local selection = g.selection
         if not selection then
@@ -201,19 +207,50 @@ function gutils.compute_visibility(g, keep_position)
         for _, grecipe in pairs(g.recipes) do
             grecipe.selector_positions = nil
             grecipe.entity = nil
+            grecipe.visible = true
             if selection[grecipe.name] then
                 if not keep_position then
                     grecipe.line = nil
                     grecipe.col = nil
-                end
-                grecipe.visible = true
-                if show_only_researched and not grecipe.enabled then
-                    grecipe.visible = false
+                elseif not grecipe.line or not grecipe.col then
+                    position_missing = true
                 end
             else
                 grecipe.line = nil
                 grecipe.col = nil
-                grecipe.visible = false
+                grecipe.visible = nil
+            end
+        end
+    elseif g.visibility == commons.visibility_layers then
+        local selection = g.selection
+        if not selection then
+            selection = {}
+        end
+        local visible_layers = g.visible_layers
+        if not visible_layers then
+            visible_layers = {}
+        end
+        for _, grecipe in pairs(g.recipes) do
+            grecipe.selector_positions = nil
+            grecipe.entity = nil
+            if selection[grecipe.name] then
+                if grecipe.layer and visible_layers[grecipe.layer] then
+                    grecipe.visible = true
+                else
+                    grecipe.visible = nil
+                end
+                if not keep_position then
+                    grecipe.line = nil
+                    grecipe.col = nil
+                else
+                    if not grecipe.line or not grecipe.col then
+                        position_missing = true
+                    end
+                end
+            else
+                grecipe.line = nil
+                grecipe.col = nil
+                grecipe.visible = nil
             end
         end
     else -- if g.visibility == commons.visibility_all then
@@ -230,6 +267,7 @@ function gutils.compute_visibility(g, keep_position)
             end
         end
     end
+    return position_missing
 end
 
 ---@param g Graph
@@ -260,7 +298,20 @@ end
 function gutils.filter_enabled_recipe(recipes)
     local new_recipes = {}
     for key, recipe in pairs(recipes) do
-        if recipe.enabled then
+        if recipe.enabled and not recipe.is_product then
+            new_recipes[key] = recipe
+        end
+    end
+    return new_recipes
+end
+
+---@generic KEY
+---@param recipes table<KEY, GRecipe>
+---@return table<KEY, GRecipe>
+function gutils.filter_non_product_recipe(recipes)
+    local new_recipes = {}
+    for key, recipe in pairs(recipes) do
+        if not recipe.is_product then
             new_recipes[key] = recipe
         end
     end
@@ -299,7 +350,7 @@ function gutils.get_connected_productions(grecipe, result)
 
     for _, product in pairs(grecipe.products) do
         for _, precipe in pairs(product.ingredient_of) do
-            if precipe.visible then
+            if precipe.visible and precipe.col then
                 result[precipe.name] = precipe
             end
         end
@@ -308,48 +359,55 @@ function gutils.get_connected_productions(grecipe, result)
 end
 
 ---@param g Graph
----@param all boolean?
+---@param recipes {[string]:GRecipe}?
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
 ---@return table<string, GProduct>
----@return integer
-function gutils.get_product_flow(g, all)
+---@return table<string, GProduct>
+---@return table<string, GRecipe>
+function gutils.get_product_flow(g, recipes)
     ---@type table<string, GProduct>
     local inputs
     ---@type table<string, GProduct>
     local outputs
     ---@type table<string, GProduct>
     local intermediates
+    ---@type table<string, GProduct>
+    local all
 
     inputs = {}
     outputs = {}
     intermediates = {}
-    local selection = g.selection
-    if not selection then selection = {} end
-    local recipe_count = 0
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
-            for _, ingredient in pairs(recipe.ingredients) do
-                local name = ingredient.name
-                inputs[name] = ingredient
+    all = {}
+    local used_recipes = {}
+    if recipes then
+        for _, recipe in pairs(recipes) do
+            if recipe.visible and not recipe.is_product then
+                used_recipes[recipe.name] = recipe
+                for _, ingredient in pairs(recipe.ingredients) do
+                    local name = ingredient.name
+                    inputs[name] = ingredient
+                    all[name] = ingredient
+                end
             end
         end
-        recipe_count = recipe_count + 1
-    end
-    for _, recipe in pairs(g.recipes) do
-        if recipe.visible and (all or selection[recipe.name]) and not recipe.is_product then
-            for _, product in pairs(recipe.products) do
-                local name = product.name
-                if inputs[name] then
-                    intermediates[name] = product
-                    inputs[name] = nil
-                elseif not intermediates[name] then
-                    outputs[name] = product
+        for _, recipe in pairs(recipes) do
+            if recipe.visible and not recipe.is_product then
+                used_recipes[recipe.name] = recipe
+                for _, product in pairs(recipe.products) do
+                    local name = product.name
+                    if inputs[name] then
+                        intermediates[name] = product
+                        inputs[name] = nil
+                    elseif not intermediates[name] then
+                        outputs[name] = product
+                    end
+                    all[name] = product
                 end
             end
         end
     end
-    return inputs, outputs, intermediates, recipe_count
+    return inputs, outputs, intermediates, all, used_recipes
 end
 
 local line_margin = 5
@@ -407,10 +465,11 @@ function gutils.recenter(g)
 end
 
 ---@param recipes table<any, GRecipe>
-function gutils.compute_sum(recipes)
+---@param gname string?
+function gutils.compute_sum(recipes, gname)
     local col, line, count = 0, 0, 0
     for _, recipe in pairs(recipes) do
-        if recipe.visible and recipe.col then
+        if recipe.visible and recipe.col and recipe.name ~= gname then
             col = col + recipe.col
             line = line + recipe.line
             count = count + 1
@@ -460,16 +519,21 @@ local saved_graph_fields = {
     "preferred_modules",
     "preferred_beacon",
     "preferred_beacon_count",
+    "preferred_beacon_modules",
     "iovalues",
     "visibility",
-    "color_index"
+    "color_index",
+    "current_layer",
+    "visible_layers",
+    "show_products"
+    
 }
 
 local saved_reciped_fields = {
     "name",
-    "production_config",
-    "line",
-    "col"
+    "production_config", "line",
+    "col",
+    "layer"
 }
 
 gutils.saved_graph_fields = saved_graph_fields
@@ -507,7 +571,6 @@ end
 ---@param products {[string]:any}
 ---@return {[string]:GRecipe}
 function gutils.get_connected_recipes(g, products)
-
     ---@type {[string]:GProduct}
     local to_scan = {}
     local done_scan = {}
@@ -547,9 +610,13 @@ end
 ---@param col integer
 ---@param line integer
 function gutils.set_colline(g, grecipe, col, line)
-
-    local gcol = g.gcols[grecipe.col]
-    gcol.line_set[grecipe.line] = nil
+    local gcol
+    if grecipe.col then
+        gcol = g.gcols[grecipe.col]
+        if gcol then
+            gcol.line_set[grecipe.line] = nil
+        end
+    end
 
     gcol = g.gcols[col]
     if not gcol then
@@ -571,12 +638,48 @@ function gutils.set_colline(g, grecipe, col, line)
     end
 end
 
+---@param g Graph
+---@param col integer
+---@param line integer
+---@return GElement?
+function gutils.get_element_at_position(g, col, line)
+    local gcol = g.gcols[col]
+    if not gcol then return nil end
+    return gcol.line_set[line]
+end
+
 ---@param player LuaPlayer
 ---@param recipe_name string
 function gutils.set_cursor_stack(player, recipe_name)
     player.cursor_stack.clear()
-    player.cursor_stack.set_stack{name=commons.recipe_symbol_name, count=1}
-    player.cursor_stack.tags = { recipe_name = recipe_name}
+    player.cursor_stack.set_stack { name = commons.recipe_symbol_name, count = 1 }
+    player.cursor_stack.tags = { recipe_name = recipe_name }
+end
+
+---@param player LuaPlayer
+function gutils.exit(player) end
+
+---@param player LuaPlayer
+function gutils.enter(player) end
+
+---@param g Graph
+function gutils.clear(g)
+    g.selection = {}
+    g.iovalues = {}
+    g.color_index = 0
+    for _, gproduct in pairs(g.products) do
+        gproduct.color = nil
+    end
+    g.product_outputs = nil
+    g.product_inputs = nil
+    g.production_failed = nil
+    g.production_recipes_failed = nil
+    g.bound_products = nil
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.production_config = nil
+        grecipe.machine = nil
+        grecipe.layer = nil
+    end
 end
 
 return gutils

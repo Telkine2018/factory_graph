@@ -11,7 +11,7 @@ local commons = {
     context_version = 1,
     prefix = prefix,
     surface_prefix = "_factory_graph_",
-    tile_name = prefix .. "-ground",
+    tile_name = prefix .. "-ground2",
 
     recipe_symbol_name = prefix .. "-recipe-symbol",
     product_symbol_name = prefix .. "-product-symbol",
@@ -28,12 +28,14 @@ local commons = {
 
     visibility_all = 1,
     visibility_selection = 2,
+    visibility_layers = 3,
     add_debug_info = false,
 
-    selection_change_event = "selection_change",        
+    selection_change_event = "selection_change",
     production_compute_event = "production_compute",
     production_data_change_event = "production_data_change",
     graph_selection_change_event = "graph_selection_change",
+    open_recipe_selection = "open_recipe_selection",
 
     math_precision = 0.000001,
     production_failures = {
@@ -41,10 +43,13 @@ local commons = {
         linear_dependecy = "linear_dependecy",
         no_soluce = "no_soluce",
         no_soluce1 = "no_soluce1",
-        invalid_soluce="invalid_soluce",
+        invalid_soluce = "invalid_soluce",
         too_many_free_variables = "too_many_free_variables",
-        too_many_constraints = "too_many_constraints"
-    }
+        too_many_constraints = "too_many_constraints",
+        cannot_find_machine = "cannot_find_machine",
+        use_handcraft_recipe = "use_handcraft_recipe"
+    },
+    generate_with_lab_tiles = true
 
 }
 
@@ -70,4 +75,3 @@ commons.surface_prefix_filter = "^" .. commons.surface_prefix
 function commons.png(name) return (commons.graphic_path):format(name) end
 
 return commons
-

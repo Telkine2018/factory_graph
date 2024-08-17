@@ -1,5 +1,92 @@
 ---------------------------------------------------------------------------------------------------
-Version: 0.0.1
-Date: 03. 03. 2024.
+Version: 1.0.10
+Date: 18. 08. 2024.
+  Changes:
+    - Improve line layout
+---------------------------------------------------------------------------------------------------
+Version: 1.0.9
+Date: 17. 08. 2024.
+  Changes:
+    - Add a checkbox to show input products on the graph - Ctrl-Click on a product to open the recipe list
+    - Improve automatic layout when selection change (in graph settings)
+---------------------------------------------------------------------------------------------------
+Version: 1.0.8
+Date: 16. 08. 2024.
+  Bugfixes:
+    - Fix crash on migration
+    - Fix display on select all recipes
+---------------------------------------------------------------------------------------------------
+Version: 1.0.7
+Date: 14. 08. 2024.
+  Changes:
+    - Add command to set layer to used products (involved in production), you can choose layed display to hide other recipes and also recompute layout
+    - Add graph setting to set line gap (gap between two adjacent lines)
+    - Improve drawing
+    - Add new graphic layout computations in settings, based on a tree whose roots are the targeted products (non zero value in production panel)
+---------------------------------------------------------------------------------------------------
+Version: 1.0.6
+Date: 02. 07. 2024.
+  Changes:
+    - Shift left click on a product (in the product panel) will set the layer of all recipe using this product (to find which recipe use a product)
+    - Add a setting to prefer machines in player inventory
+    - Change layer display to keep position when switching with selection display
+    - Add beacon modules preferences
+    - Improve link drawing
+  Bugfixes:
+    - Fix module selection
+    - Fix crash when production failed
+    - Fix history on recipe selection
+    - Fix layer management
+---------------------------------------------------------------------------------------------------
+Version: 1.0.5
+Date: 04. 05. 2024.
+  Changes:
+    - A saved selection is automatically pinned
+    - Add settings for the height of the save panel
+    - An game autosave is done when a selection is saved (can be disabled in settings)
+    - Right click on a machine in production panel highlights the real machines on origin surface
+    - Shift left click on a machine request missing machines from logistic network
+    - Add copy/paste machine preferences
+  Bugfixes:
+    - Crash when importing from a wrong machine
+    - Invalid craft recipe for furnace
+    - Crash on configuration change
+---------------------------------------------------------------------------------------------------
+Version: 1.0.4
+Date: 03. 05. 2024.
+  Bugfixes:
+    - Fix clear of savings
+    - Loading current selected saving does not override saved one
+    - Save position in graph upon exit
+    - Fix invalid use of black tile in nauvis
+  Changes:
+    - Alt-k on an assembly machine or a furnace move the graph to the corresponding recipe
+    - Add pinned selections in saving panel
+---------------------------------------------------------------------------------------------------
+Version: 1.0.3
+Date: 29. 04. 2024.
+  Bugfixes:
+    - Fix force change in enter/exit
+    - Fix invalid solver solution
+  Changes:
+    - Add summary of all machines used in a production
+    - Misc. improvements on layer
+---------------------------------------------------------------------------------------------------
+Version: 1.0.2
+Date: 25. 04. 2024.
+  Bugfixes:
+    - Add compatibility with Blueprint Sandox (Add <ALT>+<Graph button> to exit from Graph Exitor directly to Nauvis)
+    - Add layer management (<Shift>Click on recipe in graph, parameters in global settings)
+    - Fix crash on translations
+---------------------------------------------------------------------------------------------------
+Version: 1.0.1
+Date: 20. 04. 2024.
+  Changes:
+    - Add SHIFT on graph button to open production panel
+  Bugfixes:
+    - Fix crash at startup
+---------------------------------------------------------------------------------------------------
+Version: 1.0.0
+Date: 13. 04. 2024.
   Info:
     - Initial release
