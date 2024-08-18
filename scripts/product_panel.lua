@@ -467,6 +467,9 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         local output_label = ""
         ---@type LocalisedString
         local input_label = ""
+        ---@type LocalisedString
+        local inventory_label = ""
+
         if math.abs(output) > math_precision or math.abs(input) > math_precision then
             output_label = { np("product_produced"), tostring(output) }
 
@@ -474,6 +477,19 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                 input_label = { np("product_consumed"), tostring(input) }
             else
                 input_label = { np("product_all_consumed") }
+            end
+
+            local char = product_panel.get_character(player)
+            if char then
+                local inv = char.get_main_inventory()
+                local signal = tools.sprite_to_signal(product_name)
+                if signal and signal.type == "item" and inv then
+                    local count = inv.get_item_count(signal.name)
+                    local need = math.abs(input)
+                    if count > 0 and need > 0 then
+                        inventory_label = { np("in_inventory"), tostring(count), tostring(math.floor(count / need)) }
+                    end
+                end
             end
         end
 
@@ -522,7 +538,8 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         scan_list(gproduct.product_of)
 
         local recipe_str = table.concat(pline)
-        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label, output_label, input_label, recipe_str }
+        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label,
+            output_label, input_label, inventory_label, recipe_str }
     end)
 
 tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
@@ -777,17 +794,24 @@ function product_panel.update_error_panel(g, error_panel)
     end
 end
 
----@param player any
----@return LuaInventory?
----@return LuaLogisticNetwork?
----@return {[string]:integer}
-local function get_inventories(player)
+---@param player LuaPlayer
+---@return LuaEntity?
+function product_panel.get_character(player)
     ---@type LuaEntity
     local character = player.character
     local vars = tools.get_vars(player)
     if not character and vars.saved_character and vars.saved_character.valid then
         character = vars.saved_character
     end
+    return character
+end
+
+---@param player LuaPlayer
+---@return LuaInventory?
+---@return LuaLogisticNetwork?
+---@return {[string]:integer}
+local function get_inventories(player)
+    local character = product_panel.get_character(player)
 
     ---@type LuaInventory?
     local inv
