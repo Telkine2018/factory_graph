@@ -247,11 +247,11 @@ end
 function graph.get_product_recipe(g, product_name)
     local recipe = g.recipes[product_name]
     local product = g.products[product_name]
-    if recipe then 
+    if recipe then
         recipe.visible = true
         g.selection[recipe.name] = recipe
         product.product_of[recipe.name] = recipe
-        return recipe 
+        return recipe
     end
 
     recipe = {
@@ -1428,6 +1428,18 @@ function graph.tree_layout(g, settings)
         end
     end
 
+    ---@param grecipe GRecipe
+    local function add_empty(grecipe)
+        ---@type DisplayTreeNode
+        local newnode = {
+            recipe_name = grecipe.name,
+            grecipe = grecipe,
+            depth = 1
+        }
+        processed_recipes[grecipe.name] = true
+        table.insert(node_table, newnode)
+    end
+
     local sorted_table = {}
     for _, product in pairs(to_process) do
         if type(g.iovalues[product.name]) == "number" or outputs[product.name] then
@@ -1471,6 +1483,14 @@ function graph.tree_layout(g, settings)
     for _, product in pairs(sorted_table) do
         add_root(product)
         build_tree()
+    end
+
+    for _, grecipe in pairs(g.selection) do
+        if grecipe.visible then
+            if #grecipe.products == 0 then
+                add_empty(grecipe)
+            end
+        end
     end
 
     --- Process other product
