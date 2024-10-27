@@ -74,9 +74,17 @@ function dash_line_for_product(product, dash)
     if product.ids then
         for _, id in pairs(product.ids) do
             if dash then
-                rendering.set_dashes(id, 0.05, 0.1)
+                if id.dash_length == 0 then
+                    id.gap_length = 0.1
+                    id.dash_length = 0.05
+                    -- rendering.set_dashes(id, 0.05, 0.1)
+                end
             else
-                rendering.set_dashes(id, 0, 0)
+                if id .dash_length > 0 then
+                    id.dash_length = 0.0
+                    id.gap_length = 0.0
+                    -- rendering.set_dashes(id, 0, 0)
+                end
             end
         end
     end
@@ -570,9 +578,9 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
             end
         end
     end
-    topo_direct = topo_left_top >= topo_right_top 
+    topo_direct = topo_left_top >= topo_right_top
         and topo_left_top >= topo_left_bottom
-        and topo_right_bottom >= topo_right_top 
+        and topo_right_bottom >= topo_right_top
         and topo_right_bottom >= topo_left_bottom
 
     routing_line = routing_line - 0.001 * routing_col
@@ -1215,7 +1223,8 @@ local function draw_selected_entity(player, entity, grecipe)
     ---@type LocalisedString
     local localised_name = gutils.get_recipe_name(player, grecipe)
     local id = rendering.draw_text { surface = g.surface,
-        target = entity, text = localised_name, color = { 1, 1, 1 }, target_offset = { 0, 0.6 },
+        text = localised_name, color = { 1, 1, 1 },
+        target = { entity = entity, offset = { 0, 0.6 } },
         vertical_alignment = "top", alignment = "center", scale = recipe_font_size }
     table.insert(ids, id)
 
@@ -1290,11 +1299,11 @@ local function on_selected_entity_changed(e)
     local entity = player.selected
 
     if (g.selector_id) then
-        rendering.destroy(g.selector_id)
+        g.selector_id.destroy()
         g.selector_id = nil
     end
     if g.selector_product_name_id then
-        rendering.destroy(g.selector_product_name_id)
+        g.selector_product_name_id.destroy()
         g.selector_product_name_id = nil
     end
 
@@ -1303,8 +1312,8 @@ local function on_selected_entity_changed(e)
             g.selector_id = rendering.draw_rectangle {
                 surface = surface,
                 color = { 1, 0, 0 },
-                left_top = entity, left_top_offset = { -commons.selector_size, -commons.selector_size },
-                right_bottom = entity, right_bottom_offset = { commons.selector_size, commons.selector_size },
+                left_top = { entity = entity, offset = { -commons.selector_size, -commons.selector_size } },
+                right_bottom = { entity = entity, offset = { commons.selector_size, commons.selector_size } },
                 width = 0.5
             }
             local grecipe = g.selected_recipe
@@ -1317,8 +1326,8 @@ local function on_selected_entity_changed(e)
                         g.selector_product_name_id = rendering.draw_text {
                             color = { 1, 1, 1 },
                             surface = surface,
-                            target = entity,
-                            target_offset = { 0, -0.4 },
+                            target = { entity = entity,
+                                offset = { 0, -0.4 } },
                             alignment = "center",
                             text = text,
                             scale = 0.4

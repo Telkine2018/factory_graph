@@ -825,7 +825,7 @@ local function get_inventories(player)
     local craft_queue = {}
     if player.crafting_queue_size > 0 then
         for _, c in pairs(player.crafting_queue) do
-            local recipe = game.recipe_prototypes[c.recipe]
+            local recipe = prototypes.recipe[c.recipe]
             if recipe then
                 for _, p in pairs(recipe.products) do
                     if p.type == "item" then
@@ -983,7 +983,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     for _, m in pairs(sorted_table) do
         local name               = m.name
         local count              = m.count
-        local item               = game.entity_prototypes[name].items_to_place_this[1].name
+        local item               = prototypes.entity[name].items_to_place_this[1].name
         local crafted            = craft_queue[item] or 0
         local in_inventory_count = inv and inv.get_item_count(item) or 0
         local in_network_count   = network and network.get_item_count(item) or 0
@@ -1051,7 +1051,7 @@ tools.on_event(defines.events.on_player_crafted_item,
 ---@param item string
 ---@param count integer?
 function product_panel.craft_machine(player, item, count)
-    local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
+    local recipes = prototypes.get_recipe_filtered { { filter = "has-product-item",
         elem_filters = { { filter = "name", name = item } } } }
 
     if string.find(player.surface.name, commons.surface_prefix_filter) then
@@ -1255,7 +1255,7 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_hover,
         if not machine_name then return end
 
         local parts = { "" }
-        local proto = game.entity_prototypes[machine_name]
+        local proto = prototypes.entity[machine_name]
         if proto then
             parts = product_panel.create_parts_tooltip(player, proto)
             e.element.tooltip = { np("build-button-tooltip_hover"), parts }
@@ -1319,7 +1319,7 @@ function product_panel.create_parts_tooltip(player, machine_entity)
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
             local machine_recipes =
-                game.get_filtered_recipe_prototypes { {
+                prototypes.get_recipe_filtered { {
                     filter = "has-product-item",
                     elem_filters = { { filter = "name", name = machine_item } } } }
 
@@ -1389,9 +1389,9 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
             if e.control then
                 local machine = grecipe.machine
-                if not machine then 
+                if not machine then
                     local config = machinedb.get_default_config(g, recipe_name, {})
-                    if not config  then
+                    if not config then
                         return
                     end
                     machine = production.compute_machine(g, grecipe, config)
@@ -1400,6 +1400,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                 if string.find(player.surface.name, commons.surface_prefix_filter) then
                     gutils.exit(player)
                 end
+
+                ---@cast machine -nil
 
                 local bp_entity = {
 
@@ -1459,10 +1461,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                             rendering.draw_rectangle {
                                 surface = surface,
                                 color = color,
-                                left_top = entity,
-                                right_bottom = entity,
-                                left_top_offset = { -w, -h },
-                                right_bottom_offset = { w, h },
+                                left_top = { entity = entity, offset = { -w, -h } },
+                                right_bottom = { entity = entity, right_bottom_offset = { w, h } },
                                 width = 2, time_to_live = 2 * 60
                             }
                             count = count + 1

@@ -493,7 +493,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     ---@type {grecipe:GRecipe, recipe:LuaRecipePrototype?, localized:string}[]
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
-        local recipe = game.recipe_prototypes[grecipe.name]
+        local recipe = prototypes.recipe[grecipe.name]
         if (not grecipe.hidden) or g.show_hidden then
             if recipe then
                 table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })

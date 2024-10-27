@@ -49,32 +49,13 @@ local function get_energy(machine)
     if percent < -0.8 then
         percent = -0.8
     end
-    local energy = machine.machine.max_energy_usage * machine.count * (1 + percent) * 60
+    local energy = machine.machine.get_max_energy_usage() * machine.count * (1 + percent) * 60
     return energy
 end
 
 production.get_product_amount = get_product_amount
 production.get_ingredient_amount = get_ingredient_amount
 production.get_energy = get_energy
-
----@param g Graph
----@param module LuaItemPrototype
----@return {[string]:true}
-function production.add_limitation(g, module)
-    if not g.module_limitations then
-        g.module_limitations = {}
-    end
-    local module_name = module.name
-    local limitation_map = g.module_limitations[module_name]
-    if not limitation_map then
-        limitation_map = {}
-        g.module_limitations[module_name] = limitation_map
-        for _, name in pairs(module.limitations) do
-            limitation_map[name] = true
-        end
-    end
-    return limitation_map
-end
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -88,21 +69,21 @@ function production.compute_machine(g, grecipe, config)
         if grecipe.is_product then goto skip end
 
         local recipe_name = grecipe.name
-        local recipe = game.recipe_prototypes[recipe_name]
+        local recipe = prototypes.recipe[recipe_name]
 
         ---@type ProductionMachine
         machine = {
             recipe_name = recipe_name,
             grecipe = grecipe,
             recipe = recipe,
-            machine = game.entity_prototypes[config.machine_name],
+            machine = prototypes.entity[config.machine_name],
             config = config
         }
 
         if config.machine_modules then
             machine.modules = {}
             for _, module_name in pairs(config.machine_modules) do
-                table.insert(machine.modules, game.item_prototypes[module_name])
+                table.insert(machine.modules,prototypes.item[module_name])
             end
         end
 
@@ -111,39 +92,45 @@ function production.compute_machine(g, grecipe, config)
         local productivity = 0
         local consumption = 0
         local pollution = 0
+        local quality = 0
 
         if machine.modules then
             for _, module in pairs(machine.modules) do
                 local effects = module.module_effects
                 if effects then
-                    if effects.speed then speed = speed + effects.speed.bonus end
-                    if effects.productivity then productivity = productivity + effects.productivity.bonus end
-                    if effects.consumption then consumption = consumption + effects.consumption.bonus end
-                    if effects.pollution then pollution = pollution + effects.pollution.bonus end
+                    if effects.speed then speed = speed + effects.speed end
+                    if effects.productivity then productivity = productivity + effects.productivity end
+                    if effects.consumption then consumption = consumption + effects.consumption end
+                    if effects.pollution then pollution = pollution + effects.pollution end
+                    if effects.quality then quality = quality + effects.quality end
                 end
             end
         end
 
-        if config.beacon_name and config.beacon_modules then
-            local beacon = game.entity_prototypes[config.beacon_name]
+        if config.beacon_name and config.beacon_modules and config.beacon_count > 0 then
+            local beacon = prototypes.entity[config.beacon_name]
             local effectivity = beacon.distribution_effectivity
-
+            local profile = beacon.profile
             local beacon_count = config.beacon_count or 0
+            
+            if profile then
+                local index = #profile
+                if index > config.beacon_count then
+                    index = config.beacon_count
+                end
+                effectivity = profile[index] * effectivity
+            end
+            
             for _, module_name in pairs(config.beacon_modules) do
-                local module = game.item_prototypes[module_name]
+                local module = prototypes.item[module_name]
                 local effects = module.module_effects
 
-                if module.limitations and #module.limitations > 0 then
-                    local limitation_map = production.add_limitation(g, module)
-                    if not limitation_map[recipe_name] then
-                        goto skip
-                    end
-                end
                 if effects then
-                    if effects.speed then speed = speed + beacon_count * effectivity * effects.speed.bonus end
-                    if effects.productivity then productivity = productivity + beacon_count * effectivity * effects.productivity.bonus end
-                    if effects.consumption then consumption = consumption + beacon_count * effectivity * effects.consumption.bonus end
-                    if effects.pollution then pollution = pollution + beacon_count * effectivity * effects.pollution.bonus end
+                    if effects.speed then speed = speed + beacon_count * effectivity * effects.speed end
+                    if effects.productivity then productivity = productivity + beacon_count * effectivity * effects.productivity end
+                    if effects.consumption then consumption = consumption + beacon_count * effectivity * effects.consumption end
+                    if effects.pollution then pollution = pollution + beacon_count * effectivity * effects.pollution end
+                    if effects.quality then quality = quality + beacon_count * effectivity * effects.quality end
                 end
                 ::skip::
             end
@@ -156,10 +143,11 @@ function production.compute_machine(g, grecipe, config)
         machine.productivity = productivity
         machine.consumption = consumption
         machine.pollution = pollution
+        machine.quality = quality / 10
 
         if machine.machine then
-            machine.theorical_craft_s = (1 + speed) * machine.machine.crafting_speed / recipe.energy
-            machine.limited_craft_s = math.min(machine.theorical_craft_s, 60)
+            machine.theorical_craft_s = (1 + speed) * machine.machine.get_crafting_speed("normal") / recipe.energy
+            machine.limited_craft_s = machine.theorical_craft_s
             machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
         else
             machine.theorical_craft_s = 0
@@ -747,17 +735,17 @@ end
 ---@param g Graph
 ---@param structure_change boolean?
 function production.push(g, structure_change)
-    if not global.production_queue then
-        global.production_queue = {}
+    if not storage.production_queue then
+        storage.production_queue = {}
     end
     local player_index = g.player.index
-    local data = global.production_queue[player_index]
+    local data = storage.production_queue[player_index]
     if data then
         if structure_change then
             data.structure_change = true
         end
     else
-        global.production_queue[player_index] = { g = g, structure_change = structure_change }
+        storage.production_queue[player_index] = { g = g, structure_change = structure_change }
     end
 end
 
@@ -774,11 +762,11 @@ function production.clear(g)
 end
 
 tools.on_nth_tick(30, function()
-    local production_queue = global.production_queue
+    local production_queue = storage.production_queue
     if not production_queue then
         return
     end
-    global.production_queue = nil
+    storage.production_queue = nil
     for _, data in pairs(production_queue) do
         production.compute_matrix(data.g)
         tools.fire_user_event(commons.production_compute_event, { g = data.g, structure_change = data.structure_change })

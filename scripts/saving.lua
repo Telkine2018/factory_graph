@@ -204,15 +204,15 @@ local function get_proto(icon)
     if not s_icon then return "" end
     if s_icon.type == "item" then
         ---@type LuaItemPrototype
-        local proto = game.item_prototypes[s_icon.name]
+        local proto = prototypes.item[s_icon.name]
         return "A " .. proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
     elseif s_icon.type == "fluid" then
         ---@type LuaFluidPrototype
-        local proto = game.fluid_prototypes[s_icon.name]
+        local proto = prototypes.fluid[s_icon.name]
         return "B " .. proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
     elseif s_icon.type == "virtual" then
         ---@type LuaVirtualSignalPrototype
-        local proto = game.virtual_signal_prototypes[s_icon.name]
+        local proto = prototypes.virtual_signal[s_icon.name]
         return "C " .. proto.subgroup.order .. " " .. proto.order
     else
         return ""
@@ -263,8 +263,8 @@ end
 ---@param save Saving
 local function update_save(g, save)
     local data = gutils.create_saving_data(g)
-    local json = game.table_to_json(data)
-    json       = game.encode_string(json) --[[@as string]]
+    local json = helpers.table_to_json(data)
+    json       = helpers.encode_string(json) --[[@as string]]
     save.json  = json
 end
 
@@ -380,8 +380,8 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
         local save = saves[index]
 
         if not (e.button ~= defines.mouse_button_type.left or e.shift) then
-            local json = game.decode_string(save.json) --[[@as string]]
-            local data = game.json_to_table(json) --[[@as SavingData]]
+            local json = helpers.decode_string(save.json) --[[@as string]]
+            local data = helpers.json_to_table(json) --[[@as SavingData]]
             local new_flow = tools.get_child(frame, "new_flow")
             if new_flow then
                 load_current_header(new_flow, save)
@@ -399,8 +399,8 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             graph.load_saving(g, data)
             saving.update_selection(line.parent)
         elseif not (e.button ~= defines.mouse_button_type.left or not e.shift or e.control) then
-            local json = game.decode_string(save.json) --[[@as string]]
-            local data = game.json_to_table(json) --[[@as SavingData]]
+            local json = helpers.decode_string(save.json) --[[@as string]]
+            local data = helpers.json_to_table(json) --[[@as SavingData]]
             graph.import_saving(g, data)
         end
     end)
@@ -417,7 +417,7 @@ tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
 
         parent.icon2.elem_value = signal
         if signal and parent.label and parent.label.text == "" then
-            if signal.type == "item" then
+            if not signal.type or signal.type == "item" then
                 parent.label.text = translations.get_item_name(e.player_index, signal.name) or ""
             elseif signal.type == "fluid" then
                 parent.label.text = translations.get_fluid_name(e.player_index, signal.name) or ""

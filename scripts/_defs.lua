@@ -11,12 +11,12 @@ local tools = require("scripts.tools")
 ---@field gcols GCol[]
 ---@field current_col integer
 ---@field product_line integer
----@field graph_ids integer[]?
+---@field graph_ids LuaRenderObject[]?
 ---@field x_routing RoutingSet
 ---@field y_routing RoutingSet
 ---@field select_product_positions GRecipeProductPosition[]?        @ to clear selection
----@field graph_select_ids integer[]?
----@field highlighted_recipes_ids integer[]?
+---@field graph_select_ids LuaRenderObject[]?
+---@field highlighted_recipes_ids LuaRenderObject[]?
 ---@field selected_recipe GRecipe?
 ---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
 ---@field selector_product_name string?             @ selected product
@@ -24,15 +24,16 @@ local tools = require("scripts.tools")
 ---@field rs_recipe GRecipe?                        @ recipe for product selection
 ---@field rs_product GProduct?                      @ product for product selection
 ---@field rs_location GuiLocation?
----@field selector_id integer?                      @ selector rectangle id
----@field selector_product_name_id integer?         @ selector text id
+---@field selector_id LuaRenderObject?                      @ selector rectangle id
+---@field selector_product_name_id LuaRenderObject?         @ selector text id
 ---@field recipe_order integer
 ---@field player_position MapPosition
 ---@field module_limitations {[string]:({[string]:true})}
 ---@field excluded_categories {[string]:boolean}?
+---@field excluded_subgroups {[string]:boolean}?
 ---@field require_full_selection boolean?
 ---@field move_recipe GRecipe?
----@field layer_ids integer[]?
+---@field layer_ids LuaRenderObject[]?
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
@@ -83,7 +84,7 @@ local tools = require("scripts.tools")
 ---@field is_root boolean?
 ---@field root_recipe GRecipe?
 ---@field color Color
----@field ids integer[]?
+---@field ids LuaRenderObject[]?
 
 ---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
@@ -162,6 +163,7 @@ local tools = require("scripts.tools")
 ---@field productivity number
 ---@field consumption number
 ---@field pollution number
+---@field quality number
 ---@field theorical_craft_s number      @ without productivity
 ---@field limited_craft_s number        @ without productivity
 ---@field produced_craft_s number
