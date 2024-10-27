@@ -1389,7 +1389,13 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
             if e.control then
                 local machine = grecipe.machine
-                if not machine then return end
+                if not machine then 
+                    local config = machinedb.get_default_config(g, recipe_name, {})
+                    if not config  then
+                        return
+                    end
+                    machine = production.compute_machine(g, grecipe, config)
+                end
 
                 if string.find(player.surface.name, commons.surface_prefix_filter) then
                     gutils.exit(player)

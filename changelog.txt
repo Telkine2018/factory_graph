@@ -3,6 +3,8 @@ Version: 1.0.10
 Date: 18. 08. 2024.
   Changes:
     - Improve line layout
+  Bugfixes:
+    - Crash on recipe with no product
 ---------------------------------------------------------------------------------------------------
 Version: 1.0.9
 Date: 17. 08. 2024.
