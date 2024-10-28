@@ -1,6 +1,6 @@
 {
   "name": "factory_graph",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "title": "Factory graph",
   "author": "Telkine2018",
   "contact": "",
@@ -9,6 +9,6 @@
   "factorio_version": "2.0",
   "dependencies": [
 		"base >= 2.0.0" ,
-    "flib >= 0.12.9"
+    "flib >= 0.15.0"
 	]
 }

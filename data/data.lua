@@ -99,9 +99,9 @@ local product_selector = {
 
   type = "lamp",
   name = commons.product_selector_name,
-  collision_box = { left_top = { -selector_size, -selector_size }, right_bottom = { selector_size, selector_size } },
+  collision_box = { { -selector_size, -selector_size }, { selector_size, selector_size } },
   collision_mask = { layers={} },
-  selection_box = { left_top = { -selector_size, -selector_size }, right_bottom = { selector_size, selector_size } },
+  selection_box = { { -selector_size, -selector_size }, { selector_size, selector_size } },
   selection_priority = 70,
   minable = nil,
   maximum_wire_distance = 1,
