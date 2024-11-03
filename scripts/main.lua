@@ -224,6 +224,10 @@ function main.enter_surface(player, recipe_name)
         surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
     end
 
+    for _, force in pairs(game.forces) do
+        force.set_surface_hidden(surface, true)
+    end
+
     local character        = player.character
     vars.surface           = surface
     vars.extern_surface    = player.surface
@@ -531,7 +535,7 @@ tools.on_event(defines.events.on_research_finished,
         local force_index = tech.force.index
 
         for _, player in pairs(game.players) do
-            if player.force_index == force_index then
+            if player.valid and player.force_index == force_index then
                 local g = gutils.get_graph(player)
                 if g then
                     local need_refresh
