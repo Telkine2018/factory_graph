@@ -1,5 +1,5 @@
 
-local dictionary = require("__flib__.dictionary-lite")
+local dictionary = require("__flib__.dictionary")
 
 -- local dictionary = require("scripts.dictionary-lite")
 
@@ -49,14 +49,14 @@ end
 
 
 local function load_translations()
-    load_names_and_descriptions("fluid", game.fluid_prototypes)
-    load_names_and_descriptions("item", game.item_prototypes)
+    load_names_and_descriptions("fluid", prototypes.fluid)
+    load_names_and_descriptions("item", prototypes.item)
 
-    load_names_and_descriptions("recipe_category", game.recipe_category_prototypes)
-    load_names_and_descriptions("recipe", game.recipe_prototypes)
+    load_names_and_descriptions("recipe_category", prototypes.recipe_category)
+    load_names_and_descriptions("recipe", prototypes.recipe)
 
-    load_names("entity", game.entity_prototypes)
-    load_names("technology", game.technology_prototypes)
+    load_names("entity", prototypes.entity)
+    load_names("technology", prototypes.technology)
 end
 
 tools.on_init(function()

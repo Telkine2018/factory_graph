@@ -74,13 +74,18 @@ end
 ---@param g Graph
 ---@param recipes table<string, LuaRecipe>
 ---@param excluded_categories {[string]:boolean}?
+---@param excluded_subgroups {[string]:boolean}?
 ---@return boolean
-function graph.update_recipes(g, recipes, excluded_categories)
+function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
     if not excluded_categories then
         excluded_categories = {}
     end
+    if not excluded_subgroups then
+        excluded_subgroups = {}
+    end
     local changed
     g.excluded_categories = excluded_categories
+    g.excluded_subgroups = excluded_subgroups
 
     for _, gproduct in pairs(g.products) do
         gproduct.ingredient_of = {}
@@ -88,7 +93,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
     end
 
     for name, recipe in pairs(recipes) do
-        if not excluded_categories[recipe.category] then
+        if not excluded_categories[recipe.category] and not excluded_subgroups[recipe.subgroup.name] then
             if (not recipe.hidden) or g.show_hidden then
                 local grecipe = g.recipes[name]
                 if not grecipe then
@@ -106,16 +111,16 @@ function graph.update_recipes(g, recipes, excluded_categories)
                     local pconfig = grecipe.production_config
                     if pconfig then
                         ---@type boolean?
-                        local failed = pconfig.machine_name and not game.entity_prototypes[pconfig.machine_name]
-                        failed = failed or (pconfig.beacon_name and not game.entity_prototypes[pconfig.beacon_name])
+                        local failed = pconfig.machine_name and not prototypes.entity[pconfig.machine_name]
+                        failed = failed or (pconfig.beacon_name and not prototypes.entity[pconfig.beacon_name])
                         if pconfig.machine_modules then
                             for _, module in pairs(pconfig.machine_modules) do
-                                failed = failed or (module and not game.item_prototypes[module])
+                                failed = failed or (module and not prototypes.item[module])
                             end
                         end
                         if pconfig.beacon_modules then
                             for _, module in pairs(pconfig.beacon_modules) do
-                                failed = failed or (module and not game.item_prototypes[module])
+                                failed = failed or (module and not prototypes.item[module])
                             end
                         end
                         if failed then
@@ -158,7 +163,7 @@ function graph.update_recipes(g, recipes, excluded_categories)
         end
     end
 
-    local resources = game.get_filtered_entity_prototypes { { filter = "type", type = "resource" } }
+    local resources = prototypes.get_entity_filtered { { filter = "type", type = "resource" } }
     for _, resource in pairs(resources) do
         local minable = resource.mineable_properties
         if minable and minable.minable and minable.products then
@@ -170,14 +175,17 @@ function graph.update_recipes(g, recipes, excluded_categories)
         end
     end
 
-    local pumps = game.get_filtered_entity_prototypes { { filter = "type", type = "offshore-pump" } }
+    --[[
+    local pumps = prototypes.get_entity_filtered  { { filter = "type", type = "offshore-pump" } }
     for _, pump in pairs(pumps) do
-        local fluid = pump.fluid
+        local box = pump.fluid_box
+        local fluid = box.filter
         if fluid then
             local product = get_product(g, "fluid/" .. fluid.name)
             product.is_root = true
         end
     end
+    ]]
 
     for _, product in pairs(g.products) do
         if product.used and product.is_root then
@@ -247,11 +255,11 @@ end
 function graph.get_product_recipe(g, product_name)
     local recipe = g.recipes[product_name]
     local product = g.products[product_name]
-    if recipe then 
+    if recipe then
         recipe.visible = true
         g.selection[recipe.name] = recipe
         product.product_of[recipe.name] = recipe
-        return recipe 
+        return recipe
     end
 
     recipe = {
@@ -321,26 +329,26 @@ function graph.remove_unused(g)
     end
 
     if changed then
-        if g.preferred_beacon and game.entity_prototypes[g.preferred_beacon] == nil then
+        if g.preferred_beacon and prototypes.entity[g.preferred_beacon] == nil then
             g.preferred_beacon = nil
         end
         if g.preferred_machines then
             for i = #g.preferred_machines, 1, -1 do
-                if game.entity_prototypes[g.preferred_machines[i]] == nil then
+                if prototypes.entity[g.preferred_machines[i]] == nil then
                     table.remove(g.preferred_machines, i)
                 end
             end
         end
         if g.preferred_modules then
             for i = #g.preferred_modules, 1, -1 do
-                if game.item_prototypes[g.preferred_modules[i]] == nil then
+                if prototypes.item[g.preferred_modules[i]] == nil then
                     table.remove(g.preferred_modules, i)
                 end
             end
         end
         if g.preferred_beacon_modules then
             for i = #g.preferred_beacon_modules, 1, -1 do
-                if game.item_prototypes[g.preferred_beacon_modules[i]] == nil then
+                if prototypes.item[g.preferred_beacon_modules[i]] == nil then
                     table.remove(g.preferred_beacon_modules, i)
                 end
             end
@@ -1058,10 +1066,10 @@ end
 ---@param player LuaPlayer
 ---@param data RedrawRequest?
 function graph.deferred_update(player, data)
-    local redraw_queue = global.redraw_queue
+    local redraw_queue = storage.redraw_queue
     if not redraw_queue then
         redraw_queue = {}
-        global.redraw_queue = redraw_queue
+        storage.redraw_queue = redraw_queue
     end
     if not data then
         data = {
@@ -1081,11 +1089,11 @@ end
 tools.on_event(defines.events.on_tick,
     function(e)
         ---@type {[integer]:RedrawRequest}
-        local redraw_queue = global.redraw_queue
+        local redraw_queue = storage.redraw_queue
         if not redraw_queue then
             return
         end
-        global.redraw_queue = nil
+        storage.redraw_queue = nil
         for player_index, data in pairs(redraw_queue) do
             local g = gutils.get_graph(game.players[player_index])
             if data.do_layout then
@@ -1428,6 +1436,18 @@ function graph.tree_layout(g, settings)
         end
     end
 
+    ---@param grecipe GRecipe
+    local function add_empty(grecipe)
+        ---@type DisplayTreeNode
+        local newnode = {
+            recipe_name = grecipe.name,
+            grecipe = grecipe,
+            depth = 1
+        }
+        processed_recipes[grecipe.name] = true
+        table.insert(node_table, newnode)
+    end
+
     local sorted_table = {}
     for _, product in pairs(to_process) do
         if type(g.iovalues[product.name]) == "number" or outputs[product.name] then
@@ -1445,17 +1465,17 @@ function graph.tree_layout(g, settings)
             ---@cast s1 -nil
             ---@cast s2 -nil
             if s1.type == "item" then
-                local proto = game.item_prototypes[s1.name]
+                local proto = prototypes.item[s1.name]
                 order1 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
             elseif s1.type == "fluid" then
-                local proto = game.fluid_prototypes[s1.name]
+                local proto = prototypes.fluid[s1.name]
                 order1 = proto.subgroup.order .. " " .. proto.order
             end
             if s2.type == "item" then
-                local proto = game.item_prototypes[s2.name]
+                local proto = prototypes.item[s2.name]
                 order2 = proto.group.order .. " " .. proto.subgroup.order .. " " .. proto.order
             elseif s2.type == "fluid" then
-                local proto = game.fluid_prototypes[s2.name]
+                local proto = prototypes.fluid[s2.name]
                 order2 = proto.subgroup.order .. " " .. proto.order
             end
             return order1 < order2
@@ -1471,6 +1491,14 @@ function graph.tree_layout(g, settings)
     for _, product in pairs(sorted_table) do
         add_root(product)
         build_tree()
+    end
+
+    for _, grecipe in pairs(g.selection) do
+        if grecipe.visible then
+            if #grecipe.products == 0 then
+                add_empty(grecipe)
+            end
+        end
     end
 
     --- Process other product

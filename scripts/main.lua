@@ -1,5 +1,5 @@
 local mod_gui = require("mod-gui")
-local dictionary = require("__flib__/dictionary-lite")
+local dictionary = require("__flib__/dictionary")
 local migration = require("__flib__/migration")
 
 local commons = require("scripts.commons")
@@ -66,7 +66,11 @@ local excluded_categories = {
     ["fuel-depot"] = true,
     ["transport-drone-request"] = true,
     ["transport-fluid-request"] = true,
+}
 
+local excluded_subgroups = {
+    ["empty-barrel"] = true,
+    ["fill-barrel"] = true
 }
 
 ---@param player any
@@ -86,7 +90,7 @@ function main.enter(player, recipe_name)
         g.player = player
         vars.graph = g
         local recipes = player.force.recipes
-        graph.update_recipes(g, recipes, excluded_categories)
+        graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
         graph.do_layout(g)
         graph.create_recipe_objects(g)
     end
@@ -177,7 +181,7 @@ local tile_name = commons.tile_name
 function main.enter_surface(player, recipe_name)
     local vars = tools.get_vars(player)
 
-    if not game.tile_prototypes[tile_name] then
+    if not prototypes.tile[tile_name] then
         tile_name = "lab-dark-2"
     end
 
@@ -388,6 +392,16 @@ local function picker_dolly_install()
 end
 
 tools.on_init(function()
+    local to_delete = {}
+    for _, surface in pairs(game.surfaces) do
+        if string.find(surface.name, commons.surface_prefix_filter) then
+            table.insert(to_delete, surface.name)
+        end
+    end
+    for _, name in pairs(to_delete) do
+        game.delete_surface(name)
+    end
+
     picker_dolly_install()
 end)
 
@@ -423,7 +437,7 @@ tools.on_configuration_changed(
                     command.open(player)
                 end
                 local recipes = player.force.recipes
-                graph.update_recipes(g, recipes, g.excluded_categories)
+                graph.update_recipes(g, recipes, g.excluded_categories, g.excluded_subgroups or {})
 
                 local need_refresh
                 for _, grecipe in pairs(g.recipes) do
@@ -450,9 +464,22 @@ tools.on_configuration_changed(
                         g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
                         g.surface.clear()
                     end
+
                     if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.7") then
                         g.line_gap = 0.2
                         g.always_use_full_selection = false
+                    end
+
+                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "2.0.0") then
+                        g.graph_ids = tools.render_translate_table(g.graph_ids)
+                        g.graph_select_ids = tools.render_translate_table(g.graph_select_ids)
+                        g.highlighted_recipes_ids = tools.render_translate_table(g.highlighted_recipes_ids)
+                        g.selector_id = tools.render_translate(g.selector_id)
+                        g.selector_product_name_id = tools.render_translate(g.selector_product_name_id)
+                        g.layer_ids = tools.render_translate_table(g.layer_ids)
+                        for _, gproduct in pairs(g.products) do
+                            gproduct.ids = tools.render_translate_table(g.ids)
+                        end
                     end
                 end
                 graph.deferred_update(player, { selection_changed = true, do_layout = need_refresh })
@@ -508,7 +535,7 @@ tools.on_event(defines.events.on_research_finished,
                 local g = gutils.get_graph(player)
                 if g then
                     local need_refresh
-                    for _, effect in pairs(tech.effects) do
+                    for _, effect in pairs(tech.prototype.effects) do
                         if effect.type == "unlock-recipe" then
                             local recipe_name = effect.recipe
                             local grecipe = g.recipes[recipe_name]
@@ -591,7 +618,7 @@ local function import_entities(e, clear)
         if entity.type == "assembling-machine" or entity.type == "furnace" then
             local recipe = entity.get_recipe()
             if not recipe and entity.type == "furnace" then
-                recipe = entity.previous_recipe
+                recipe = entity.previous_recipe.name
             end
             if recipe then
                 g.selection[recipe.name] = g.recipes[recipe.name]

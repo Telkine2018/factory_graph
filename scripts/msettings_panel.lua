@@ -26,7 +26,7 @@ local msettings = {}
 local function install_modules(container, g, config, grecipe)
     container.clear()
 
-    local assembly_machine = game.entity_prototypes[config.machine_name]
+    local assembly_machine = prototypes.entity[config.machine_name]
     if not assembly_machine then
         return
     end
@@ -36,16 +36,19 @@ local function install_modules(container, g, config, grecipe)
     end
 
     local allowed = {}
-    local modules = game.get_filtered_item_prototypes { { filter = "type", type = "module" } }
+    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
+    local recipe = prototypes.recipe[grecipe.name]
+    local allowed_effects = recipe.allowed_effects
+    local allowed_module_categories = recipe.allowed_module_categories
     for _, module in pairs(modules) do
         for effect, _ in pairs(module.module_effects) do
             if not assembly_machine.allowed_effects[effect] then
                 goto skip
             end
-        end
-        if module.limitations and #module.limitations > 0 then
-            local limitation_map = production.add_limitation(g, module)
-            if not limitation_map[grecipe.name] then
+            if allowed_effects and not allowed_effects[effect] then
+                goto skip
+            end
+            if allowed_module_categories and not allowed_module_categories[module.category] then
                 goto skip
             end
         end
@@ -60,7 +63,7 @@ local function install_modules(container, g, config, grecipe)
         if config.machine_modules then
             module_name = config.machine_modules[i]
             if module_name then
-                local module = game.item_prototypes[module_name]
+                local module = prototypes.item[module_name]
                 if module then
                     for effect in pairs(module.module_effects) do
                         if not assembly_machine.allowed_effects[effect] then
@@ -87,23 +90,31 @@ local function install_beacon_modules(container, g, config, grecipe)
     container.clear()
 
     if config.beacon_name then
-        local beacon = game.entity_prototypes[config.beacon_name]
+        local beacon = prototypes.entity[config.beacon_name]
         if not beacon then return end
 
         local count = beacon.module_inventory_size
         local allowed = {}
-        local modules = game.get_filtered_item_prototypes { { filter = "type", type = "module" } }
+        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
+
+        local recipe = prototypes.recipe[grecipe.name]
+        local allowed_effects = recipe.allowed_effects
+        local allowed_module_categories = recipe.allowed_module_categories
         for _, module in pairs(modules) do
-            for effect, _ in pairs(module.module_effects) do
+            for effect, value in pairs(module.module_effects) do
+                if effect == "quality" and value <= 0 then
+                    goto next
+                end
                 if not beacon.allowed_effects[effect] then
                     goto skip
                 end
-            end
-            if module.limitations and #module.limitations > 0 then
-                local limitation_map = production.add_limitation(g, module)
-                if not limitation_map[grecipe.name] then
+                if allowed_effects and not allowed_effects[effect] then
                     goto skip
                 end
+                if allowed_module_categories and not allowed_module_categories[module.category] then
+                    goto skip
+                end
+                ::next::
             end
             table.insert(allowed, module.name)
             ::skip::
@@ -153,7 +164,7 @@ function msettings.create(player_index, grecipe)
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end
 
-    local recipe = game.recipe_prototypes[grecipe.name]
+    local recipe = prototypes.recipe[grecipe.name]
 
     ---@type Params.create_standard_panel
     local params = {
@@ -199,7 +210,7 @@ function msettings.create(player_index, grecipe)
     b.style.height = 40
     tools.set_name_handler(b, np("is_default"))
 
-    local recipe = game.recipe_prototypes[grecipe.name]
+    local recipe = prototypes.recipe[grecipe.name]
     local category = recipe.category
     machinedb.initialize()
     local machines = machinedb.category_to_machines[category]
@@ -295,7 +306,7 @@ tools.on_named_event(np("is_default"), defines.events.on_gui_checked_state_chang
             install_modules(field_table.modules, g, config, g.recipes[recipe_name])
 
             field_table.beacon.elem_value = config.beacon_name
-            install_beacon_modules(field_table.beacon_modules, g, config, recipe_name)
+            install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
 
             enable_config(field_table, e.element.state)
 
@@ -350,7 +361,7 @@ tools.on_named_event(np("beacon"), defines.events.on_gui_elem_changed,
         local recipe_name = vars.msettings_recipe_name
         config.beacon_name = e.element.elem_value --[[@as string]]
 
-        install_beacon_modules(field_table.beacon_modules, g, config, recipe_name)
+        install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
         msettings.save(player)
     end
 )
@@ -517,6 +528,7 @@ function msettings.report(player)
     report_value({ np("report_productivity") }, machine.productivity)
     report_value({ np("report_consumption") }, machine.consumption)
     report_value({ np("report_pollution") }, machine.pollution)
+    report_value({ np("report_quality") }, machine.quality)
 
     local energy = production.get_energy(machine)
     label = report_table.add { type = "label", caption = { np("energy") } }
@@ -525,14 +537,6 @@ function msettings.report(player)
     label.style.width = 100
     label.style.horizontal_align = "right"
 
-    --[[
-    local pollution = production.get_pollution(machine)
-    label = report_table.add { type = "label", caption = { np("pollution") } }
-    label.style.width = 100
-    label = report_table.add { type = "label", caption = "[color=orange]" .. luautil.format_number(pollution, true) .. "[/color]" }
-    label.style.width = 100
-    label.style.horizontal_align = "right"
-]]
 end
 
 ---@param e EventData.on_lua_shortcut
@@ -590,6 +594,7 @@ tools.register_user_event(commons.production_compute_event, function(data)
     end
     recipe_frame.clear()
     msettings.create_product_line(recipe_frame, machine)
+    msettings.report(player)
 end)
 
 return msettings

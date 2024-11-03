@@ -48,6 +48,8 @@ local function do_mine(e, to_cursor)
     local grecipe = g.entity_map[entity.unit_number]
     ---@cast grecipe GRecipe
 
+    if not grecipe then return end
+    
     if grecipe.visible then
         graph.remove_recipe_visibility(g, grecipe)
         grecipe.entity = nil
@@ -114,8 +116,8 @@ local function on_build(entity, e, revive)
             recipe_name = entity.tags.recipe_name --[[@as string]]
             selected = tags.selected --[[@as boolean]]
         end
-    elseif e.stack then
-        tags = e.stack.tags
+    elseif e.tags then
+        tags = e.tags
         if tags then
             recipe_name = tags.recipe_name --[[@as string]]
             selected = tags.selected --[[@as boolean]]
@@ -182,7 +184,7 @@ end
 
 ---@param e EventData.on_built_entity
 local function on_player_built(e)
-    local entity = e.created_entity
+    local entity = e.entity
 
     on_build(entity, e)
 end

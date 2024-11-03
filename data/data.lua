@@ -56,11 +56,11 @@ local function create_symbol(name, filename)
   }
   local selection_size = 0.7
   entity.selection_box = {
-    {
+    left_top = {
       -selection_size,
       -selection_size
     },
-    {
+    right_bottom = {
       selection_size,
       selection_size
     },
@@ -100,7 +100,7 @@ local product_selector = {
   type = "lamp",
   name = commons.product_selector_name,
   collision_box = { { -selector_size, -selector_size }, { selector_size, selector_size } },
-  collision_mask = {},
+  collision_mask = { layers={} },
   selection_box = { { -selector_size, -selector_size }, { selector_size, selector_size } },
   selection_priority = 70,
   minable = nil,
@@ -293,7 +293,7 @@ add {
   icon = png("item/recipe-symbol"),
   icon_size = 32,
   place_result = commons.recipe_symbol_name,
-  flags = { "hidden", "not-stackable", "only-in-cursor" }
+  flags = { "not-stackable", "only-in-cursor" }
 }
 
 add {
@@ -303,7 +303,7 @@ add {
   icon = png("item/product-symbol"),
   icon_size = 32,
   place_result = commons.product_symbol_name,
-  flags = { "hidden", "not-stackable", "only-in-cursor" }
+  flags = { "not-stackable", "only-in-cursor" }
 }
 
 add {
@@ -313,12 +313,22 @@ add {
   icon = png("item/unresearched-symbol"),
   icon_size = 32,
   place_result = commons.unresearched_symbol_name,
-  flags = { "hidden", "not-stackable", "only-in-cursor" }
+  flags = { "not-stackable", "only-in-cursor" }
 }
 
 add {
 
   type = "selection-tool",
+  select = {
+    border_color = {1,1,1},
+    cursor_box_type  = "entity",
+    mode = {"any-entity"}
+  },
+  alt_select = {
+    border_color = {1,1,0},
+    cursor_box_type  = "entity",
+    mode = {"any-entity"}
+  },
   name = prefix .. "-selection_tool",
   icon = png("icon32"),
   icon_size = 32,
@@ -328,7 +338,7 @@ add {
   alt_selection_mode = { "same-force", "any-entity" },
   selection_cursor_box_type = "entity",
   alt_selection_cursor_box_type = "entity",
-  flags = { "hidden", "not-stackable", "only-in-cursor", "spawnable" },
+  flags = { "not-stackable", "only-in-cursor", "spawnable" },
   subgroup = "other",
   stack_size = 1,
   stackable = false,

@@ -65,7 +65,7 @@ function recipe_panel.create(player_index, grecipe)
     local g = gutils.get_graph(player)
 
     ---@type LuaRecipePrototype
-    local recipe = game.recipe_prototypes[grecipe.name]
+    local recipe = prototypes.recipe[grecipe.name]
 
     ---@type LocalisedString
     local name = translations.get_recipe_name(player_index, grecipe.name)
@@ -150,9 +150,9 @@ function recipe_panel.create(player_index, grecipe)
     label.style.top_margin = 5
 
     local category = recipe.category
-    local machines = game.get_filtered_entity_prototypes { { filter = "crafting-category", crafting_category = category } }
+    local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category } }
 
-    local technologies = game.get_filtered_technology_prototypes { { filter = "unlocks-recipe", recipe = recipe.name } }
+    local technologies = prototypes.get_technology_filtered { { filter = "unlocks-recipe", recipe = recipe.name } }
     if technologies and #technologies > 0 then
         add_line({ np("technology") })
 
@@ -167,8 +167,8 @@ function recipe_panel.create(player_index, grecipe)
     for _, machine in pairs(machines) do
         local localised = translations.get_entity_name(player.index, machine.name)
         if (localised) then
-            local prototypes = game.get_filtered_recipe_prototypes { { filter = "has-product-item", elem_filters = { { filter = "name", name = machine.name } } } }
-            if prototypes and next(prototypes) then
+            local prototypes = prototypes.get_recipe_filtered { { filter = "has-product-item", elem_filters = { { filter = "name", name = machine.name } } } }
+            if prototypes and #prototypes > 0 then
                 for _, proto in pairs(prototypes) do
                     if player.force.recipes[proto.name].enabled then
                         goto searched

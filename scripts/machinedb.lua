@@ -13,7 +13,6 @@ local gutils = require("scripts.gutils")
 ---@class ModuleInfo
 ---@field name string
 ---@field effects ModuleEffects
----@field limitations {[string]:boolean}
 
 ---@class MachineDb
 ---@field machines {[string]:MachineInfo}
@@ -41,7 +40,7 @@ function machinedb.get_machine(machine)
         categories = {},
         allowed_effects = machine.allowed_effects,
         module_inventory_size = machine.module_inventory_size,
-        crafting_speed = machine.crafting_speed
+        crafting_speed = machine.get_crafting_speed("normal")
     }
     machinedb.machines[machine.name] = existing
     return existing
@@ -57,8 +56,8 @@ function machinedb.initialize()
         return
     end
     machinedb.initialized = true
-    for category_name, _ in pairs(game.recipe_category_prototypes) do
-        local machines = game.get_filtered_entity_prototypes { { filter = "crafting-category", crafting_category = category_name } }
+    for category_name, _ in pairs(prototypes.recipe_category) do
+        local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category_name } }
         local machine_infos = {}
         for _, machine in pairs(machines) do
             local info = machinedb.get_machine(machine)
@@ -69,7 +68,7 @@ function machinedb.initialize()
         table.sort(machine_infos, function(e1, e2) return e1.crafting_speed < e2.crafting_speed end)
     end
 
-    local modules = game.get_filtered_item_prototypes { { filter = "type", type = "module" } }
+    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
     for module_name, module in pairs(modules) do
         if not excluded_module_groups[module.group.name] then
             ---@type ModuleInfo
@@ -77,15 +76,7 @@ function machinedb.initialize()
                 name = module_name,
                 effects = module.module_effects
             }
-            if module_info.effects then
-                if module.limitations and #module.limitations > 0 then
-                    module_info.limitations = {}
-                    for _, recipe_name in pairs(module.limitations) do
-                        module_info.limitations[recipe_name] = true
-                    end
-                end
-                machinedb.modules[module_name] = module_info
-            end
+            machinedb.modules[module_name] = module_info
         end
     end
 end
@@ -94,9 +85,9 @@ end
 ---@param machine_name string
 ---@return boolean
 function machinedb.is_machine_enabled(force, machine_name)
-    local entity = game.entity_prototypes[machine_name]
+    local entity = prototypes.entity[machine_name]
     local item = entity.items_to_place_this[1]
-    local machine_recipes = game.get_filtered_recipe_prototypes {
+    local machine_recipes = prototypes.get_recipe_filtered {
         { filter = "has-product-item",
             elem_filters = { { filter = "name", name = item } } } }
     for _, mr in pairs(machine_recipes) do
@@ -133,7 +124,7 @@ end
 ---@return ProductionConfig?
 function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local force = g.player.force --[[@as LuaForce]]
-    local recipe = game.recipe_prototypes[recipe_name]
+    local recipe = prototypes.recipe[recipe_name]
     if not recipe then
         return nil
     end
@@ -224,16 +215,31 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local preferred_beacon
     local found_beacon_module
     if preferred_beacon_name then
-        preferred_beacon = game.entity_prototypes[preferred_beacon_name]
+        preferred_beacon = prototypes.entity[preferred_beacon_name]
     end
+
+    local recipe_allowed_effects = recipe.allowed_effects
+    local allowed_module_categories = recipe.allowed_module_categories
 
     for _, module_name in pairs(preferred_modules) do
         local module = machinedb.modules[module_name]
-        if not module or (module.limitations and not module.limitations[recipe_name]) then
+
+        if not module then
             goto skip
         end
 
         local effects = module.effects
+
+        if recipe_allowed_effects then
+            for name in pairs(effects) do
+                if not recipe_allowed_effects[name] then
+                    goto skip
+                end
+            end
+        end
+        if allowed_module_categories and not allowed_module_categories[module.category] then
+            goto skip
+        end
 
         local allowed_effects = found_machine.allowed_effects
         if effects.productivity and not allowed_effects.productivity then goto skip end
@@ -249,11 +255,18 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     if preferred_beacon then
         for _, module_name in pairs(preferred_beacon_modules) do
             local module = machinedb.modules[module_name]
-            if not module or (module.limitations and not module.limitations[recipe_name]) then
+            local effects = module.effects
+
+            if recipe_allowed_effects then
+                for name in pairs(effects) do
+                    if not recipe_allowed_effects[name] then
+                        goto skip
+                    end
+                end
+            end
+            if allowed_module_categories and not allowed_module_categories[module.category] then
                 goto skip
             end
-
-            local effects = module.effects
 
             local allowed_effects = found_machine.allowed_effects
             if effects.productivity and not allowed_effects.productivity then goto skip end

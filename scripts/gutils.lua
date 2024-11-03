@@ -4,13 +4,13 @@ local translations = require("scripts.translations")
 
 local gutils = {}
 
----@param ids integer[]?
+---@param ids LuaRenderObject[]?
 ---@return nil
 function gutils.destroy_drawing(ids)
     if not ids then return nil end
 
     for _, id in pairs(ids) do
-        rendering.destroy(id)
+        id.destroy()
     end
     return nil
 end
@@ -113,10 +113,10 @@ function gutils.move_view(player, position)
     if count == 0 then return end
     dx = dx / count
     dy = dy / count
-    if not global.recipe_move then
-        global.recipe_move = {}
+    if not storage.recipe_move then
+        storage.recipe_move = {}
     end
-    global.recipe_move[player.index] = {
+    storage.recipe_move[player.index] = {
         x = origin.x,
         y = origin.y,
         dx = dx,
@@ -153,7 +153,7 @@ end
 
 local function move_tick_handler()
     ---@type {[integer]:MoveProcess}
-    local moves = global.recipe_move
+    local moves = storage.recipe_move
     if not moves then return end
 
     local toremove = {}
@@ -175,7 +175,7 @@ local function move_tick_handler()
         moves[player_index] = nil
     end
     if table_size(moves) == 0 then
-        global.recipe_move = nil
+        storage.recipe_move = nil
     end
 end
 tools.on_event(defines.events.on_tick, move_tick_handler)

@@ -467,6 +467,9 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         local output_label = ""
         ---@type LocalisedString
         local input_label = ""
+        ---@type LocalisedString
+        local inventory_label = ""
+
         if math.abs(output) > math_precision or math.abs(input) > math_precision then
             output_label = { np("product_produced"), tostring(output) }
 
@@ -474,6 +477,19 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                 input_label = { np("product_consumed"), tostring(input) }
             else
                 input_label = { np("product_all_consumed") }
+            end
+
+            local char = product_panel.get_character(player)
+            if char then
+                local inv = char.get_main_inventory()
+                local signal = tools.sprite_to_signal(product_name)
+                if signal and signal.type == "item" and inv then
+                    local count = inv.get_item_count(signal.name)
+                    local need = math.abs(input)
+                    if count > 0 and need > 0 then
+                        inventory_label = { np("in_inventory"), tostring(count), tostring(math.floor(count / need)) }
+                    end
+                end
             end
         end
 
@@ -522,7 +538,8 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         scan_list(gproduct.product_of)
 
         local recipe_str = table.concat(pline)
-        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label, output_label, input_label, recipe_str }
+        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label,
+            output_label, input_label, inventory_label, recipe_str }
     end)
 
 tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
@@ -777,17 +794,24 @@ function product_panel.update_error_panel(g, error_panel)
     end
 end
 
----@param player any
----@return LuaInventory?
----@return LuaLogisticNetwork?
----@return {[string]:integer}
-local function get_inventories(player)
+---@param player LuaPlayer
+---@return LuaEntity?
+function product_panel.get_character(player)
     ---@type LuaEntity
     local character = player.character
     local vars = tools.get_vars(player)
     if not character and vars.saved_character and vars.saved_character.valid then
         character = vars.saved_character
     end
+    return character
+end
+
+---@param player LuaPlayer
+---@return LuaInventory?
+---@return LuaLogisticNetwork?
+---@return {[string]:integer}
+local function get_inventories(player)
+    local character = product_panel.get_character(player)
 
     ---@type LuaInventory?
     local inv
@@ -801,7 +825,7 @@ local function get_inventories(player)
     local craft_queue = {}
     if player.crafting_queue_size > 0 then
         for _, c in pairs(player.crafting_queue) do
-            local recipe = game.recipe_prototypes[c.recipe]
+            local recipe = prototypes.recipe[c.recipe]
             if recipe then
                 for _, p in pairs(recipe.products) do
                     if p.type == "item" then
@@ -959,7 +983,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     for _, m in pairs(sorted_table) do
         local name               = m.name
         local count              = m.count
-        local item               = game.entity_prototypes[name].items_to_place_this[1].name
+        local item               = prototypes.entity[name].items_to_place_this[1].name
         local crafted            = craft_queue[item] or 0
         local in_inventory_count = inv and inv.get_item_count(item) or 0
         local in_network_count   = network and network.get_item_count(item) or 0
@@ -1027,7 +1051,7 @@ tools.on_event(defines.events.on_player_crafted_item,
 ---@param item string
 ---@param count integer?
 function product_panel.craft_machine(player, item, count)
-    local recipes = game.get_filtered_recipe_prototypes { { filter = "has-product-item",
+    local recipes = prototypes.get_recipe_filtered { { filter = "has-product-item",
         elem_filters = { { filter = "name", name = item } } } }
 
     if string.find(player.surface.name, commons.surface_prefix_filter) then
@@ -1231,7 +1255,7 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_hover,
         if not machine_name then return end
 
         local parts = { "" }
-        local proto = game.entity_prototypes[machine_name]
+        local proto = prototypes.entity[machine_name]
         if proto then
             parts = product_panel.create_parts_tooltip(player, proto)
             e.element.tooltip = { np("build-button-tooltip_hover"), parts }
@@ -1295,7 +1319,7 @@ function product_panel.create_parts_tooltip(player, machine_entity)
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
             local machine_recipes =
-                game.get_filtered_recipe_prototypes { {
+                prototypes.get_recipe_filtered { {
                     filter = "has-product-item",
                     elem_filters = { { filter = "name", name = machine_item } } } }
 
@@ -1365,11 +1389,19 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
             if e.control then
                 local machine = grecipe.machine
-                if not machine then return end
+                if not machine then
+                    local config = machinedb.get_default_config(g, recipe_name, {})
+                    if not config then
+                        return
+                    end
+                    machine = production.compute_machine(g, grecipe, config)
+                end
 
                 if string.find(player.surface.name, commons.surface_prefix_filter) then
                     gutils.exit(player)
                 end
+
+                ---@cast machine -nil
 
                 local bp_entity = {
 
@@ -1429,10 +1461,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                             rendering.draw_rectangle {
                                 surface = surface,
                                 color = color,
-                                left_top = entity,
-                                right_bottom = entity,
-                                left_top_offset = { -w, -h },
-                                right_bottom_offset = { w, h },
+                                left_top = { entity = entity, offset = { -w, -h } },
+                                right_bottom = { entity = entity, right_bottom_offset = { w, h } },
                                 width = 2, time_to_live = 2 * 60
                             }
                             count = count + 1
