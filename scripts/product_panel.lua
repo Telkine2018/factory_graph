@@ -1411,9 +1411,36 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     recipe = recipe_name
                 }
                 if machine.modules then
-                    bp_entity.items = {}
+                    local item_map = {}
                     for _, module in pairs(machine.modules) do
-                        bp_entity.items[module.name] = (bp_entity.items[module.name] or 0) + 1
+                        item_map[module.name] = (item_map[module.name] or 0) + 1
+                    end
+                    bp_entity.items = {}
+                    local stack_index = 0
+                    local module_inventory = defines.inventory.assembling_machine_modules
+                    if machine.machine.type == "furnace" then
+                        module_inventory = defines.inventory.furnace_modules
+                    end
+                    for name, count in pairs(item_map) do
+                        local bp_item = {
+                            id = {
+                                name = name,
+                                quality = "normal"
+                            },
+                            items = {
+                                in_inventory = {}
+                            }
+                        }
+                        table.insert(bp_entity.items, bp_item)
+                        for i = 1, count do
+                            local module_item = {
+                                inventory = module_inventory,
+                                stack = stack_index,
+                                count = 1
+                            }
+                            table.insert(bp_item.items.in_inventory, module_item)
+                            stack_index = stack_index + 1
+                        end
                     end
                 end
 
