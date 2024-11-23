@@ -73,7 +73,7 @@ local excluded_subgroups = {
     ["fill-barrel"] = true
 }
 
----@param player any
+---@param player LuaPlayer
 ---@param recipe_name string?
 function main.enter(player, recipe_name)
     if string.find(player.surface.name, commons.surface_prefix_filter) then
@@ -84,6 +84,10 @@ function main.enter(player, recipe_name)
     end
 
     local vars = tools.get_vars(player)
+    vars.controller_type = player.controller_type
+    vars.controller_position = player.position
+    vars.controller_surface_index = player.surface_index
+
     local surface = main.enter_surface(player, recipe_name)
     if not vars.graph then
         local g = graph.new(surface)
@@ -330,6 +334,12 @@ function main.exit(player)
             character.cheat_mode = false
         end
         vars.character = nil
+        if vars.controller_type == defines.controllers.remote then
+            player.set_controller {
+                type = defines.controllers.remote,
+                position = vars.controller_position,
+                surface = vars.controller_surface_index }
+        end
     elseif vars.extern_position and vars.extern_surface then
         player.teleport(vars.extern_position, vars.extern_surface, false)
     elseif vars.extern_position then
