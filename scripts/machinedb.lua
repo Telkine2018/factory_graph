@@ -312,4 +312,27 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     return config
 end
 
+---@param g Graph
+function machinedb.compute_recipes_productivities(g)
+    local techs = g.player.force.technologies
+    local productivities = {}
+    for name, force_tech in pairs(techs) do
+        local tech = prototypes.technology[name]
+        for _, effect in pairs(tech.effects) do
+            if effect.type == "change-recipe-productivity" then
+                local recipe = effect.recipe
+                local change = effect.change
+                local productivity = productivities[recipe] or 0
+                for level = 1, force_tech.level - 1 do
+                    productivity = productivity + change
+                end
+                if productivity > 0 then
+                    productivities[recipe] = productivity
+                end
+            end
+        end
+    end
+    return productivities
+end
+
 return machinedb

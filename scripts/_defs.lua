@@ -34,6 +34,7 @@ local tools = require("scripts.tools")
 ---@field require_full_selection boolean?
 ---@field move_recipe GRecipe?
 ---@field layer_ids LuaRenderObject[]?
+---@field recipes_productivities {[string]:number}?
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"

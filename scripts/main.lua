@@ -548,6 +548,7 @@ tools.on_event(defines.events.on_research_finished,
             if player.valid and player.force_index == force_index then
                 local g = gutils.get_graph(player)
                 if g then
+                    g.recipes_productivities = nil
                     local need_refresh
                     for _, effect in pairs(tech.prototype.effects) do
                         if effect.type == "unlock-recipe" then
@@ -581,7 +582,8 @@ tools.on_event(defines.events.on_research_reversed,
                 local g = gutils.get_graph(player)
                 if g then
                     local need_refresh
-                    for _, effect in pairs(tech.effects) do
+                    g.recipes_productivities = nil
+                    for _, effect in pairs(tech.prototype.effects) do
                         if effect.type == "unlock-recipe" then
                             local recipe_name = effect.recipe
                             local grecipe = g.recipes[recipe_name]

@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.4
+Date: 30. 11. 2024.
+  Bugfixes:
+    - Change return zone in remote
+    - fix base productivity from researches and in assembly-machine
+---------------------------------------------------------------------------------------------------
 Version: 2.0.3
 Date: 03. 11. 2024.
   Bugfixes:

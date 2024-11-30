@@ -87,12 +87,29 @@ function production.compute_machine(g, grecipe, config)
             end
         end
 
+        if not g.recipes_productivities then
+            g.recipes_productivities = machinedb.compute_recipes_productivities(g)
+        end
+        local research_productivity = g.recipes_productivities[recipe_name] or 0
+
         local speed = 0
         ---@cast speed -nil
-        local productivity = 0
+        local productivity = research_productivity
         local consumption = 0
         local pollution = 0
         local quality = 0
+
+        if machine.machine.effect_receiver then
+            local base_effect = machine.machine.effect_receiver.base_effect
+
+            if base_effect then
+                productivity = productivity + (base_effect.productivity or 0)
+                speed = speed + (base_effect.speed or 0)
+                consumption = consumption + (base_effect.consumption or 0)
+                quality = quality + (base_effect.quality or 0)
+                pollution = pollution + (base_effect.pollution or 0)
+            end
+        end
 
         if machine.modules then
             for _, module in pairs(machine.modules) do
