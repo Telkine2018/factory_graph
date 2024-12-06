@@ -275,7 +275,7 @@ end
 
 ------------------------------------------------
 
----@param event integer
+---@param event integer | defines.events
 ---@param handler fun(EventData)
 ---@param filters ({["filter"]:string}|{["name"]:string})[]?
 function tools.on_event(event, handler, filters)
@@ -848,7 +848,7 @@ tools.opposite_directions = {
 }
 
 ---@param direction integer | defines.direction
----@return integer
+---@return integer | defines.direction
 function tools.get_opposite_direction(direction)
     if direction == define_directions.north then
         return define_directions.south
