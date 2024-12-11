@@ -94,70 +94,70 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
 
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category] and not excluded_subgroups[recipe.subgroup.name] then
-            if (not recipe.hidden) or g.show_hidden then
-                local grecipe = g.recipes[name]
-                if not grecipe then
-                    grecipe = {
-                        name = name,
-                        ingredients = {},
-                        products = {},
-                        visible = true,
-                        order = 1
-                    }
-                    g.recipes[name] = grecipe
-                    changed = true
-                else
-                    grecipe.machine = nil
-                    local pconfig = grecipe.production_config
-                    if pconfig then
-                        ---@type boolean?
-                        local failed = pconfig.machine_name and not prototypes.entity[pconfig.machine_name]
-                        failed = failed or (pconfig.beacon_name and not prototypes.entity[pconfig.beacon_name])
-                        if pconfig.machine_modules then
-                            for _, module in pairs(pconfig.machine_modules) do
-                                failed = failed or (module and not prototypes.item[module])
-                            end
-                        end
-                        if pconfig.beacon_modules then
-                            for _, module in pairs(pconfig.beacon_modules) do
-                                failed = failed or (module and not prototypes.item[module])
-                            end
-                        end
-                        if failed then
-                            grecipe.production_config = nil
+            local grecipe = g.recipes[name]
+            if not grecipe then
+                grecipe = {
+                    name = name,
+                    ingredients = {},
+                    products = {},
+                    visible = true,
+                    order = 1,
+                    hidden = recipe.hidden
+                }
+                g.recipes[name] = grecipe
+                changed = true
+            else
+                grecipe.machine = nil
+                grecipe.hidden = recipe.hidden
+                local pconfig = grecipe.production_config
+                if pconfig then
+                    ---@type boolean?
+                    local failed = pconfig.machine_name and not prototypes.entity[pconfig.machine_name]
+                    failed = failed or (pconfig.beacon_name and not prototypes.entity[pconfig.beacon_name])
+                    if pconfig.machine_modules then
+                        for _, module in pairs(pconfig.machine_modules) do
+                            failed = failed or (module and not prototypes.item[module])
                         end
                     end
-                end
-                grecipe.used = true
-                if recipe.enabled then
-                    grecipe.enabled = true
-                else
-                    grecipe.enabled = false
-                end
-                if recipe.ingredients then
-                    grecipe.ingredients = {}
-                    for _, ingredient in pairs(recipe.ingredients) do
-                        local iname = ingredient.type .. "/" .. ingredient.name
-                        local gproduct = get_product(g, iname)
-
-                        table.insert(grecipe.ingredients, gproduct)
-                        gproduct.ingredient_of[recipe.name] = grecipe
+                    if pconfig.beacon_modules then
+                        for _, module in pairs(pconfig.beacon_modules) do
+                            failed = failed or (module and not prototypes.item[module])
+                        end
+                    end
+                    if failed then
+                        grecipe.production_config = nil
                     end
                 end
+            end
+            grecipe.used = true
+            if recipe.enabled then
+                grecipe.enabled = true
+            else
+                grecipe.enabled = false
+            end
+            if recipe.ingredients then
+                grecipe.ingredients = {}
+                for _, ingredient in pairs(recipe.ingredients) do
+                    local iname = ingredient.type .. "/" .. ingredient.name
+                    local gproduct = get_product(g, iname)
 
-                if recipe.products then
-                    grecipe.products = {}
-                    for _, production in pairs(recipe.products) do
-                        local iname = production.type .. "/" .. production.name
-                        local gproduct = get_product(g, iname)
+                    table.insert(grecipe.ingredients, gproduct)
+                    gproduct.ingredient_of[recipe.name] = grecipe
+                end
+            end
 
-                        table.insert(grecipe.products, gproduct)
-                        gproduct.product_of[recipe.name] = grecipe
-                        gproduct.is_root = nil
-                    end
-                    if #grecipe.products == 1 and recipe.products[1].probability == 0 then
-                        grecipe.is_void = true
-                    end
+            if recipe.products then
+                grecipe.products = {}
+                for _, production in pairs(recipe.products) do
+                    local iname = production.type .. "/" .. production.name
+                    local gproduct = get_product(g, iname)
+
+                    table.insert(grecipe.products, gproduct)
+                    gproduct.product_of[recipe.name] = grecipe
+                    gproduct.is_root = nil
+                end
+                if #grecipe.products == 1 and recipe.products[1].probability == 0 then
+                    grecipe.is_void = true
                 end
             end
         end

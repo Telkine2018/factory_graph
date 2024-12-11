@@ -494,7 +494,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = prototypes.recipe[grecipe.name]
-        if (not grecipe.hidden) or g.show_hidden then
+        if (not recipe.hidden) or g.show_hidden then
             if recipe then
                 table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
             else

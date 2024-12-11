@@ -289,21 +289,22 @@ local function save(player, frame)
     end
 
     local need_selection_change
+    local show_hidden_change = field_table.show_hidden.state ~= g.show_hidden
 
     local always_use_full_selection = field_table.always_use_full_selection.state
     g.autosave_on_graph_switching = field_table.autosave_on_graph_switching.state
     g.layout_on_selection = field_table["layout-on-selection"].state
     g.graph_zoom_level = tonumber(field_table.graph_zoom_level.text)
     g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
-    g.show_hidden = field_table.show_hidden.state
     g.show_only_researched = field_table.show_only_researched.state
-    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap then
+    g.show_hidden = field_table.show_hidden.state
+    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap  then
         g.grid_size = grid_size_value
         g.line_gap = line_gap_value
         graph.refresh(player, true)
     end
 
-    if g.always_use_full_selection ~= always_use_full_selection then
+    if g.always_use_fulld_selection ~= always_use_full_selection then
         need_selection_change = true
         g.always_use_full_selection = always_use_full_selection
     end
@@ -354,7 +355,9 @@ local function save(player, frame)
     end
 
     g.visible_layers = visible_layers
-    if layer_change or need_selection_change then
+    if show_hidden_change then
+        graph.deferred_update(player, { selection_changed = true, do_layout = true })
+    elseif layer_change or need_selection_change then
         graph.deferred_update(player, { 
             do_redraw = true, 
             center_on_graph = false, 

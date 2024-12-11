@@ -91,6 +91,7 @@ local tools = require("scripts.tools")
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
 ---@field enabled boolean?
+---@field hidden boolean?
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
 ---@field craft_per_s number?
