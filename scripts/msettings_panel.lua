@@ -2,8 +2,6 @@ local luautil = require("__core__/lualib/util")
 
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
-local translations = require("scripts.translations")
-local graph = require("scripts.graph")
 local gutils = require("scripts.gutils")
 local machinedb = require("scripts.machinedb")
 local production = require("scripts.production")
@@ -549,9 +547,8 @@ function msettings.report(player)
 
 end
 
----@param e EventData.on_lua_shortcut
-local function on_control_click(e)
-    local player = game.players[e.player_index]
+---@param player LuaPlayer
+function msettings.open_selection(player)
     local surface = player.surface
 
     if not string.find(surface.name, commons.surface_prefix_filter) then
@@ -568,8 +565,20 @@ local function on_control_click(e)
         tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, only_product = true })
     end
 end
-script.on_event(prefix .. "-control-click", on_control_click)
 
+tools.register_user_event(commons.open_current_selection,
+    function(player)
+        player.opened = nil
+        msettings.open_selection(player);
+    end)
+
+---@param e EventData.on_lua_shortcut
+local function on_control_click(e)
+
+    local player = game.players[e.player_index]
+    msettings.open_selection(player)
+end
+script.on_event(prefix .. "-control-click", on_control_click)
 
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine

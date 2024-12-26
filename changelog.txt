@@ -1,11 +1,12 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.5
-Date: 25. 12. 2024.
+Date: 26. 12. 2024.
   Bugfixes:
     - Limit productivity to 300 %
     - Add quality in machine and module selection and computation
   Changes:
     - Add zh-CN locale, thanks to plexpt
+    - Change action on single click, now open information dialog
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.4
 Date: 30. 11. 2024.

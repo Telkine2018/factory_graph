@@ -1397,20 +1397,22 @@ local function on_gui_opened(e)
     if entity then
         local entity_name = entity.name
         if recipe_entity_names[entity_name] then
-            local grecipe = g.entity_map[entity.unit_number]
-            if not grecipe then return end
+            if g.visibility == commons.visibility_all then
+                local grecipe = g.entity_map[entity.unit_number]
+                if not grecipe then return end
 
-            if g.selection[grecipe.name] then
-                g.selection[grecipe.name] = nil
+                if g.selection[grecipe.name] then
+                    g.selection[grecipe.name] = nil
+                else
+                    g.selection[grecipe.name] = grecipe
+                end
+                gutils.fire_selection_change(g)
+                redraw_connections(g)
+                draw_selected_entity(player, entity, grecipe)
+                player.opened = nil
             else
-                g.selection[grecipe.name] = grecipe
+                tools.fire_user_event(commons.open_current_selection, player)
             end
-            gutils.fire_selection_change(g)
-
-            redraw_connections(g)
-            draw_selected_entity(player, entity, grecipe)
-
-            player.opened = nil
         elseif entity_name == commons.product_selector_name then
             local product = drawing.get_product_from_selected(player, entity)
             if product then
