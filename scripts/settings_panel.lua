@@ -25,8 +25,10 @@ tools.add_panel_name(settings_panel_name)
 ---@param machine_name string?
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
-    local b = container.add { type = "choose-elem-button", elem_type = "entity", entity = machine_name,
-        elem_filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } } }
+    local filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } }
+    local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality",  elem_filters =  filters }
+    local signal = tools.id_to_signal(machine_name)
+    b.elem_value = signal
     tools.set_name_handler(b, np("preferred_machines"))
     return b
 end
@@ -35,8 +37,10 @@ end
 ---@param module_name string?
 ---@return LuaGuiElement
 local function add_module_button(container, module_name)
-    local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
-        elem_filters = { { filter = "type", type = "module" } } }
+    local filters ={ { filter = "type", type = "module" } }
+    local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters =  filters }
+    local signal = tools.id_to_signal(module_name)
+    b.elem_value = signal
     tools.set_name_handler(b, np("preferred_modules"))
     return b
 end
@@ -164,8 +168,9 @@ function settings_panel.create(player_index)
     set_module_buttons(g, pmodule_flow, g.preferred_modules)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
-    flow.add { type = "choose-elem-button", elem_type = "entity", elem_filters = { { filter = "type", type = "beacon" } },
-        name = "preferred_beacon", entity = g.preferred_beacon }
+    b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = { { filter = "type", type = "beacon" } },
+        name = "preferred_beacon" }
+    b.elem_value = tools.id_to_signal(g.preferred_beacon)
 
     flow.add { type = "label", caption = { np("preferred_beacon_count") } }
     flow.add { type = "textfield", numeric = true, text = tostring(g.preferred_beacon_count or 0),
@@ -231,7 +236,12 @@ local function blist_values(button_table)
     for _, button in pairs(button_table.children) do
         local elem_value = button.elem_value
         if elem_value then
-            table.insert(values, elem_value)
+            if type(elem_value) == "string" then
+                table.insert(values, elem_value)
+            elseif type(elem_value) == "table" then
+                local signalid = tools.signal_to_id(elem_value --[[@as SignalFilter]])
+                table.insert(values, signalid)
+            end
         end
     end
     return values
@@ -314,18 +324,14 @@ local function save(player, frame)
     g.use_machine_in_inventory = field_table.use_machine_in_inventory.state
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
-    g.preferred_beacon = field_table.preferred_beacon.elem_value --[[@as string]]
+    g.preferred_beacon = tools.signal_to_id(field_table.preferred_beacon.elem_value --[[@as SignalFilter]])
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
     g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
 
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
-    --[[
-    if g.current_layer and g.visibility == commons.visibility_layers then
-        visible_layers[g.current_layer] = true
-    end
-    --]]
+
     for i = 1, #visible_layers_flow.children do
         local b = visible_layers_flow.children[i]
         local signal = b.elem_value --[[@as SignalID]]

@@ -149,6 +149,7 @@ local tools = require("scripts.tools")
 
 ---@class ProductionConfig
 ---@field machine_name string
+---@field machine_quality string?
 ---@field machine_modules string[]
 ---@field beacon_name string?
 ---@field beacon_modules string[]?
@@ -156,11 +157,13 @@ local tools = require("scripts.tools")
 
 ---@class ProductionMachine
 ---@field name string
+---@field machine_quality string
 ---@field grecipe GRecipe
 ---@field config ProductionConfig
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype
 ---@field modules LuaItemPrototype[]
+---@field module_qualities string[]
 ---@field speed number
 ---@field productivity number
 ---@field consumption number

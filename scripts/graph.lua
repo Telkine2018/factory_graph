@@ -112,8 +112,8 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                 local pconfig = grecipe.production_config
                 if pconfig then
                     ---@type boolean?
-                    local failed = pconfig.machine_name and not prototypes.entity[pconfig.machine_name]
-                    failed = failed or (pconfig.beacon_name and not prototypes.entity[pconfig.beacon_name])
+                    local failed = pconfig.machine_name and not prototypes.entity[tools.extract_name(pconfig.machine_name)]
+                    failed = failed or (pconfig.beacon_name and not prototypes.entity[tools.extract_name(pconfig.beacon_name)])
                     if pconfig.machine_modules then
                         for _, module in pairs(pconfig.machine_modules) do
                             failed = failed or (module and not prototypes.item[module])
@@ -329,7 +329,7 @@ function graph.remove_unused(g)
     end
 
     if changed then
-        if g.preferred_beacon and prototypes.entity[g.preferred_beacon] == nil then
+        if g.preferred_beacon and prototypes.entity[tools.id_to_signal(g.preferred_beacon).name] == nil then
             g.preferred_beacon = nil
         end
         if g.preferred_machines then
@@ -341,14 +341,14 @@ function graph.remove_unused(g)
         end
         if g.preferred_modules then
             for i = #g.preferred_modules, 1, -1 do
-                if prototypes.item[g.preferred_modules[i]] == nil then
+                if prototypes.item[tools.id_to_signal(g.preferred_modules[i]).name] == nil then
                     table.remove(g.preferred_modules, i)
                 end
             end
         end
         if g.preferred_beacon_modules then
             for i = #g.preferred_beacon_modules, 1, -1 do
-                if prototypes.item[g.preferred_beacon_modules[i]] == nil then
+                if prototypes.item[tools.id_to_signal(g.preferred_beacon_modules[i]).name] == nil then
                     table.remove(g.preferred_beacon_modules, i)
                 end
             end

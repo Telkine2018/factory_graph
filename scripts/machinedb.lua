@@ -157,10 +157,16 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     ---@type {[string]:integer}
     local machine_set = {}
+    local machine_ids = {}
     local order = 0
-    for _, machine_name in pairs(preferred_machines) do
-        machine_set[machine_name] = order
-        order = order + 1
+    for _, machine_id in pairs(preferred_machines) do
+        local signal = tools.id_to_signal(machine_id)
+        ---@cast signal -nil
+        if not machine_set[signal.name] then
+            machine_set[signal.name] = order
+            machine_ids[signal.name] = machine_id
+            order = order + 1
+        end
     end
 
     local found_index
@@ -209,20 +215,32 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
     end
     local found_machine = machines[found_index]
+    local found_machine_name
+    if found_machine then
+        found_machine_name = machine_ids[found_machine.name]
+        if not found_machine_name then
+            found_machine_name = found_machine.name
+        end
+    end
+
     local found_machine_module
 
-    local preferred_beacon_name = g.preferred_beacon
+    local preferred_beacon_id = g.preferred_beacon
     local preferred_beacon
     local found_beacon_module
-    if preferred_beacon_name then
-        preferred_beacon = prototypes.entity[preferred_beacon_name]
+    if preferred_beacon_id then
+        local signal = tools.id_to_signal(preferred_beacon_id)
+        ---@cast signal -nil
+        preferred_beacon = prototypes.entity[signal.name]
     end
 
     local recipe_allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
 
-    for _, module_name in pairs(preferred_modules) do
-        local module = machinedb.modules[module_name]
+    for _, module_id in pairs(preferred_modules) do
+        local msignal = tools.id_to_signal(module_id)
+        ---@cast msignal -nil
+        local module = machinedb.modules[msignal.name]
 
         if not module then
             goto skip
@@ -246,15 +264,17 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         if effects.speed and not allowed_effects.speed then goto skip end
         if effects.consumption and not allowed_effects.consumption then goto skip end
 
-        found_machine_module = module_name
+        found_machine_module = module_id
         break
         ::skip::
     end
 
 
     if preferred_beacon then
-        for _, module_name in pairs(preferred_beacon_modules) do
-            local module = machinedb.modules[module_name]
+        for _, module_id in pairs(preferred_beacon_modules) do
+            local bsignal = tools.id_to_signal(module_id)
+            ---@cast bsignal -nil
+            local module = machinedb.modules[bsignal.name]
             local effects = module.effects
 
             if recipe_allowed_effects then
@@ -280,7 +300,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             if effects.speed and not allowed_effects.speed then goto skip end
             if effects.consumption and not allowed_effects.consumption then goto skip end
 
-            found_beacon_module = module_name
+            found_beacon_module = module_id
             break
 
             ::skip::
@@ -293,7 +313,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     ---@type ProductionConfig
     local config = {
-        machine_name = found_machine.name,
+        machine_name = found_machine_name,
     }
     if found_machine_module then
         config.machine_modules = {}
@@ -302,7 +322,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
     end
     if found_beacon_module then
-        config.beacon_name = preferred_beacon_name
+        config.beacon_name = preferred_beacon_id
         config.beacon_modules = {}
         for i = 1, preferred_beacon.module_inventory_size do
             table.insert(config.beacon_modules, found_beacon_module)

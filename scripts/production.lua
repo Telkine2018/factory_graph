@@ -71,19 +71,27 @@ function production.compute_machine(g, grecipe, config)
         local recipe_name = grecipe.name
         local recipe = prototypes.recipe[recipe_name]
 
+        local smachine = tools.id_to_signal(config.machine_name)
+        ---@cast smachine -nil
+
         ---@type ProductionMachine
         machine = {
-            recipe_name = recipe_name,
+            recipe_name = smachine.name,
+            machine_quality = smachine.quality or "normal",
             grecipe = grecipe,
             recipe = recipe,
-            machine = prototypes.entity[config.machine_name],
+            machine = prototypes.entity[smachine.name],
             config = config
         }
 
+        machine.modules = {}
+        machine.module_qualities = {}
         if config.machine_modules then
-            machine.modules = {}
-            for _, module_name in pairs(config.machine_modules) do
-                table.insert(machine.modules,prototypes.item[module_name])
+            for _, module_id in pairs(config.machine_modules) do
+                local smodule = tools.id_to_signal(module_id)
+                ---@cast smodule -nil
+                table.insert(machine.modules,prototypes.item[smodule.name])
+                table.insert(machine.module_qualities, smodule.quality)
             end
         end
 
@@ -111,25 +119,52 @@ function production.compute_machine(g, grecipe, config)
             end
         end
 
-        if machine.modules then
-            for _, module in pairs(machine.modules) do
-                local effects = module.module_effects
-                if effects then
-                    if effects.speed then speed = speed + effects.speed end
-                    if effects.productivity then productivity = productivity + effects.productivity end
-                    if effects.consumption then consumption = consumption + effects.consumption end
-                    if effects.pollution then pollution = pollution + effects.pollution end
-                    if effects.quality then quality = quality + effects.quality end
+        ---@param effects ModuleEffects
+        ---@param qmodifier number
+        ---@param effectivity integer
+        local function apply_effect(effects, qmodifier, effectivity)
+            if effects then
+                if effects.speed then 
+                    speed = speed + effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed) 
+                end
+                if effects.productivity then 
+                    productivity = productivity + effectivity * qmodifier * effects.productivity 
+                end
+                if effects.consumption then 
+                    consumption = consumption + effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption) 
+                end
+                if effects.pollution then 
+                    pollution = pollution + effectivity * (effects.pollution < 0 and qmodifier * effects.pollution or effects.pollution)
+                end
+                if effects.quality then 
+                    quality = quality + effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality) 
                 end
             end
         end
 
+        if machine.modules then
+            for index = 1, #machine.modules  do
+                local module = machine.modules[index]
+                local module_quality = machine.module_qualities[index]
+                local effects = module.module_effects
+                local qproto = prototypes.quality[module_quality or "normal"]
+                local qmodifier = 1 + qproto.level * 0.3
+
+                apply_effect(effects, qmodifier, 1)
+            end
+        end
+
         if config.beacon_name and config.beacon_modules and config.beacon_count > 0 then
-            local beacon = prototypes.entity[config.beacon_name]
+            local sbeacon = tools.id_to_signal(config.beacon_name)
+            ---@cast sbeacon -nil
+            local beacon = prototypes.entity[sbeacon.name]
             local effectivity = beacon.distribution_effectivity
             local profile = beacon.profile
             local beacon_count = config.beacon_count or 0
-            
+
+            local qproto = prototypes.quality[sbeacon.quality or "normal"]
+            effectivity = effectivity + beacon.distribution_effectivity_bonus_per_quality_level * qproto.level
+
             if profile then
                 local index = #profile
                 if index > config.beacon_count then
@@ -138,22 +173,24 @@ function production.compute_machine(g, grecipe, config)
                 effectivity = profile[index] * effectivity
             end
             
-            for _, module_name in pairs(config.beacon_modules) do
-                local module = prototypes.item[module_name]
+            for _, module_id in pairs(config.beacon_modules) do
+                local smodule = tools.id_to_signal(module_id)
+                ---@cast smodule -nil
+                local module = prototypes.item[smodule.name]
                 local effects = module.module_effects
 
-                if effects then
-                    if effects.speed then speed = speed + beacon_count * effectivity * effects.speed end
-                    if effects.productivity then productivity = productivity + beacon_count * effectivity * effects.productivity end
-                    if effects.consumption then consumption = consumption + beacon_count * effectivity * effects.consumption end
-                    if effects.pollution then pollution = pollution + beacon_count * effectivity * effects.pollution end
-                    if effects.quality then quality = quality + beacon_count * effectivity * effects.quality end
-                end
+                local qproto = prototypes.quality[smodule.quality or "normal"]
+                local qmodifier = 1 + qproto.level * 0.3
+
+                apply_effect(effects, qmodifier, effectivity * beacon_count)
                 ::skip::
             end
         end
         if speed < -0.8 then
             speed = -0.8
+        end
+        if productivity > 3.0 then
+            productivity = 3.0
         end
         machine.name = recipe_name
         machine.speed = speed
@@ -163,7 +200,7 @@ function production.compute_machine(g, grecipe, config)
         machine.quality = quality / 10
 
         if machine.machine then
-            machine.theorical_craft_s = (1 + speed) * machine.machine.get_crafting_speed("normal") / recipe.energy
+            machine.theorical_craft_s = (1 + speed) * machine.machine.get_crafting_speed(smachine.quality) / recipe.energy
             machine.limited_craft_s = machine.theorical_craft_s
             machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s
         else

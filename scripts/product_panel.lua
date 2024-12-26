@@ -628,11 +628,11 @@ local function create_product_line(container, machine)
 
     local b = line1.add {
         type = "choose-elem-button",
-        elem_type = "entity",
-        entity = machine.machine and machine.machine.name or nil,
+        elem_type = "entity-with-quality",
         style = green_button,
         tooltip = { np("machine-tooltip") }
     }
+    b.elem_value = { name = machine.machine and machine.machine.name or nil, quality = machine.machine_quality }
     b.locked = true
     tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
     b.raise_hover_events = true
@@ -926,9 +926,9 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
 
         local count = math.ceil(machine.count)
         if count > 0 and machine.machine then
-            local machine_name = machine.machine.name
-
-            count_per_machine[machine_name] = (count_per_machine[machine_name] or 0) + count
+            local machine_id = tools.signal_to_id { name = machine.machine.name, quality = machine.machine_quality }
+            ---@cast machine_id -nil
+            count_per_machine[machine_id] = (count_per_machine[machine_id] or 0) + count
         end
     end
 
@@ -950,6 +950,8 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     ---@field name string
     ---@field label string
     ---@field count integer
+    ---@field quality string
+    ---@field id string
 
     ---@type ProductPanel_Machines[]
     local sorted_table = {}
@@ -971,10 +973,14 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     label.style.horizontal_align = "center"
     label.style.width            = lwidth
 
-    for name, count in pairs(count_per_machine) do
+    for id, count in pairs(count_per_machine) do
+        local smachine = tools.id_to_signal(id)
+        ---@cast smachine -nil
         table.insert(sorted_table, {
-            name = name,
-            label = translations.get_entity_name(summary_flow.player_index, name),
+            id = id,
+            quality = smachine.quality,
+            name = smachine.name,
+            label = translations.get_entity_name(summary_flow.player_index, smachine.name),
             count = count
         })
     end
@@ -982,22 +988,25 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
 
     for _, m in pairs(sorted_table) do
         local name               = m.name
+        local quality            = m.quality
         local count              = m.count
         local item               = prototypes.entity[name].items_to_place_this[1].name
+        local sitem              = { name = item, quality = quality }
         local crafted            = craft_queue[item] or 0
-        local in_inventory_count = inv and inv.get_item_count(item) or 0
-        local in_network_count   = network and network.get_item_count(item) or 0
+        local in_inventory_count = inv and inv.get_item_count(sitem) or 0
+        local in_network_count   = network and network.get_item_count(sitem) or 0
         local b                  = per_machine_table.add {
             type = "choose-elem-button",
-            elem_type = "item",
-            item = item,
+            elem_type = "item-with-quality",
             tooltip = { np("build-button-tooltip") } }
+        b.elem_value             = sitem
         tools.set_name_handler(b, np("summary_machine"), {
             item = item,
             count = count,
             in_inventory_count = in_inventory_count,
             in_network_count = in_network_count,
-            machine_name = name
+            machine_name = name,
+            quality = quality
         })
         b.locked                         = true
         b.raise_hover_events             = true
@@ -1088,88 +1097,80 @@ function product_panel.get_request_table(player, notcreate)
     return logistic_request_table
 end
 
+---@param player LuaPlayer
+local function get_section(player, create)
+    local point = player.get_requester_point()
+    if not point then return end
+
+    local section_name = "FactoryGraphRequest_" .. player.index
+    local sections = point.sections
+    local section
+    for _, s in pairs(sections) do
+        if s.group == section_name then
+            section = s
+        end
+    end
+    if section or not create then
+        return section
+    end
+    section = point.add_section(section_name)
+    return section
+end
+
 ---@class LogisticRequest
 ---@field slot_index integer
 ---@field item string
+---@field quality string
 ---@field total_count integer
 ---@field has_value boolean
 ---@field min integer?
 ---@field max integer?
+---@field id string
 
 ---@param player LuaPlayer
 ---@param item string
 ---@param total_count integer
-function product_panel.request_items(player, item, total_count)
+---@param quality string
+function product_panel.request_items(player, item, total_count, quality)
     local request_table = product_panel.get_request_table(player)
-    ---@cast request_table -nil
-    local current = request_table[item]
 
     if not player.character then return end
 
+    local section = get_section(player, true)
+    if not section then return end
+
     local vars = tools.get_vars(player)
     vars.logistic_request_start = game.tick
+
+    local id = tools.signal_to_id { name = item, quality = quality }
+    ---@cast request_table -nil
+    ---@cast id -nil
+    local current = request_table[id]
+
     if current then
-        current.total_count = total_count
-        player.set_personal_logistic_slot(current.slot_index,
+        section.set_slot(current.slot_index,
             {
-                name = item,
-                min = current.total_count,
-                max = current.total_count
+                value = { name = item, quality = quality },
+                min = total_count,
+                max = total_count
             })
         return
     end
 
-    local slot_index = 1
-    for i = 1, player.character.request_slot_count + 1 do
-        local slot = player.get_personal_logistic_slot(i)
-        if slot.name == nil or slot.name == item then
-            slot_index = i
-            break
-        end
-    end
-
-    local slot = player.get_personal_logistic_slot(slot_index)
+    local slot_index = section.filters_count + 1
 
     ---@type LogisticRequest
     local current = {
         item = item,
         total_count = total_count,
         slot_index = slot_index,
-        has_value = slot.name ~= nil,
-        min = slot and slot.min,
-        max = slot and slot.max
+        min = total_count,
+        max = total_count,
+        quality = quality,
+        id = id
     }
-    request_table[item] = current
-    player.set_personal_logistic_slot(current.slot_index, { name = item, min = current.total_count, max = current.total_count })
-end
-
-local function clear_logistic_slot(player, request)
-    if not request.has_value then
-        player.clear_personal_logistic_slot(request.slot_index)
-    else
-        player.set_personal_logistic_slot(request.slot_index,
-            {
-                name = request.item,
-                min = request.min,
-                max = request.max
-            })
-    end
-end
-
----@param player LuaPlayer
-function product_panel.clear_requests(player)
-    local vars = tools.get_vars(player)
-    local request_table = product_panel.get_request_table(player, true)
-    if not request_table then
-        return
-    end
-
-    for _, request in pairs(request_table) do
-        clear_logistic_slot(player, request)
-    end
-    vars.logistic_request_table = nil
-    vars.logistic_request_start = nil
-    graph.deferred_update(player, { update_product_list = true })
+    request_table[id] = current
+    section.set_slot(current.slot_index, { value = { name = item, quality = quality }, min = total_count, max = total_count })
 end
 
 tools.on_event(defines.events.on_player_main_inventory_changed,
@@ -1181,29 +1182,32 @@ tools.on_event(defines.events.on_player_main_inventory_changed,
         local player = game.players[e.player_index]
         local vars = tools.get_vars(player)
 
-        local start = vars.logistic_request_start
-        if not start then return end
-        local tick = game.tick
-        if tick - start > logistic_request_timeout then
-            product_panel.clear_requests(player)
-        else
-            local request_table = product_panel.get_request_table(player, true)
-            if not request_table then return end
+        local request_table = product_panel.get_request_table(player, true)
+        if not request_table then return end
 
+        local inv = player.character.get_main_inventory()
+        if inv then
+            local to_remove = {}
             for _, request in pairs(request_table) do
-                local inv = player.character.get_main_inventory()
-                if inv then
-                    local current_count = inv.get_item_count(request.item)
-                    if current_count >= request.total_count then
-                        clear_logistic_slot(player, request)
-                        request_table[request.item] = nil
-                        if not next(request_table) then
-                            vars.logistic_request_table = nil
-                            vars.logistic_request_start = nil
-                            graph.deferred_update(player, { update_product_list = true })
-                        end
-                    end
+                local current_count = inv.get_item_count({ name = request.item, quality = request.quality })
+                if current_count >= request.total_count then
+                    to_remove[request.id] = request
                 end
+            end
+            for id, _ in pairs(to_remove) do
+                request_table[id] = nil
+            end
+            if not next(request_table) then
+                vars.logistic_request_table = nil
+                vars.logistic_request_start = nil
+
+                local section = get_section(player, false)
+                if section then
+                    section.filters = {}
+                    player.get_requester_point().remove_section(section.index)
+                end
+
+                graph.deferred_update(player, { update_product_list = true })
             end
         end
     end
@@ -1212,30 +1216,34 @@ tools.on_event(defines.events.on_player_main_inventory_changed,
 tools.on_named_event(np("summary_machine"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
-        local item = e.element.tags.item --[[@as string]]
-        local player = game.players[e.player_index]
+        local item    = e.element.tags.item --[[@as string]]
+        local quality = e.element.tags.quality --[[@as string]]
+        local sitem   = { name = item, quality = quality }
+        local player  = game.players[e.player_index]
         if e.alt then return end
         if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift) then
+            if quality == "normal" then return end
             product_panel.craft_machine(player, item)
         elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift) then
+            if quality == "normal" then return end
             local count                        = e.element.tags.count --[[@as integer]]
             local inv, network, crafting_queue = get_inventories(player)
 
-            local in_inventory_count           = inv and inv.get_item_count(item) or 0
-            local in_network_count             = network and network.get_item_count(item) or 0
+            local in_inventory_count           = inv and inv.get_item_count(sitem) or 0
+            local in_network_count             = network and network.get_item_count(sitem) or 0
             local crafted                      = crafting_queue[item] or 0
             count                              = count - in_inventory_count - in_network_count - crafted
             if count > 0 then
                 product_panel.craft_machine(player, item, count)
             end
         elseif not (e.button ~= defines.mouse_button_type.left or e.control or not e.shift) then
-            local count                        = e.element.tags.count --[[@as integer]]
-            local inv, network, crafting_queue = get_inventories(player)
-            local in_inventory_count           = inv and inv.get_item_count(item) or 0
-            local in_network_count             = network and network.get_item_count(item) or 0
-            count                              = math.min(count - in_inventory_count, in_network_count) + in_inventory_count
+            local count              = e.element.tags.count --[[@as integer]]
+            local inv, network       = get_inventories(player)
+            local in_inventory_count = inv and inv.get_item_count(sitem) or 0
+            local in_network_count   = network and network.get_item_count(sitem) or 0
+            count                    = math.min(count - in_inventory_count, in_network_count) + in_inventory_count
             if count > 0 then
-                product_panel.request_items(player, item, count)
+                product_panel.request_items(player, item, count, quality)
             end
         end
         graph.deferred_update(player, { update_product_list = true })
@@ -1407,13 +1415,18 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
                     entity_number = 1,
                     name = machine.machine.name,
+                    quality = machine.machine_quality,
                     position = { 0.5, 0.5 },
                     recipe = recipe_name
                 }
                 if machine.modules then
                     local item_map = {}
+                    local index = 1
                     for _, module in pairs(machine.modules) do
-                        item_map[module.name] = (item_map[module.name] or 0) + 1
+                        local id = tools.signal_to_id({ name = module.name, quality = machine.module_qualities[index] })
+                        ---@cast id -nil
+                        item_map[id] = (item_map[id] or 0) + 1
+                        index = index + 1
                     end
                     bp_entity.items = {}
                     local stack_index = 0
@@ -1421,11 +1434,13 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     if machine.machine.type == "furnace" then
                         module_inventory = defines.inventory.furnace_modules
                     end
-                    for name, count in pairs(item_map) do
+                    for id, count in pairs(item_map) do
+                        local smodule = tools.id_to_signal(id)
+                        ---@cast smodule -nil
                         local bp_item = {
                             id = {
-                                name = name,
-                                quality = "normal"
+                                name = smodule.name,
+                                quality = smodule.quality
                             },
                             items = {
                                 in_inventory = {}

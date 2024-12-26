@@ -26,7 +26,7 @@ local msettings = {}
 local function install_modules(container, g, config, grecipe)
     container.clear()
 
-    local assembly_machine = prototypes.entity[config.machine_name]
+    local assembly_machine = prototypes.entity[tools.extract_name(config.machine_name)]
     if not assembly_machine then
         return
     end
@@ -58,12 +58,16 @@ local function install_modules(container, g, config, grecipe)
 
     ---@cast count -nil
     for i = 1, count do
-        local module_name
+        local module_id
+        local smodule = nil
 
         if config.machine_modules then
-            module_name = config.machine_modules[i]
-            if module_name then
-                local module = prototypes.item[module_name]
+            module_id = config.machine_modules[i]
+            if module_id then
+                smodule = tools.id_to_signal(module_id)
+                ---@cast smodule -nil
+
+                local module = prototypes.item[smodule.name]
                 if module then
                     for effect in pairs(module.module_effects) do
                         if not assembly_machine.allowed_effects[effect] then
@@ -71,13 +75,14 @@ local function install_modules(container, g, config, grecipe)
                         end
                     end
                 end
-                module_name = module.name
+                module_id = module.name
                 ::skip::
             end
         end
 
-        local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
+        local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
             elem_filters = { { filter = "name", name = allowed } } }
+        b.elem_value = smodule
         tools.set_name_handler(b, np("module_button"), { count = count })
     end
 end
@@ -90,7 +95,7 @@ local function install_beacon_modules(container, g, config, grecipe)
     container.clear()
 
     if config.beacon_name then
-        local beacon = prototypes.entity[config.beacon_name]
+        local beacon = prototypes.entity[tools.extract_name(config.beacon_name)]
         if not beacon then return end
 
         local count = beacon.module_inventory_size
@@ -121,12 +126,13 @@ local function install_beacon_modules(container, g, config, grecipe)
         end
 
         for i = 1, count do
-            local module_name
+            local smodule = nil
             if config.beacon_modules and config.beacon_modules[i] then
-                module_name = config.beacon_modules[i]
+                smodule = tools.id_to_signal(config.beacon_modules[i])
             end
-            local b = container.add { type = "choose-elem-button", elem_type = "item", item = module_name,
+            local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
                 elem_filters = { { filter = "name", name = allowed } } }
+            b.elem_value = smodule
             tools.set_name_handler(b, np("module_button"), { count = count })
         end
     end
@@ -225,8 +231,10 @@ function msettings.create(player_index, grecipe)
     end
 
     field_table.add { type = "label", caption = { np("machine") } }
-    b = field_table.add { type = "choose-elem-button", elem_type = "entity", entity = config.machine_name, name = "machine",
+    b = field_table.add { type = "choose-elem-button", elem_type = "entity-with-quality", name = "machine",
         elem_filters = { { filter = "name", name = machine_names } } }
+    local signal = tools.id_to_signal(config.machine_name)
+    b.elem_value = signal
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
@@ -234,8 +242,10 @@ function msettings.create(player_index, grecipe)
     install_modules(module_flow, g, config, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
-    b = field_table.add { type = "choose-elem-button", elem_type = "entity", entity = config.beacon_name, name = "beacon",
+    b = field_table.add { type = "choose-elem-button", elem_type = "entity-with-quality", name = "beacon",
         elem_filters = { { filter = "type", type = "beacon" } } }
+    signal = tools.id_to_signal(config.beacon_name)
+    b.elem_value = signal
     tools.set_name_handler(b, np("beacon"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("beacon_modules") } }
@@ -302,10 +312,10 @@ tools.on_named_event(np("is_default"), defines.events.on_gui_checked_state_chang
                 config[name] = value
             end
 
-            field_table.machine.elem_value = config.machine_name
+            field_table.machine.elem_value = tools.id_to_signal(config.machine_name)
             install_modules(field_table.modules, g, config, g.recipes[recipe_name])
 
-            field_table.beacon.elem_value = config.beacon_name
+            field_table.beacon.elem_value = tools.id_to_signal(config.beacon_name)
             install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
 
             enable_config(field_table, e.element.state)
@@ -333,7 +343,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
 
         local vars = tools.get_vars(player)
         local config = vars.msettings_config
-        config.machine_name = e.element.elem_value --[[@as string]]
+        config.machine_name = tools.signal_to_id(e.element.elem_value)
 
         install_modules(field_table.modules, g, config, g.recipes[recipe_name])
 
@@ -359,7 +369,7 @@ tools.on_named_event(np("beacon"), defines.events.on_gui_elem_changed,
         local vars = tools.get_vars(player)
         local config = vars.msettings_config
         local recipe_name = vars.msettings_recipe_name
-        config.beacon_name = e.element.elem_value --[[@as string]]
+        config.beacon_name = tools.signal_to_id(e.element.elem_value)
 
         install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
         msettings.save(player)
@@ -388,20 +398,20 @@ local function read_config(player)
         return nil
     end
 
-    config.machine_name = field_table.machine.elem_value --[[@as string]]
+    config.machine_name = tools.signal_to_id(field_table.machine.elem_value)
     if not config.machine_name then
         player.print { np("no_machine_set") }
         return nil
     end
     config.machine_modules = {}
     for _, fmod in pairs(field_table.modules.children) do
-        local module_name = fmod.elem_value
-        if module_name then
-            table.insert(config.machine_modules, module_name)
+        local module_id = tools.signal_to_id(fmod.elem_value)
+        if module_id then
+            table.insert(config.machine_modules, module_id)
         end
     end
 
-    config.beacon_name = field_table.beacon.elem_value --[[@as string]]
+    config.beacon_name = tools.signal_to_id(field_table.beacon.elem_value)
     if config.beacon_name then
         config.beacon_modules = {}
         for _, fmod in pairs(field_table.beacon_modules.children) do
