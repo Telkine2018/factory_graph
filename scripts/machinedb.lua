@@ -86,14 +86,18 @@ end
 ---@return boolean
 function machinedb.is_machine_enabled(force, machine_name)
     local entity = prototypes.entity[machine_name]
-    local item = entity.items_to_place_this[1]
-    local machine_recipes = prototypes.get_recipe_filtered {
-        { filter = "has-product-item",
-            elem_filters = { { filter = "name", name = item } } } }
-    for _, mr in pairs(machine_recipes) do
-        if not mr.hidden and force.recipes[mr.name].enabled then
-            return true
+    if entity.items_to_place_this then
+        local item = entity.items_to_place_this[1]
+        local machine_recipes = prototypes.get_recipe_filtered {
+            { filter = "has-product-item",
+                elem_filters = { { filter = "name", name = item } } } }
+        for _, mr in pairs(machine_recipes) do
+            if not mr.hidden and force.recipes[mr.name].enabled then
+                return true
+            end
         end
+    else
+        return true
     end
     return false
 end

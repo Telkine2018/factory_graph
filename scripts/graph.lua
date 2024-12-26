@@ -49,7 +49,8 @@ function graph.new(surface)
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
         world_zoom_level = 2,
-        line_gap = 0.2
+        line_gap = 0.2,
+        show_products = true
     }
 end
 
@@ -93,7 +94,9 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     end
 
     for name, recipe in pairs(recipes) do
-        if not excluded_categories[recipe.category] and not excluded_subgroups[recipe.subgroup.name] then
+        if not excluded_categories[recipe.category] 
+                and not excluded_subgroups[recipe.subgroup.name] 
+                and not recipe.prototype.is_parameter  then
             local grecipe = g.recipes[name]
             if not grecipe then
                 grecipe = {

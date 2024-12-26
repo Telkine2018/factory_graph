@@ -987,49 +987,52 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     table.sort(sorted_table, function(m1, m2) return m1.label < m2.label end)
 
     for _, m in pairs(sorted_table) do
-        local name               = m.name
-        local quality            = m.quality
-        local count              = m.count
-        local item               = prototypes.entity[name].items_to_place_this[1].name
-        local sitem              = { name = item, quality = quality }
-        local crafted            = craft_queue[item] or 0
-        local in_inventory_count = inv and inv.get_item_count(sitem) or 0
-        local in_network_count   = network and network.get_item_count(sitem) or 0
-        local b                  = per_machine_table.add {
-            type = "choose-elem-button",
-            elem_type = "item-with-quality",
-            tooltip = { np("build-button-tooltip") } }
-        b.elem_value             = sitem
-        tools.set_name_handler(b, np("summary_machine"), {
-            item = item,
-            count = count,
-            in_inventory_count = in_inventory_count,
-            in_network_count = in_network_count,
-            machine_name = name,
-            quality = quality
-        })
-        b.locked                         = true
-        b.raise_hover_events             = true
-        local machine_label              = per_machine_table.add {
-            type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
-        machine_label.style.right_margin = 10
+        local name    = m.name
+        local quality = m.quality
+        local count   = m.count
+        local proto   = prototypes.entity[name]
+        if proto.items_to_place_this then
+            local item               = proto.items_to_place_this[1].name
+            local sitem              = { name = item, quality = quality }
+            local crafted            = craft_queue[item] or 0
+            local in_inventory_count = inv and inv.get_item_count(sitem) or 0
+            local in_network_count   = network and network.get_item_count(sitem) or 0
+            local b                  = per_machine_table.add {
+                type = "choose-elem-button",
+                elem_type = "item-with-quality",
+                tooltip = { np("build-button-tooltip") } }
+            b.elem_value             = sitem
+            tools.set_name_handler(b, np("summary_machine"), {
+                item = item,
+                count = count,
+                in_inventory_count = in_inventory_count,
+                in_network_count = in_network_count,
+                machine_name = name,
+                quality = quality
+            })
+            b.locked                         = true
+            b.raise_hover_events             = true
+            local machine_label              = per_machine_table.add {
+                type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
+            machine_label.style.right_margin = 10
 
-        local count_label, inv_label     = get_summary_labels(count, in_inventory_count, in_network_count, crafted)
+            local count_label, inv_label     = get_summary_labels(count, in_inventory_count, in_network_count, crafted)
 
-        local label                      = per_machine_table.add {
-            type = "label", caption = count_label, tooltip = { np("build-used-tooltip") } }
-        label.style.horizontal_align     = "center"
-        label.style.width                = lwidth
+            local label                      = per_machine_table.add {
+                type = "label", caption = count_label, tooltip = { np("build-used-tooltip") } }
+            label.style.horizontal_align     = "center"
+            label.style.width                = lwidth
 
-        label                            = per_machine_table.add {
-            type = "label", caption = inv_label, tooltip = { np("build-inventory-tooltip") } }
-        label.style.horizontal_align     = "center"
-        label.style.width                = lwidth
+            label                            = per_machine_table.add {
+                type = "label", caption = inv_label, tooltip = { np("build-inventory-tooltip") } }
+            label.style.horizontal_align     = "center"
+            label.style.width                = lwidth
 
-        label                            = per_machine_table.add {
-            type = "label", caption = tostring(in_network_count), tooltip = { np("build-logistic-tooltip") } }
-        label.style.horizontal_align     = "center"
-        label.style.width                = lwidth
+            label                            = per_machine_table.add {
+                type = "label", caption = tostring(in_network_count), tooltip = { np("build-logistic-tooltip") } }
+            label.style.horizontal_align     = "center"
+            label.style.width                = lwidth
+        end
     end
 end
 
@@ -1323,7 +1326,7 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
 ---@return table
 function product_panel.create_parts_tooltip(player, machine_entity)
     local parts = { "" }
-    if machine_entity then
+    if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
             local machine_recipes =
@@ -1405,6 +1408,11 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     machine = production.compute_machine(g, grecipe, config)
                 end
 
+                if not machine then return end
+                if not machine.machine.items_to_place_this or #machine.machine.items_to_place_this==0 then
+                    return
+                end
+
                 if string.find(player.surface.name, commons.surface_prefix_filter) then
                     gutils.exit(player)
                 end
@@ -1470,9 +1478,10 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                 ---@type ProductionMachine
                 local machine = grecipe.machine
                 if not machine or not machine.machine then return end
-                local item = machine.machine.items_to_place_this[1].name
-
-                product_panel.craft_machine(player, item)
+                if machine.machine.items_to_place_this then
+                    local item = machine.machine.items_to_place_this[1].name
+                    product_panel.craft_machine(player, item)
+                end
             else
                 msettings_panel.create(e.player_index, grecipe)
             end
