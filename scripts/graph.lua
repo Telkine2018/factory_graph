@@ -94,9 +94,9 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     end
 
     for name, recipe in pairs(recipes) do
-        if not excluded_categories[recipe.category] 
-                and not excluded_subgroups[recipe.subgroup.name] 
-                and not recipe.prototype.is_parameter  then
+        if not excluded_categories[recipe.category]
+            and not excluded_subgroups[recipe.subgroup.name]
+            and not recipe.prototype.is_parameter then
             local grecipe = g.recipes[name]
             if not grecipe then
                 grecipe = {
@@ -152,12 +152,14 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
             if recipe.products then
                 grecipe.products = {}
                 for _, production in pairs(recipe.products) do
-                    local iname = production.type .. "/" .. production.name
-                    local gproduct = get_product(g, iname)
+                    if production.type ~= "research-progress" then
+                        local iname = production.type .. "/" .. production.name
+                        local gproduct = get_product(g, iname)
 
-                    table.insert(grecipe.products, gproduct)
-                    gproduct.product_of[recipe.name] = grecipe
-                    gproduct.is_root = nil
+                        table.insert(grecipe.products, gproduct)
+                        gproduct.product_of[recipe.name] = grecipe
+                        gproduct.is_root = nil
+                    end
                 end
                 if #grecipe.products == 1 and recipe.products[1].probability == 0 then
                     grecipe.is_void = true
@@ -171,9 +173,11 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
         local minable = resource.mineable_properties
         if minable and minable.minable and minable.products then
             for _, p in pairs(minable.products) do
-                local pname = p.type .. "/" .. p.name
-                local product = get_product(g, pname)
-                product.is_root = true
+                if p.type ~= "research-progress" then
+                    local pname = p.type .. "/" .. p.name
+                    local product = get_product(g, pname)
+                    product.is_root = true
+                end
             end
         end
     end

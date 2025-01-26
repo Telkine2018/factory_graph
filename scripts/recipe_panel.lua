@@ -106,7 +106,7 @@ function recipe_panel.create(player_index, grecipe)
             if machine and machine.count and machine.count > 0 then
                 local per_machine = production.get_ingredient_amount(machine, p)
                 caption = { np("ingredient"),
-                    tools.fround(per_machine* machine.count),
+                    tools.fround(per_machine * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name),
                     "(" .. tools.fround(per_machine) .. "/m)"
@@ -125,24 +125,26 @@ function recipe_panel.create(player_index, grecipe)
     if recipe.products and #recipe.products > 0 then
         add_line({ np("products") })
         for _, p in pairs(recipe.products) do
-            local caption
+            if p.type ~= "research-progress" then
+                local caption
 
-            if machine and machine.count and machine.count > 0 then
-                local per_machine = production.get_product_amount(machine, p)
-                caption = { np("product"),
-                    tools.fround(per_machine * machine.count),
-                    "[" .. p.type .. "=" .. p.name .. "]",
-                    gutils.get_product_name(player, p.type .. "/" .. p.name),
-                    "(" .. tools.fround(per_machine) .. "/m)"
-                }
-            else
-                caption = get_product_label(player_index, p)
-                if add_debug_info then
-                    caption = { "", caption, " [", p.name, "]" }
+                if machine and machine.count and machine.count > 0 then
+                    local per_machine = production.get_product_amount(machine, p)
+                    caption = { np("product"),
+                        tools.fround(per_machine * machine.count),
+                        "[" .. p.type .. "=" .. p.name .. "]",
+                        gutils.get_product_name(player, p.type .. "/" .. p.name),
+                        "(" .. tools.fround(per_machine) .. "/m)"
+                    }
+                else
+                    caption = get_product_label(player_index, p)
+                    if add_debug_info then
+                        caption = { "", caption, " [", p.name, "]" }
+                    end
                 end
+                local label = flow.add { type = "label", caption = caption }
+                label.style.bottom_margin = 3
             end
-            local label = flow.add { type = "label", caption = caption }
-            label.style.bottom_margin = 3
         end
     end
 
