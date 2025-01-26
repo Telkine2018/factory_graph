@@ -2,7 +2,7 @@
 Version: 2.0.6
 Date: 26. 01. 2025.
   Bugfixes:
-    - Handle production type == "research-progress" (used in Cerys mod).
+    - Handle production type == "research-progress" (used in Ceris mod).
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.5
 Date: 26. 12. 2024.
