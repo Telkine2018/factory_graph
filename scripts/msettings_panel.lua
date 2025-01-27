@@ -219,10 +219,17 @@ function msettings.create(player_index, grecipe)
     machinedb.initialize()
     local machines = machinedb.category_to_machines[category]
     local machine_names = {}
-    if machines then
+    if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
+        local search_surface = tools.get_vars(player).extern_surface
+        if search_surface and not search_surface.valid then
+            search_surface = nil
+        end
         for _, m in pairs(machines) do
-            if not g.show_only_researched or machinedb.is_machine_enabled(force, m.name) then
+            if not g.show_only_researched or 
+                    machinedb.is_machine_enabled(force, m.name)  or
+                    (search_surface and search_surface.count_entities_filtered{name=m.name} > 0)
+                     then
                 table.insert(machine_names, m.name)
             end
         end

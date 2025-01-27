@@ -1,8 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.7
+Date: 27. 01. 2025.
+  Bugfixes:
+    - Display machines that exists on surface but was not yet researched (used in Cerys mod).
+---------------------------------------------------------------------------------------------------
 Version: 2.0.6
 Date: 26. 01. 2025.
   Bugfixes:
-    - Handle production type == "research-progress" (used in Ceris mod).
+    - Handle production type == "research-progress" (used in Cerys mod).
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.5
 Date: 26. 12. 2024.
