@@ -34,6 +34,7 @@ local tools = require("scripts.tools")
 ---@field require_full_selection boolean?
 ---@field move_recipe GRecipe?
 ---@field layer_ids LuaRenderObject[]?
+---@field recipes_productivities {[string]:number}?
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
@@ -90,6 +91,7 @@ local tools = require("scripts.tools")
 ---@field ingredients  GProduct[]
 ---@field products  GProduct[]
 ---@field enabled boolean?
+---@field hidden boolean?
 ---@field selector_positions {[string]:MapPosition}
 ---@field is_product boolean?
 ---@field craft_per_s number?
@@ -147,6 +149,7 @@ local tools = require("scripts.tools")
 
 ---@class ProductionConfig
 ---@field machine_name string
+---@field machine_quality string?
 ---@field machine_modules string[]
 ---@field beacon_name string?
 ---@field beacon_modules string[]?
@@ -154,11 +157,13 @@ local tools = require("scripts.tools")
 
 ---@class ProductionMachine
 ---@field name string
+---@field machine_quality string
 ---@field grecipe GRecipe
 ---@field config ProductionConfig
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype
 ---@field modules LuaItemPrototype[]
+---@field module_qualities string[]
 ---@field speed number
 ---@field productivity number
 ---@field consumption number

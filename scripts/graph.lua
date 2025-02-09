@@ -49,7 +49,8 @@ function graph.new(surface)
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
         world_zoom_level = 2,
-        line_gap = 0.2
+        line_gap = 0.2,
+        show_products = true
     }
 end
 
@@ -93,61 +94,65 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     end
 
     for name, recipe in pairs(recipes) do
-        if not excluded_categories[recipe.category] and not excluded_subgroups[recipe.subgroup.name] then
-            if (not recipe.hidden) or g.show_hidden then
-                local grecipe = g.recipes[name]
-                if not grecipe then
-                    grecipe = {
-                        name = name,
-                        ingredients = {},
-                        products = {},
-                        visible = true,
-                        order = 1
-                    }
-                    g.recipes[name] = grecipe
-                    changed = true
-                else
-                    grecipe.machine = nil
-                    local pconfig = grecipe.production_config
-                    if pconfig then
-                        ---@type boolean?
-                        local failed = pconfig.machine_name and not prototypes.entity[pconfig.machine_name]
-                        failed = failed or (pconfig.beacon_name and not prototypes.entity[pconfig.beacon_name])
-                        if pconfig.machine_modules then
-                            for _, module in pairs(pconfig.machine_modules) do
-                                failed = failed or (module and not prototypes.item[module])
-                            end
-                        end
-                        if pconfig.beacon_modules then
-                            for _, module in pairs(pconfig.beacon_modules) do
-                                failed = failed or (module and not prototypes.item[module])
-                            end
-                        end
-                        if failed then
-                            grecipe.production_config = nil
+        if not excluded_categories[recipe.category]
+            and not excluded_subgroups[recipe.subgroup.name]
+            and not recipe.prototype.is_parameter then
+            local grecipe = g.recipes[name]
+            if not grecipe then
+                grecipe = {
+                    name = name,
+                    ingredients = {},
+                    products = {},
+                    visible = true,
+                    order = 1,
+                    hidden = recipe.hidden
+                }
+                g.recipes[name] = grecipe
+                changed = true
+            else
+                grecipe.machine = nil
+                grecipe.hidden = recipe.hidden
+                local pconfig = grecipe.production_config
+                if pconfig then
+                    ---@type boolean?
+                    local failed = pconfig.machine_name and not prototypes.entity[tools.extract_name(pconfig.machine_name)]
+                    failed = failed or (pconfig.beacon_name and not prototypes.entity[tools.extract_name(pconfig.beacon_name)])
+                    if pconfig.machine_modules then
+                        for _, module in pairs(pconfig.machine_modules) do
+                            failed = failed or (module and not prototypes.item[module])
                         end
                     end
-                end
-                grecipe.used = true
-                if recipe.enabled then
-                    grecipe.enabled = true
-                else
-                    grecipe.enabled = false
-                end
-                if recipe.ingredients then
-                    grecipe.ingredients = {}
-                    for _, ingredient in pairs(recipe.ingredients) do
-                        local iname = ingredient.type .. "/" .. ingredient.name
-                        local gproduct = get_product(g, iname)
-
-                        table.insert(grecipe.ingredients, gproduct)
-                        gproduct.ingredient_of[recipe.name] = grecipe
+                    if pconfig.beacon_modules then
+                        for _, module in pairs(pconfig.beacon_modules) do
+                            failed = failed or (module and not prototypes.item[module])
+                        end
+                    end
+                    if failed then
+                        grecipe.production_config = nil
                     end
                 end
+            end
+            grecipe.used = true
+            if recipe.enabled then
+                grecipe.enabled = true
+            else
+                grecipe.enabled = false
+            end
+            if recipe.ingredients then
+                grecipe.ingredients = {}
+                for _, ingredient in pairs(recipe.ingredients) do
+                    local iname = ingredient.type .. "/" .. ingredient.name
+                    local gproduct = get_product(g, iname)
 
-                if recipe.products then
-                    grecipe.products = {}
-                    for _, production in pairs(recipe.products) do
+                    table.insert(grecipe.ingredients, gproduct)
+                    gproduct.ingredient_of[recipe.name] = grecipe
+                end
+            end
+
+            if recipe.products then
+                grecipe.products = {}
+                for _, production in pairs(recipe.products) do
+                    if production.type ~= "research-progress" then
                         local iname = production.type .. "/" .. production.name
                         local gproduct = get_product(g, iname)
 
@@ -155,9 +160,9 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                         gproduct.product_of[recipe.name] = grecipe
                         gproduct.is_root = nil
                     end
-                    if #grecipe.products == 1 and recipe.products[1].probability == 0 then
-                        grecipe.is_void = true
-                    end
+                end
+                if #grecipe.products == 1 and recipe.products[1].probability == 0 then
+                    grecipe.is_void = true
                 end
             end
         end
@@ -168,9 +173,11 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
         local minable = resource.mineable_properties
         if minable and minable.minable and minable.products then
             for _, p in pairs(minable.products) do
-                local pname = p.type .. "/" .. p.name
-                local product = get_product(g, pname)
-                product.is_root = true
+                if p.type ~= "research-progress" then
+                    local pname = p.type .. "/" .. p.name
+                    local product = get_product(g, pname)
+                    product.is_root = true
+                end
             end
         end
     end
@@ -329,7 +336,7 @@ function graph.remove_unused(g)
     end
 
     if changed then
-        if g.preferred_beacon and prototypes.entity[g.preferred_beacon] == nil then
+        if g.preferred_beacon and prototypes.entity[tools.id_to_signal(g.preferred_beacon).name] == nil then
             g.preferred_beacon = nil
         end
         if g.preferred_machines then
@@ -341,14 +348,14 @@ function graph.remove_unused(g)
         end
         if g.preferred_modules then
             for i = #g.preferred_modules, 1, -1 do
-                if prototypes.item[g.preferred_modules[i]] == nil then
+                if prototypes.item[tools.id_to_signal(g.preferred_modules[i]).name] == nil then
                     table.remove(g.preferred_modules, i)
                 end
             end
         end
         if g.preferred_beacon_modules then
             for i = #g.preferred_beacon_modules, 1, -1 do
-                if prototypes.item[g.preferred_beacon_modules[i]] == nil then
+                if prototypes.item[tools.id_to_signal(g.preferred_beacon_modules[i]).name] == nil then
                     table.remove(g.preferred_beacon_modules, i)
                 end
             end

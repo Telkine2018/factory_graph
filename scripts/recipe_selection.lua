@@ -494,7 +494,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = prototypes.recipe[grecipe.name]
-        if (not grecipe.hidden) or g.show_hidden then
+        if (not recipe.hidden) or g.show_hidden then
             if recipe then
                 table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
             else
@@ -770,59 +770,58 @@ function recipe_selection.process_query(player, name)
     local action = faction and faction.selected_index or 1
     local recipes = {}
 
-    if action == 1 then
-        local gproduct = g.products[name]
-        for _, grecipe in pairs(gproduct.ingredient_of) do
-            recipes[grecipe.name] = grecipe
-        end
-        for _, grecipe in pairs(gproduct.product_of) do
-            recipes[grecipe.name] = grecipe
-        end
-    elseif action == 2 then
-        local kproducts = gutils.get_output_products(g)
-        local uproducts = { [name] = g.products[name] }
-        while (true) do
-            local _, product = next(uproducts)
-            if not product then break end
-
-            local frecipe
-            if product.root_recipe then
-                frecipe = product.root_recipe
-            else
-                _, frecipe = next(product.product_of)
+    local gproduct = g.products[name]
+    if gproduct then
+        if action == 1 then
+            for _, grecipe in pairs(gproduct.ingredient_of) do
+                recipes[grecipe.name] = grecipe
             end
+            for _, grecipe in pairs(gproduct.product_of) do
+                recipes[grecipe.name] = grecipe
+            end
+        elseif action == 2 then
+            local kproducts = gutils.get_output_products(g)
+            local uproducts = { [name] = gproduct }
+            while (true) do
+                local _, product = next(uproducts)
+                if not product then break end
 
-            uproducts[product.name] = nil
-            kproducts[product.name] = product
-
-            if frecipe then
-                recipes[frecipe.name] = frecipe
-                for _, p in pairs(frecipe.products) do
-                    kproducts[p.name] = p
+                local frecipe
+                if product.root_recipe then
+                    frecipe = product.root_recipe
+                else
+                    _, frecipe = next(product.product_of)
                 end
-                for _, i in pairs(frecipe.ingredients) do
-                    if not kproducts[i.name] then
-                        uproducts[i.name] = i
+
+                uproducts[product.name] = nil
+                kproducts[product.name] = product
+
+                if frecipe then
+                    recipes[frecipe.name] = frecipe
+                    for _, p in pairs(frecipe.products) do
+                        kproducts[p.name] = p
+                    end
+                    for _, i in pairs(frecipe.ingredients) do
+                        if not kproducts[i.name] then
+                            uproducts[i.name] = i
+                        end
                     end
                 end
             end
-        end
-    elseif action == 3 then
-        local gproduct = g.products[name]
-        recipes = gproduct.ingredient_of
-    elseif action == 4 then
-        local gproduct = g.products[name]
-        recipes = gproduct.product_of
-    elseif action == 5 then
-        local gproduct = g.products[name]
-        for _, grecipe in pairs(gproduct.ingredient_of) do
-            if g.selection[grecipe.name] then
-                recipes[grecipe.name] = grecipe
+        elseif action == 3 then
+            recipes = gproduct.ingredient_of
+        elseif action == 4 then
+            recipes = gproduct.product_of
+        elseif action == 5 then
+            for _, grecipe in pairs(gproduct.ingredient_of) do
+                if g.selection[grecipe.name] then
+                    recipes[grecipe.name] = grecipe
+                end
             end
-        end
-        for _, grecipe in pairs(gproduct.product_of) do
-            if g.selection[grecipe.name] then
-                recipes[grecipe.name] = grecipe
+            for _, grecipe in pairs(gproduct.product_of) do
+                if g.selection[grecipe.name] then
+                    recipes[grecipe.name] = grecipe
+                end
             end
         end
     end

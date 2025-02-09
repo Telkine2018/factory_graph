@@ -73,7 +73,7 @@ local excluded_subgroups = {
     ["fill-barrel"] = true
 }
 
----@param player any
+---@param player LuaPlayer
 ---@param recipe_name string?
 function main.enter(player, recipe_name)
     if string.find(player.surface.name, commons.surface_prefix_filter) then
@@ -84,6 +84,10 @@ function main.enter(player, recipe_name)
     end
 
     local vars = tools.get_vars(player)
+    vars.controller_type = player.controller_type
+    vars.controller_position = player.position
+    vars.controller_surface_index = player.surface_index
+
     local surface = main.enter_surface(player, recipe_name)
     if not vars.graph then
         local g = graph.new(surface)
@@ -224,6 +228,10 @@ function main.enter_surface(player, recipe_name)
         surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
     end
 
+    for _, force in pairs(game.forces) do
+        force.set_surface_hidden(surface, true)
+    end
+
     local character        = player.character
     vars.surface           = surface
     vars.extern_surface    = player.surface
@@ -326,6 +334,12 @@ function main.exit(player)
             character.cheat_mode = false
         end
         vars.character = nil
+        if vars.controller_type == defines.controllers.remote then
+            player.set_controller {
+                type = defines.controllers.remote,
+                position = vars.controller_position,
+                surface = vars.controller_surface_index }
+        end
     elseif vars.extern_position and vars.extern_surface then
         player.teleport(vars.extern_position, vars.extern_surface, false)
     elseif vars.extern_position then
@@ -531,9 +545,10 @@ tools.on_event(defines.events.on_research_finished,
         local force_index = tech.force.index
 
         for _, player in pairs(game.players) do
-            if player.force_index == force_index then
+            if player.valid and player.force_index == force_index then
                 local g = gutils.get_graph(player)
                 if g then
+                    g.recipes_productivities = nil
                     local need_refresh
                     for _, effect in pairs(tech.prototype.effects) do
                         if effect.type == "unlock-recipe" then
@@ -567,7 +582,8 @@ tools.on_event(defines.events.on_research_reversed,
                 local g = gutils.get_graph(player)
                 if g then
                     local need_refresh
-                    for _, effect in pairs(tech.effects) do
+                    g.recipes_productivities = nil
+                    for _, effect in pairs(tech.prototype.effects) do
                         if effect.type == "unlock-recipe" then
                             local recipe_name = effect.recipe
                             local grecipe = g.recipes[recipe_name]

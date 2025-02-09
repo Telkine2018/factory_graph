@@ -275,7 +275,7 @@ end
 
 ------------------------------------------------
 
----@param event integer
+---@param event integer | defines.events
 ---@param handler fun(EventData)
 ---@param filters ({["filter"]:string}|{["name"]:string})[]?
 function tools.on_event(event, handler, filters)
@@ -670,7 +670,7 @@ function tools.fire_user_event(name, data)
     if handler then handler(data) end
 end
 
----@param signal SignalID
+---@param signal (SignalID | SignalFilter) ?
 ---@return string?
 function tools.signal_to_sprite(signal)
     if not signal then return nil end
@@ -733,7 +733,7 @@ end
 ---@return string?
 function tools.check_sprite(sprite, default)
     if not sprite then return nil end
-    local signal = tools.sprite_to_signal(sprite)
+    local signal = tools.id_to_signal(sprite)
     ---@cast signal -nil
     if check_signal(signal.type, signal.name) then
         return sprite
@@ -741,7 +741,6 @@ function tools.check_sprite(sprite, default)
         return default
     end
 end
-
 
 --- Find dimension of an entity
 ---@param master LuaEntity
@@ -780,7 +779,7 @@ end
 ---@return string
 function tools.get_constant_name(index, base)
     if base then
-    for name, i in pairs(base) do if i == index then return name end end
+        for name, i in pairs(base) do if i == index then return name end end
     end
     return tostring(index)
 end
@@ -848,7 +847,7 @@ tools.opposite_directions = {
 }
 
 ---@param direction integer | defines.direction
----@return integer
+---@return integer | defines.direction
 function tools.get_opposite_direction(direction)
     if direction == define_directions.north then
         return define_directions.south
@@ -902,7 +901,7 @@ function tools.get_item_stack_size(name)
     local stack_size = stack_size_map[name]
     if stack_size then return stack_size end
 
-    local signal = tools.sprite_to_signal(name) --[[@as SignalID]]
+    local signal = tools.id_to_signal(name) --[[@as SignalID]]
     if signal.type == "item" then
         local proto = prototypes.item[signal.name]
         if proto then
@@ -960,8 +959,7 @@ end
 function tools.trim(s)
     if not s then return "" end
     return s:match "^%s*(.-)%s*$"
- end
-
+end
 
 ---@param text string?
 ---@return number?
@@ -1122,6 +1120,88 @@ function tools.render_translate_table(ids)
         ids[i] = tools.render_translate(ids[i])
     end
     return ids
+end
+
+---@param item ItemFilter?
+---@return string?
+function tools.item_to_string(item)
+    if not item then return nil end
+    return item.name .. "/" .. (item.comparator or "=") .. "/" .. (item.quality or "normal")
+end
+
+local gmatch = string.gmatch
+
+---@param qname string?
+---@return (ItemFilter|string)?
+function tools.string_to_item(qname)
+    if not qname then return nil end
+    if type(qname) ~= "string" then return qname end
+    local split = gmatch(qname, "([^/]+)")
+    local name = split()
+    local comparator = split() or "="
+    local quality = split() or "normal"
+    return { name = name, comparator = comparator, quality = quality }
+end
+
+-------------------------------------
+
+---@param signal SignalFilter 
+---@return string?
+function tools.signal_to_id(signal)
+    if not signal then return nil end
+    if signal.quality and signal.quality ~= "normal" then
+        return (signal.type or "item") .. "/" .. signal.name .. "/" .. (signal.comparator or "=") .. "/" .. signal.quality
+    else
+        return (signal.type or "item") .. "/" .. signal.name
+    end
+end
+
+---@param signalid string?
+---@return SignalFilter?
+function tools.id_to_signal(signalid)
+    if not signalid then return nil end
+    if type(signalid) ~= "string" then return signalid end
+    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local type, name = split()
+    local comparator, quality = split() 
+    if name ~= nil then
+        return { type = type, name = name, comparator = comparator, quality = quality }
+    else
+        return { type = "item", name = signalid }
+    end
+end
+
+
+---@param signalid string?
+---@return string?
+function tools.extract_name(signalid)
+    if not signalid then return nil end
+    local signal = tools.id_to_signal(signalid)
+    ---@cast signal -nil
+    return signal.name
+end
+
+---@param signalid string?
+---@return (SignalFilter | string)?
+function tools.id_to_filter(signalid)
+    if not signalid then return nil end
+    if type(signalid) ~= "string" then return signalid end
+    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local type, name = split()
+    local comparator, quality = split() 
+    if not type or type == "item" then
+        if not quality or quality == "normal" then
+            return name
+        end
+        return { type = "item", name = name, comparator = comparator or "=", quality = quality }
+    end
+    return { type = type, name = name, comparator="=", quality="normal" }
+end
+
+---@param name string
+---@return SignalFilter
+function tools.build_virtual_signal(name)
+    return { type = "virtual", name = name, comparator="=", quality="normal" }
 end
 
 return tools

@@ -63,9 +63,9 @@ local function create_symbol(name, filename)
     right_bottom = {
       selection_size,
       selection_size
-    },
-    selection_priority = 60
+    }
   }
+  entity.selection_priority = 60
   entity.minable = {
     mining_time = 0.1,
     result = name,

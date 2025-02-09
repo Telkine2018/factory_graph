@@ -1,4 +1,36 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.7
+Date: 27. 01. 2025.
+  Bugfixes:
+    - Display machines that exists on surface but was not yet researched (used in Cerys mod).
+---------------------------------------------------------------------------------------------------
+Version: 2.0.6
+Date: 26. 01. 2025.
+  Bugfixes:
+    - Handle production type == "research-progress" (used in Cerys mod).
+---------------------------------------------------------------------------------------------------
+Version: 2.0.5
+Date: 26. 12. 2024.
+  Bugfixes:
+    - Limit productivity to 300 %
+    - Add quality in machine and module selection and computation
+    - Fix crash with pyanodon
+  Changes:
+    - Add zh-CN locale, thanks to plexpt
+    - Change action on single click, now open information dialog
+---------------------------------------------------------------------------------------------------
+Version: 2.0.4
+Date: 30. 11. 2024.
+  Bugfixes:
+    - Change return zone in remote
+    - fix base productivity from researches and in assembly-machine
+---------------------------------------------------------------------------------------------------
+Version: 2.0.3
+Date: 03. 11. 2024.
+  Bugfixes:
+    - Fix typo in selection_box
+    - Hide surface in space age
+---------------------------------------------------------------------------------------------------
 Version: 2.0.2
 Date: 28. 10. 2024.
   Bugfixes:
