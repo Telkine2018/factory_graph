@@ -4,7 +4,7 @@ local commons = require("scripts.commons")
 local tools = require("scripts.tools")
 local gutils = require("scripts.gutils")
 local machinedb = require("scripts.machinedb")
-local production = require("scripts.production")
+local production     = require("scripts.production")
 
 local prefix = commons.prefix
 
@@ -39,12 +39,14 @@ local function install_modules(container, g, config, grecipe)
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
     for _, module in pairs(modules) do
-        for effect, _ in pairs(module.module_effects) do
+        for effect, value in pairs(module.module_effects) do
             if not assembly_machine.allowed_effects[effect] then
                 goto skip
             end
             if allowed_effects and not allowed_effects[effect] then
-                goto skip
+                if effect ~= "quality" or value > 0 then
+                    goto skip
+                end
             end
             if allowed_module_categories and not allowed_module_categories[module.category] then
                 goto skip
@@ -67,9 +69,11 @@ local function install_modules(container, g, config, grecipe)
 
                 local module = prototypes.item[smodule.name]
                 if module then
-                    for effect in pairs(module.module_effects) do
-                        if not assembly_machine.allowed_effects[effect] then
-                            goto skip
+                    for effect, value in pairs(module.module_effects) do
+                        if effect ~= "quality" or value > 0 then
+                            if not assembly_machine.allowed_effects[effect] then
+                                goto skip
+                            end
                         end
                     end
                 end
