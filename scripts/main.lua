@@ -323,9 +323,17 @@ function main.exit(player)
 
     local character = vars.character
     if character and character.valid then
-        player.teleport(character.position, character.surface, false)
+        local surface = character.surface
+        player.teleport(character.position, surface, false)
         player.associate_character(character)
         player.set_controller { type = defines.controllers.character, character = character }
+        if surface then
+            local platform = surface.platform
+            if platform then
+                player.enter_space_platform(platform)
+            end
+        end
+
         if vars.extern_cheat_mode then
             if vars.extern_cheat_mode ~= character.cheat_mode then
                 character.cheat_mode = vars.extern_cheat_mode
