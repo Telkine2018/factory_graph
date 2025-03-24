@@ -253,9 +253,11 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         local effects = module.effects
 
         if recipe_allowed_effects then
-            for name in pairs(effects) do
+            for name, value in pairs(effects) do
                 if not recipe_allowed_effects[name] then
-                    goto skip
+                    if name ~= "quality" or value > 0 then
+                        goto skip
+                    end
                 end
             end
         end
@@ -282,9 +284,11 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             local effects = module.effects
 
             if recipe_allowed_effects then
-                for name in pairs(effects) do
+                for name, value in pairs(effects) do
                     if not recipe_allowed_effects[name] then
-                        goto skip
+                        if name ~= "quality" or value > 0 then
+                            goto skip
+                        end
                     end
                 end
             end
