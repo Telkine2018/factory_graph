@@ -53,9 +53,45 @@ local function get_energy(machine)
     return energy
 end
 
+---@param module LuaItemPrototype
+---@param module_quality string
+---@param effectivity number
+---@return ModuleEffects
+function production.get_module_effect(module, module_quality, effectivity)
+    local effects = module.module_effects
+    local qproto = prototypes.quality[module_quality or "normal"]
+    local qmodifier = 1 + qproto.level * 0.3
+
+    local result = {
+        speed = 0,
+        productivity = 0,
+        consumption = 0,
+        pollution = 0,
+        quality = 0
+    }
+    if not effects then return result end
+    if effects.speed then
+        result.speed = effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed)
+    end
+    if effects.productivity then
+        result.productivity = effectivity * qmodifier * effects.productivity
+    end
+    if effects.consumption then
+        result.consumption = effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption)
+    end
+    if effects.pollution then
+        result.pollution = effectivity * (effects.pollution < 0 and qmodifier * effects.pollution or effects.pollution)
+    end
+    if effects.quality then
+        result.quality = effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality)
+    end
+    return result
+end
+
 production.get_product_amount = get_product_amount
 production.get_ingredient_amount = get_ingredient_amount
 production.get_energy = get_energy
+
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -90,7 +126,7 @@ function production.compute_machine(g, grecipe, config)
             for _, module_id in pairs(config.machine_modules) do
                 local smodule = tools.id_to_signal(module_id)
                 ---@cast smodule -nil
-                table.insert(machine.modules,prototypes.item[smodule.name])
+                table.insert(machine.modules, prototypes.item[smodule.name])
                 table.insert(machine.module_qualities, smodule.quality)
             end
         end
@@ -124,26 +160,26 @@ function production.compute_machine(g, grecipe, config)
         ---@param effectivity integer
         local function apply_effect(effects, qmodifier, effectivity)
             if effects then
-                if effects.speed then 
-                    speed = speed + effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed) 
+                if effects.speed then
+                    speed = speed + effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed)
                 end
-                if effects.productivity then 
-                    productivity = productivity + effectivity * qmodifier * effects.productivity 
+                if effects.productivity then
+                    productivity = productivity + effectivity * qmodifier * effects.productivity
                 end
-                if effects.consumption then 
-                    consumption = consumption + effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption) 
+                if effects.consumption then
+                    consumption = consumption + effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption)
                 end
-                if effects.pollution then 
+                if effects.pollution then
                     pollution = pollution + effectivity * (effects.pollution < 0 and qmodifier * effects.pollution or effects.pollution)
                 end
-                if effects.quality then 
-                    quality = quality + effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality) 
+                if effects.quality then
+                    quality = quality + effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality)
                 end
             end
         end
 
         if machine.modules then
-            for index = 1, #machine.modules  do
+            for index = 1, #machine.modules do
                 local module = machine.modules[index]
                 local module_quality = machine.module_qualities[index]
                 local effects = module.module_effects
@@ -172,7 +208,7 @@ function production.compute_machine(g, grecipe, config)
                 end
                 effectivity = profile[index] * effectivity
             end
-            
+
             for _, module_id in pairs(config.beacon_modules) do
                 local smodule = tools.id_to_signal(module_id)
                 ---@cast smodule -nil
@@ -227,7 +263,7 @@ function production.compute_products(g, machines)
     g.product_outputs = product_outputs
     g.total_energy = 0
 
-    --- compute products
+    --- compute machines
     for _, machine in pairs(machines) do
         local machine_count = machine.count
         if machine_count then
@@ -283,6 +319,7 @@ function production.compute_matrix(g)
 
     for _, grecipe in pairs(g.recipes) do
         grecipe.machine = nil
+        grecipe.computed_config = nil
     end
 
     local has_neg_value
@@ -335,7 +372,7 @@ function production.compute_matrix(g)
             else
                 failed = commons.production_failures.use_handcraft_recipe
                 g.production_failed = failed
-                g.production_recipes_failed = {[recipe_name]=true}
+                g.production_recipes_failed = { [recipe_name] = true }
                 return
             end
         end
@@ -716,6 +753,35 @@ function production.compute_matrix(g)
     for name, count in pairs(machine_counts) do
         local machine = machines[name]
         if machine then
+            if not machine.grecipe.production_config then
+                if machine.speed > 1 and machine.quality <= 0 then
+                    local module_count = #machine.modules
+                    if machine.modules and module_count > 0 then
+                        local module = machine.modules[1]
+                        local effects = production.get_module_effect(module, machine.module_qualities[1], 1)
+                        if effects.speed > 0 or effects.productivity == 0 and effects.quality <= 0 then
+                            local excess_module_count = (math.ceil(1) - count) * (1 + machine.speed) / effects.speed
+                            if excess_module_count >= 1 then
+                                if excess_module_count >= module_count then
+                                    excess_module_count = module_count
+                                end
+                                local computed_config = machinedb.get_default_config(g, machine.grecipe.name, {})
+                                if computed_config then
+                                    machine.grecipe.computed_config = computed_config
+                                    for _ = 1, excess_module_count do
+                                        table.remove(computed_config.machine_modules, 1)
+                                        table.remove(machine.modules, 1)
+                                        table.remove(machine.module_qualities, 1)
+                                    end
+                                    local new_speed = 1 + machine.speed - excess_module_count * effects.speed
+                                    count = count * (machine.speed + 1) / new_speed
+                                    machine.speed = new_speed
+                                end
+                            end
+                        end
+                    end
+                end
+            end
             machine.count = count
         end
     end

@@ -312,6 +312,12 @@ function graph.remove_unused(g)
         end
         g.recipes[name] = nil
         g.selection[name] = nil
+        for _, product in pairs(grecipe.ingredients) do
+            product.ingredient_of[name] = nil
+        end
+        for _, product in pairs(grecipe.products) do
+            product.product_of[name] = nil
+        end
         changed = true
     end
 

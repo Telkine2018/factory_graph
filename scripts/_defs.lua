@@ -111,6 +111,7 @@ local tools = require("scripts.tools")
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?
+---@field computed_config ProductionConfig?
 ---@field line integer?
 ---@field col integer?
 

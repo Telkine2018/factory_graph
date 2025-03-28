@@ -66,6 +66,9 @@ local excluded_categories = {
     ["fuel-depot"] = true,
     ["transport-drone-request"] = true,
     ["transport-fluid-request"] = true,
+
+    ["recycling"] = true,
+    ["recycling-or-hand-crafting"] = true
 }
 
 local excluded_subgroups = {
@@ -459,7 +462,7 @@ tools.on_configuration_changed(
                     command.open(player)
                 end
                 local recipes = player.force.recipes
-                graph.update_recipes(g, recipes, g.excluded_categories, g.excluded_subgroups or {})
+                graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
 
                 local need_refresh
                 for _, grecipe in pairs(g.recipes) do

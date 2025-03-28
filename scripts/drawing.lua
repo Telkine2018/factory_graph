@@ -80,7 +80,7 @@ function dash_line_for_product(product, dash)
                     -- rendering.set_dashes(id, 0.05, 0.1)
                 end
             else
-                if id .dash_length > 0 then
+                if id.dash_length > 0 then
                     id.dash_length = 0.0
                     id.gap_length = 0.0
                     -- rendering.set_dashes(id, 0, 0)
@@ -619,6 +619,8 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
                 y = y + disp_y
                 draw_line({ x1, y }, { x2, y })
 
+                ---@cast recipe1 -nil
+                ---@cast recipe2 -nil
                 if recipe1.col > recipe2.col then
                     recipe1, recipe2 = recipe2, recipe1
                 end
@@ -774,6 +776,8 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
                 x = x + disp_x
                 draw_line({ x, y1 }, { x, y2 })
 
+                ---@cast recipe1 -nil
+                ---@cast recipe2 -nil
                 if recipe1.line > recipe2.line then
                     recipe1, recipe2 = recipe2, recipe1
                 end
@@ -1416,7 +1420,7 @@ local function on_gui_opened(e)
         elseif entity_name == commons.product_selector_name then
             local product = drawing.get_product_from_selected(player, entity)
             if product then
-                drawing.open_recipe_selection(g, product, grecipe)
+                drawing.open_recipe_selection(g, { product = product, recipe = grecipe })
             end
             player.opened = nil
         end
@@ -1476,9 +1480,8 @@ function drawing.delete_content(g, keep_location)
 end
 
 ---@param g Graph
----@param product GProduct
----@param src GRecipe
-function drawing.open_recipe_selection(g, product, src)
+---@param options RecipeSelectionOptions
+function drawing.open_recipe_selection(g, options)
 end
 
 ---@param e EventData.on_lua_shortcut
@@ -1492,10 +1495,18 @@ local function on_control_click2(e)
     local g = gutils.get_graph(player)
     if not g.selected_recipe then return end
 
-    local current_layer = g.current_layer or "virtual-signal/signal-yellow"
+    local entity = player.selected
 
-    g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
-    drawing.draw_layers(g)
+    if entity and entity.valid and entity.name == commons.product_selector_name then
+        local product = drawing.get_product_from_selected(player, entity)
+        if product then
+            drawing.open_recipe_selection(g, { product = product, recipe = g.selected_recipe, related_to_product = true })
+        end
+    else
+        local current_layer = g.current_layer or "virtual-signal/signal-yellow"
+        g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
+        drawing.draw_layers(g)
+    end
 end
 
 script.on_event(prefix .. "-control-click2", on_control_click2)

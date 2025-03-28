@@ -30,14 +30,25 @@ local sprite_button_size = 30
 
 
 ---@param g Graph
----@param product GProduct?
----@param recipe GRecipe?
----@param only_product boolean?
+---@param options RecipeSelectionOptions
 ---@return table<string, GRecipe>?
-function load_initial_recipes(g, product, recipe, only_product)
+function load_initial_recipes(g, options)
     local recipes = {}
 
-    if product and recipe then
+    local product = options.product
+    local recipe = options.recipe
+    if product and options.related_to_product then
+        for name, i_recipe in pairs(product.ingredient_of) do
+            if i_recipe.visible and not i_recipe.is_product then
+                recipes[name] = i_recipe
+            end
+        end
+        for name, p_recipe in pairs(product.product_of) do
+            if p_recipe.visible and not p_recipe.is_product then
+                recipes[name] = p_recipe
+            end
+        end
+    elseif product and recipe then
         if product.product_of[recipe.name] then
             for name, i_recipe in pairs(product.ingredient_of) do
                 recipes[name] = i_recipe
@@ -57,7 +68,7 @@ function load_initial_recipes(g, product, recipe, only_product)
         local recipe_count = table_size(recipes)
         if recipe_count == 0 then return end
     elseif product and not recipe then
-        if not only_product then
+        if not options.only_product then
             for name, i_recipe in pairs(product.ingredient_of) do
                 recipes[name] = i_recipe
             end
@@ -145,7 +156,7 @@ local function backward_history(player)
     local g = gutils.get_graph(player)
     local gproduct = top.product_name and g.products[top.product_name]
     local grecipe = top.recipe_name and g.recipes[top.recipe_name]
-    recipe_selection.open(g, gproduct, grecipe, false, true)
+    recipe_selection.open(g, { product = gproduct, recipe = grecipe, nohistory = true })
 end
 
 ---@param player LuaPlayer
@@ -178,29 +189,34 @@ local function forward_history(player)
     local g = gutils.get_graph(player)
     local gproduct = top.product_name and g.products[top.product_name]
     local grecipe = top.recipe_name and g.recipes[top.recipe_name]
-    recipe_selection.open(g, gproduct, grecipe)
+    recipe_selection.open(g, { product = gproduct, recipe = grecipe })
 end
 
+---@class RecipeSelectionOptions
+---@field g Graph?
+---@field product GProduct?
+---@field recipe GRecipe?
+---@field only_product boolean?
+---@field nohistory boolean?
+---@field related_to_product boolean?
 
 ---@param g Graph
----@param product GProduct?
----@param recipe GRecipe?
----@param only_product boolean?
----@param nohistory boolean?
-function recipe_selection.open(g, product, recipe, only_product, nohistory)
+---@param options RecipeSelectionOptions
+function recipe_selection.open(g, options)
     local player = g.player
     local player_index = player.index
 
-    if not nohistory then
-        push_history(player, product, recipe)
+    if not options.nohistory then
+        push_history(player, options.product, options.recipe)
     end
-    g.rs_product = product
-    g.rs_recipe = recipe
+    g.rs_product = options.product
+    g.rs_recipe = options.recipe
 
     recipe_selection.close(player_index)
 
-    local recipes = load_initial_recipes(g, product, recipe, only_product)
+    local recipes = load_initial_recipes(g, options)
 
+    local product = options.product
     local product_title
     if (product) then
         product_title = gutils.get_product_name(player, product.name)
@@ -388,7 +404,7 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
             local recipe_name = e.tags.recipe_name
             local g = gutils.get_graph(player)
             if g then
-                recipe_selection.open(g, g.products[product_name], g.recipes[recipe_name])
+                recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
             end
         end
     end)
@@ -780,33 +796,44 @@ function recipe_selection.process_query(player, name)
                 recipes[grecipe.name] = grecipe
             end
         elseif action == 2 then
-            local kproducts = gutils.get_output_products(g)
-            local uproducts = { [name] = gproduct }
+            local target_products = { [name] = gproduct }
+            local found_products = gutils.get_output_products(g)
             while (true) do
-                local _, product = next(uproducts)
+                local _, product = next(target_products)
                 if not product then break end
 
                 local frecipe
-                if product.root_recipe then
-                    frecipe = product.root_recipe
-                else
-                    _, frecipe = next(product.product_of)
-                end
-
-                uproducts[product.name] = nil
-                kproducts[product.name] = product
-
-                if frecipe then
-                    recipes[frecipe.name] = frecipe
-                    for _, p in pairs(frecipe.products) do
-                        kproducts[p.name] = p
-                    end
-                    for _, i in pairs(frecipe.ingredients) do
-                        if not kproducts[i.name] then
-                            uproducts[i.name] = i
-                        end
+                for _, recipe in pairs(product.product_of) do
+                    if not recipe.is_product then
+                        frecipe = recipe
+                        break
                     end
                 end
+
+                if not frecipe then
+                    found_products[product.name] = product
+                    target_products[product.name] = nil
+                    goto skip
+                end
+
+                ---@cast frecipe -nil
+                if frecipe.is_product then
+                    goto skip
+                end
+
+                recipes[frecipe.name] = frecipe
+                for _, p in pairs(frecipe.products) do
+                    found_products[p.name] = p
+                    target_products[p.name] = nil
+                end
+
+                for _, i in pairs(frecipe.ingredients) do
+                    if not found_products[i.name] then
+                        target_products[i.name] = i
+                    end
+                end
+
+                ::skip::
             end
         elseif action == 3 then
             recipes = gproduct.ingredient_of
@@ -965,7 +992,7 @@ tools.on_named_event(np("remaining"), defines.events.on_gui_click,
         if not product_name then return end
         local gproduct = g.products[product_name]
         if not gproduct then return end
-        recipe_selection.open(g, gproduct, nil, true)
+        recipe_selection.open(g, { product = gproduct, true })
     end)
 
 
@@ -984,10 +1011,10 @@ tools.register_user_event(commons.selection_change_event, function(data)
 end)
 
 tools.register_user_event(commons.open_recipe_selection, function(data)
+    ---@cast data RecipeSelectionOptions
     local g = data.g
-    recipe_selection.open(g, data.product, data.recipe, data.only_product)
+    recipe_selection.open(g, data)
 end)
-
 
 drawing.open_recipe_selection = recipe_selection.open
 graph.update_recipe_selection = recipe_selection.update_recipes

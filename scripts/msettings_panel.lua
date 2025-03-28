@@ -167,7 +167,7 @@ function msettings.create(player_index, grecipe)
         msettings.close(player)
     end
 
-    local config = grecipe.production_config
+    local config = grecipe.production_config or grecipe.computed_config
     if not config then
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end
@@ -403,6 +403,7 @@ local function read_config(player)
 
     if field_table.is_default.state then
         grecipe.production_config = nil
+        grecipe.computed_config = nil
         gutils.fire_production_data_change(g)
         return nil
     end
@@ -452,6 +453,7 @@ function msettings.save(player)
     local config = read_config(player)
     if field_table.is_default.state then
         grecipe.production_config = nil
+        grecipe.computed_config = nil
     else
         grecipe.production_config = config
     end
@@ -598,6 +600,7 @@ end
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
+    ---@type Graph
     local g = data.g
     local player = g.player
     local frame = player.gui.screen[panel_name]
@@ -612,7 +615,7 @@ tools.register_user_event(commons.production_compute_event, function(data)
     local grecipe = g.recipes[recipe_name]
     if not grecipe then return end
 
-    local config = grecipe.production_config
+    local config = grecipe.production_config or grecipe.computed_config
     if not config then
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end

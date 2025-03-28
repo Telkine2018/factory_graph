@@ -400,7 +400,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
         if not product_name then return end
 
         if not (e.button ~= defines.mouse_button_type.right or e.control or e.shift) then
-            recipe_selection.open(g, g.products[product_name], nil)
+            recipe_selection.open(g, { product = g.products[product_name] })
         elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift) then
             get_vinput(e.element.parent)
             if g.iovalues[product_name] == true then
@@ -1297,7 +1297,7 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
 
             local recipe_name = element.tags.recipe_name --[[@as string]]
             local g = gutils.get_graph(player)
-            recipe_selection.open(g, nil, g.recipes[recipe_name])
+            recipe_selection.open(g, { recipe = g.recipes[recipe_name] })
         end
     end)
 
@@ -1316,7 +1316,7 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
             if not recipe_name or not product_name then return end
 
             local g = gutils.get_graph(player)
-            recipe_selection.open(g, g.products[product_name], g.recipes[recipe_name])
+            recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
         elseif not (e.button ~= defines.mouse_button_type.left or e.shift or e.control or e.alt) then
         end
     end)
@@ -1409,7 +1409,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                 end
 
                 if not machine then return end
-                if not machine.machine.items_to_place_this or #machine.machine.items_to_place_this==0 then
+                if not machine.machine.items_to_place_this or #machine.machine.items_to_place_this == 0 then
                     return
                 end
 

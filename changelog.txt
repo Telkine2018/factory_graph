@@ -1,8 +1,13 @@
 ---------------------------------------------------------------------------------------------------
-Version: 2.0.10
+Version: 2.0.11
 Date: 24. 03. 2025.
   Bugfixes:
     - Fix default configuration with speed module and quality
+    - Fix "path to build" function in recipe list (compute recipes up to a product from already selected recipes)
+  Changes:
+    - Adjust use of speed module if count of machine <= 1
+    - Add SHIFT-CLICK on product in graph to list all recipes in graph that uses the product
+    - Remove recycling recipes
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.9
 Date: 13. 03. 2025.

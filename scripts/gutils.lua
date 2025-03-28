@@ -266,7 +266,7 @@ function gutils.compute_visibility(g, keep_position)
                 grecipe.visible = false
             end
             if show_only_researched and not grecipe.enabled then
-              grecipe.visible = false
+                grecipe.visible = false
             end
         end
     end
@@ -509,9 +509,11 @@ function gutils.get_output_products(g)
     ---@type {[string]:GProduct}
     local products = {}
     for _, recipe in pairs(g.selection) do
-        for _, product in pairs(recipe.products) do
-            local name = product.name
-            products[name] = product
+        if not recipe.is_product then
+            for _, product in pairs(recipe.products) do
+                local name = product.name
+                products[name] = product
+            end
         end
     end
     return products
@@ -529,7 +531,7 @@ local saved_graph_fields = {
     "current_layer",
     "visible_layers",
     "show_products"
-    
+
 }
 
 local saved_reciped_fields = {
@@ -680,6 +682,7 @@ function gutils.clear(g)
     g.bound_products = nil
     for _, grecipe in pairs(g.recipes) do
         grecipe.production_config = nil
+        grecipe.computed_config = nil
         grecipe.machine = nil
         grecipe.layer = nil
     end
