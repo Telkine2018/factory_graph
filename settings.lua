@@ -10,7 +10,15 @@ data:extend(
 			type = "int-setting",
 			name = prefix .. "-version",
 			setting_type = "startup",
-			default_value = 1
+			default_value = 1,
+			order = "aa"
+		},
+		{
+			type = "bool-setting",
+			name = prefix .. "-include-recycling-recipes",
+			setting_type = "startup",
+			default_value = false,
+			order = "aa"
 		},
 		{
 			type = "int-setting",

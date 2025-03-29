@@ -7,7 +7,7 @@ Date: 24. 03. 2025.
   Changes:
     - Adjust use of speed module if count of machine <= 1
     - Add SHIFT-CLICK on product in graph to list all recipes in graph that uses the product
-    - Remove recycling recipes
+    - Remove recycling recipes by default (add a settings to include). When included, hidden by default.
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.9
 Date: 13. 03. 2025.

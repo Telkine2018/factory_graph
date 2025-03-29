@@ -51,25 +51,31 @@ local excluded_categories = {
 
     -- Krastorio 2
     ["void-crushing"] = true, -- This doesn't actually exist yet, but will soon!
+
     -- Mining drones
     ["mining-depot"] = true,
+
     -- Pyanodon's
     ["py-incineration"] = true,
     ["py-runoff"] = true,
     ["py-venting"] = true,
+
     -- Reverse factory
     ["recycle-intermediates"] = true,
     ["recycle-productivity"] = true,
     ["recycle-products"] = true,
     ["recycle-with-fluids"] = true,
+
     -- Transport drones
     ["fuel-depot"] = true,
     ["transport-drone-request"] = true,
-    ["transport-fluid-request"] = true,
-
-    ["recycling"] = true,
-    ["recycling-or-hand-crafting"] = true
+    ["transport-fluid-request"] = true
 }
+
+if not settings.startup["factory_graph-include-recycling-recipes"] then
+    excluded_categories["recycling"] = true
+    excluded_categories["recycling-or-hand-crafting"] = true
+end
 
 local excluded_subgroups = {
     ["empty-barrel"] = true,

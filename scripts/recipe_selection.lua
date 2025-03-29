@@ -306,10 +306,10 @@ function recipe_selection.open(g, options)
 
     b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
 
-    local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
+    local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "auto", vertical_scroll_policy = "auto" }
     scroll.style.height = 400
     scroll.style.minimal_width = 500
-    scroll.style.horizontally_stretchable = true
+    scroll.style.maximal_width = 600
 
     local recipe_table = scroll.add { type = "table", column_count = 2, draw_horizontal_lines = true, name = "recipe_table" };
     recipe_table.style.horizontally_stretchable = true
@@ -992,7 +992,7 @@ tools.on_named_event(np("remaining"), defines.events.on_gui_click,
         if not product_name then return end
         local gproduct = g.products[product_name]
         if not gproduct then return end
-        recipe_selection.open(g, { product = gproduct, true })
+        recipe_selection.open(g, { product = gproduct, only_product = true })
     end)
 
 
