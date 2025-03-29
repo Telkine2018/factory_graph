@@ -921,6 +921,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     end
 
     local count_per_machine = {}
+    local count_per_module = {}
     for _, machine in pairs(machines) do
         create_product_line(machine_container, machine)
 
@@ -929,6 +930,16 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             local machine_id = tools.signal_to_id { name = machine.machine.name, quality = machine.machine_quality }
             ---@cast machine_id -nil
             count_per_machine[machine_id] = (count_per_machine[machine_id] or 0) + count
+
+            if machine.modules then
+                for i = 1, #machine.modules do
+                    local module = machine.modules[i]
+                    local quality = machine.module_qualities[i]
+                    local module_id = tools.signal_to_id { name = module.name, quality = quality }
+                    ---@cast module_id -nil
+                    count_per_module[module_id] = (count_per_module[module_id] or 0) + 1
+                end
+            end
         end
     end
 
@@ -952,6 +963,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     ---@field count integer
     ---@field quality string
     ---@field id string
+    ---@field is_module boolean
 
     ---@type ProductPanel_Machines[]
     local sorted_table = {}
@@ -984,6 +996,20 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             count = count
         })
     end
+
+    for id, count in pairs(count_per_module) do
+        local module = tools.id_to_signal(id)
+        ---@cast module -nil
+        table.insert(sorted_table, {
+            id = id,
+            quality = module.quality,
+            name = module.name,
+            label = translations.get_item_name(summary_flow.player_index, module.name),
+            count = count,
+            is_module = true
+        })
+    end
+
     table.sort(sorted_table, function(m1, m2) return m1.label < m2.label end)
 
     for _, m in pairs(sorted_table) do
@@ -991,8 +1017,13 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
         local quality = m.quality
         local count   = m.count
         local proto   = prototypes.entity[name]
-        if proto.items_to_place_this then
-            local item               = proto.items_to_place_this[1].name
+        local item
+        if not m.is_module and proto and proto.items_to_place_this then
+            item = proto.items_to_place_this[1].name
+        else
+            item = name
+        end
+        if item then
             local sitem              = { name = item, quality = quality }
             local crafted            = craft_queue[item] or 0
             local in_inventory_count = inv and inv.get_item_count(sitem) or 0
@@ -1012,8 +1043,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             })
             b.locked                         = true
             b.raise_hover_events             = true
-            local machine_label              = per_machine_table.add {
-                type = "label", caption = translations.get_entity_name(summary_flow.player_index, name) }
+            local machine_label              = per_machine_table.add { type = "label", caption = m.label }
             machine_label.style.right_margin = 10
 
             local count_label, inv_label     = get_summary_labels(count, in_inventory_count, in_network_count, crafted)
@@ -1640,3 +1670,4 @@ tools.on_gui_click(np("goto"),
 msettings_panel.create_product_line = create_product_line
 
 return product_panel
+
