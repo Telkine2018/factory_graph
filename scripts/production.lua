@@ -307,16 +307,10 @@ function production.compute_products(g, machines)
 end
 
 ---@param g Graph
-function production.compute_matrix(g)
+---@return {[string]:GRecipe}?
+function production.compute_recipes(g)
+
     machinedb.initialize()
-
-    local failed = nil
-
-    ---@type {[string]:ProductionMachine}
-    local machines = {}
-
-    local enabled_cache = {}
-
     for _, grecipe in pairs(g.recipes) do
         grecipe.machine = nil
         grecipe.computed_config = nil
@@ -330,7 +324,7 @@ function production.compute_matrix(g)
             end
         end
     else
-        return
+        return nil
     end
 
     ---@type {[string]:GRecipe}
@@ -347,7 +341,22 @@ function production.compute_matrix(g)
     for _, grecipe in pairs(g.selection) do
         grecipe.machine = nil
     end
+    return connected_recipes
+end
 
+---@param g Graph
+function production.compute_matrix(g)
+
+    local connected_recipes  = production.compute_recipes(g)
+    if not connected_recipes then
+        return
+    end
+
+    local failed = nil
+
+    ---@type {[string]:ProductionMachine}
+    local machines = {}
+    local enabled_cache = {}
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
 

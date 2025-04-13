@@ -241,7 +241,6 @@ local function set_output_value(g, product_name, qtlabel)
     end
 end
 
-
 function product_panel.create_product_tables(player)
     local frame = player.gui.screen[product_panel_name]
     if not frame then return end
