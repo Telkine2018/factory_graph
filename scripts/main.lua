@@ -272,7 +272,7 @@ function main.enter_surface(player, recipe_name)
     local grecipe
     if recipe_name then
         grecipe = g.recipes[recipe_name]
-        if grecipe.visible then
+        if grecipe and grecipe.visible then
             player_position = gutils.get_recipe_position(g, grecipe)
             g.player_position = nil
         else
