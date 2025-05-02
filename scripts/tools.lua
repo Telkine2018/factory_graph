@@ -727,6 +727,7 @@ local function check_signal(type, name)
     end
     return true
 end
+tools.check_signal = check_signal
 
 ---@param sprite string?
 ---@param default string?

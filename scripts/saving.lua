@@ -119,7 +119,7 @@ function saving.update(player, container)
     container.clear()
     for _, save in pairs(saves) do
         local line = container.add { type = "flow", direction = "horizontal" }
-
+        
         local cb = line.add { type = "checkbox", tooltip = { np("pinned-tooltip") }, name = "pinned", state = not not save.pinned }
         cb.style.margin = 5
         cb.style.horizontal_align = "center"
@@ -449,6 +449,28 @@ tools.on_named_event(np("pin"), defines.events.on_gui_checked_state_changed,
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
+    end)
+
+tools.on_configuration_changed(
+---@param data ConfigurationChangedData
+    function(data)
+        for _, player in pairs(game.players) do
+            local vars  = tools.get_vars(player)
+            ---@type Saving[]
+            local saves = vars.saves
+            if not saves then goto next_player end
+
+            local new_saves = {}
+            for _, save in pairs(saves) do
+                if not tools.check_sprite(save.icon1) then goto next_save end
+                if not tools.check_sprite(save.icon2) then goto next_save end
+
+                table.insert(new_saves, save)
+                ::next_save::
+            end
+            vars.saves = new_saves
+            ::next_player::
+        end
     end)
 
 return saving
