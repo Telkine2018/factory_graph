@@ -64,7 +64,7 @@ local function get_outputs(player_index)
     local result = {}
     for name, value in pairs(g.iovalues) do
         if type(value) == "number" and value > 0 then
-            result[value] = value
+            result[name] = value
         end
     end
     return result
