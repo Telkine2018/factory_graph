@@ -35,6 +35,8 @@ local tools = require("scripts.tools")
 ---@field move_recipe GRecipe?
 ---@field layer_ids LuaRenderObject[]?
 ---@field recipes_productivities {[string]:number}?
+---@field manual_mode boolean                           # manual mode asked by user
+---@field real_manual_mode boolean                      # manual mode computed
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
@@ -102,6 +104,7 @@ local tools = require("scripts.tools")
 ---@field is_recursive boolean?
 ---@field layer string?
 ---@field pos_locked boolean?
+---@field mcount number                 @ manual count of machine
 
 ---@class GSortNode
 ---@field sort_level integer?

@@ -250,6 +250,24 @@ add {
 
 add {
   type = "sprite",
+  name = prefix .. "_minus",
+  filename = png("minus"),
+  width = 32,
+  height = 32,
+  flags = { "icon" }
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_plus",
+  filename = png("plus"),
+  width = 32,
+  height = 32,
+  flags = { "icon" }
+}
+
+add {
+  type = "sprite",
   name = prefix .. "_delete",
   filename = png("delete"),
   width = 64,
@@ -346,5 +364,6 @@ add {
   entity_type_filters = { "assembling-machine", "furnace" },
   alt_entity_type_filters = { "assembling-machine", "furnace" }
 }
+
 
 data:extend(declarations)

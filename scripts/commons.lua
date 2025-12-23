@@ -68,6 +68,9 @@ commons.buttons.ingredient = commons.buttons.cyan
 commons.buttons.product = commons.buttons.orange
 commons.buttons.recipe = commons.buttons.blue
 
+commons.buttons.positive = commons.buttons.green
+commons.buttons.negative = commons.buttons.red
+
 commons.default_selection = commons.ingredient_and_product_selection
 commons.surface_prefix_filter = "^" .. commons.surface_prefix
 

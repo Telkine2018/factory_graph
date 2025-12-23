@@ -11,6 +11,7 @@ local production = {}
 local abs = math.abs
 local math_precision = commons.math_precision
 
+--- Get product amount for one machine
 ---@param machine ProductionMachine
 ---@param product Product
 ---@return number
@@ -33,6 +34,7 @@ local function get_product_amount(machine, product)
     return amount
 end
 
+--- Get ingredient amount for one machine
 ---@param machine ProductionMachine
 ---@param ingredient Ingredient
 ---@return number
@@ -106,6 +108,8 @@ function production.compute_machine(g, grecipe, config)
 
         local recipe_name = grecipe.name
         local recipe = prototypes.recipe[recipe_name]
+
+        local previous_machine = grecipe.machine
 
         local smachine = tools.id_to_signal(config.machine_name)
         ---@cast smachine -nil
@@ -253,7 +257,8 @@ local compute_machine = production.compute_machine
 
 ---@param g Graph
 ---@param machines {[string]:ProductionMachine}
-function production.compute_products(g, machines)
+---@param manual_mode boolean?
+function production.compute_products(g, machines, manual_mode)
     ---@type table<string, number>
     local product_inputs = {}
     ---@type table<string, number>
@@ -265,7 +270,12 @@ function production.compute_products(g, machines)
 
     --- compute machines
     for _, machine in pairs(machines) do
-        local machine_count = machine.count
+        local machine_count 
+        if manual_mode then
+            machine_count = machine.grecipe.mcount
+        else
+            machine_count = machine.count
+        end
         if machine_count then
             if machine_count > 0 then
                 machine.count = machine_count
@@ -352,6 +362,8 @@ function production.compute_matrix(g)
         return
     end
 
+    g.real_manual_mode = g.manual_mode
+    
     local failed = nil
 
     ---@type {[string]:ProductionMachine}
@@ -795,8 +807,11 @@ function production.compute_matrix(g)
         end
     end
 
+    local manual_mode = g.manual_mode or failed or not (g.iovalues) or table_size(g.iovalues) == 0
+    g.real_manual_mode = manual_mode
+
     --- compute products
-    production.compute_products(g, machines)
+    production.compute_products(g, machines, manual_mode)
 
     g.production_failed = failed
     g.production_recipes_failed = failed_recipes

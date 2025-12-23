@@ -34,6 +34,9 @@ local green_button = commons.buttons.green
 local red_button = commons.buttons.red
 local default_button = commons.buttons.default
 
+local mini_size = 16
+local mini_style = prefix .. "_mini_button"
+
 
 local function np(name)
     return prefix .. "-product-panel." .. name
@@ -48,7 +51,7 @@ local fround = tools.fround
 
 ---@param g Graph
 local function get_production_title(g)
-    if not g.production_failed then
+    if not g.production_failed or g.manual_mode then
         return { np("title") }
     elseif type(g.production_failed) == "string" then
         return { "", { np("failed-title") }, { np("failure_" .. g.production_failed) } }
@@ -139,6 +142,8 @@ function product_panel.create(player_index)
 
     local setup_tab = tabbed_pane.add { type = "tab", caption = { np("setup") } }
     local summary_tab = tabbed_pane.add { type = "tab", caption = { np("summary") } }
+    local error_tab = tabbed_pane.add { type = "tab", caption = { np("errors") } }
+
     local setup_flow = tabbed_pane.add { type = "flow", direction = "vertical", name = "setup_flow" }
 
     local summary_scroll = tabbed_pane.add { type = "scroll-pane", direction = "vertical",
@@ -147,13 +152,16 @@ function product_panel.create(player_index)
     summary_scroll.style.vertically_stretchable = true
     local summary_flow = summary_scroll.add { type = "flow", direction = "vertical", name = "summary_flow" }
 
-    tabbed_pane.add_tab(setup_tab, setup_flow)
-    tabbed_pane.add_tab(summary_tab, summary_scroll)
-
-    local error_panel = setup_flow.add { type = "flow", direction = "vertical", name = "error_panel" }
+    local error_scroll = tabbed_pane.add { type = "scroll-pane", direction = "vertical",
+        horizontal_scroll_policy = "never", vertical_scroll_policy = "auto" }
+    local error_panel = error_scroll.add { type = "flow", direction = "vertical", name = "error_panel" }
     error_panel.visible = false
     error_panel.style.vertically_stretchable = true
     error_panel.style.maximal_height = 600
+
+    tabbed_pane.add_tab(setup_tab, setup_flow)
+    tabbed_pane.add_tab(summary_tab, summary_scroll)
+    tabbed_pane.add_tab(error_tab, error_scroll)
 
     local machine_scroll = setup_flow.add { type = "scroll-pane",
         horizontal_scroll_policy = "never", name = "machine_scroll", vertical_scroll_policy = "auto-and-reserve-space" }
@@ -205,10 +213,14 @@ local function set_output_value(g, product_name, qtlabel)
 
                 output = fround(output)
                 input = fround(input)
-                if output >= input then
-                    value = output
+                if g.real_manual_mode then
+                    value = output - input
                 else
-                    value = -input
+                    if output >= input then
+                        value = output
+                    else
+                        value = -input
+                    end
                 end
             end
         end
@@ -216,15 +228,9 @@ local function set_output_value(g, product_name, qtlabel)
         if value and math.abs(value) > math_precision then
             value = fround(value)
             if is_computed and value > 0 then
-                caption = mark .. "[color=orange]" .. luautil.format_number(value, true) .. "[/color]"
-                if input ~= output then
-                    caption = caption .. "[color=red]?[/color]"
-                end
+                caption = mark .. "[color=green]" .. luautil.format_number(value, true) .. "[/color]"
             elseif is_computed then
-                caption = mark .. "[color=cyan]" .. luautil.format_number(-value, true) .. "[/color]"
-                if input ~= output then
-                    caption = caption .. "[color=red]?[/color]"
-                end
+                caption = mark .. "[color=red]" .. luautil.format_number(-value, true) .. "[/color]"
             else
                 caption = luautil.format_number(value, true)
             end
@@ -470,10 +476,16 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         local inventory_label = ""
 
         if math.abs(output) > math_precision or math.abs(input) > math_precision then
-            output_label = { np("product_produced"), tostring(output) }
+            if output ~= 0 then
+                output_label = { np("product_produced"), tostring(output) }
+            else
+                output_label = { np("product_nl") }
+            end
 
             if output ~= input then
-                input_label = { np("product_consumed"), tostring(input) }
+                if input ~= 0 then
+                    input_label = { np("product_consumed"), tostring(input) }
+                end
             else
                 input_label = { np("product_all_consumed") }
             end
@@ -608,34 +620,63 @@ end)
 
 local get_product_amount = production.get_product_amount
 
+local function format_machine_count(count)
+    local caption
+    if not count then
+        count = 0
+    elseif count > 1000 then
+        caption = string.format("%.0f", math.ceil(count))
+    else
+        caption = string.format("%.1f", math.ceil(count * 10) / 10)
+    end
+    return caption
+end
+
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine
-local function create_product_line(container, machine)
+---@param manual_mode boolean ?
+---@param color_values  {[string]:number}?
+local function create_product_line(container, machine, manual_mode, color_values)
     local line1 = container.add { type = "flow", direction = "horizontal" }
-    line1.style.height = 40
+    line1.style.minimal_height = 40
 
-    if not machine.count then
-        machine.count = 1
-    end
-
-    local caption
-    if machine.count > 1000 then
-        caption = string.format("%.0f", math.ceil(machine.count))
+    local count
+    if manual_mode then
+        count = machine.grecipe.mcount
     else
-        caption = string.format("%.1f", math.ceil(machine.count * 10) / 10)
+        count = machine.count
     end
+    if not count or count < 0 then
+        count = 0
+    end
+
+    local caption = format_machine_count(count)
 
     local b = line1.add {
         type = "choose-elem-button",
         elem_type = "entity-with-quality",
         style = green_button,
-        tooltip = { np("machine-tooltip") }
+        tooltip = { np("machine-tooltip") },
+        name = "machine"
     }
     b.elem_value = { name = machine.machine and machine.machine.name or nil, quality = machine.machine_quality }
     b.locked = true
     tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
     b.raise_hover_events = true
-    local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true }
+    local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true, name = "count" }
+
+    if manual_mode then
+        local count_flow = line1.add { type = "flow", direction = "vertical" }
+        count_flow.style = prefix .. "_flow"
+        b = count_flow.add { type = "sprite-button", sprite = prefix .. "_plus", name = prefix .. "-plus",
+            style = mini_style, tooltip = { np("inc_tooltip") } }
+        b.style.size = mini_size
+        tools.set_name_handler(b, np("inc_mcount"), { recipe_name = machine.recipe.name })
+        b = count_flow.add { type = "sprite-button", sprite = prefix .. "_minus", name = prefix .. "-minus",
+            style = mini_style, tooltip = { np("dec_tooltip") } }
+        b.style.size = mini_size
+        tools.set_name_handler(b, np("dec_mcount"), { recipe_name = machine.recipe.name })
+    end
 
     local frecipe = line1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
     frecipe.style.right_margin = 5
@@ -646,22 +687,28 @@ local function create_product_line(container, machine)
     line.style.left_margin = 5
     line.style.right_margin = 8
 
+    local recipe_row = line1.add { type = "table", column_count = 7 }
+
     for _, ingredient in pairs(machine.recipe.ingredients) do
         local type = ingredient.type
-        b = line1.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = ingredient_button_style }
+        local style = ingredient_button_style
+        local ingredient_name = type .. "/" .. ingredient.name
+        if color_values then
+            local value = color_values[ingredient_name] or 0
+            if value >= 0 then style = green_button else style = red_button end
+        end
+        b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = style }
         b.locked = true
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. ingredient.name })
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name })
 
-        local amount = ingredient.amount * machine.limited_craft_s * machine.count
+        local amount = ingredient.amount * machine.limited_craft_s * count
         amount = fround(amount)
         b.add { type = "label", style = default_button_label_style,
             caption = tostring(amount), ignored_by_interaction = true }
     end
 
     -- local col2 = container.add { type = "flow", direction = "horizontal" }
-    local line2 = line1
-
-    local b = line2.add {
+    local b = recipe_row.add {
         type = "sprite-button",
         name = np("goto"),
         tooltip = { np("goto-tooltip") },
@@ -675,13 +722,20 @@ local function create_product_line(container, machine)
 
     for _, product in pairs(machine.recipe.products) do
         local type = product.type
-        b = line2.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = product_button_style }
+        local style = product_button_style
+        local product_name = type .. "/" .. product.name
+        if color_values then
+            local value = color_values[product_name] or 0
+            if value >= 0 then style = green_button else style = red_button end
+        end
+
+        b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = style }
         b.locked = true
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = type .. "/" .. product.name })
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name })
 
         local amount = get_product_amount(machine, product)
 
-        amount = amount * machine.count
+        amount = amount * count
         amount = fround(amount)
         b.add { type = "label", style = default_button_label_style, caption = tostring(amount), ignored_by_interaction = true }
     end
@@ -863,6 +917,27 @@ local function get_summary_labels(count, in_inventory_count, in_network_count, c
     return count_label, inventory_count
 end
 
+
+---@param g Graph
+---@return ProductionMachine[]
+local function get_machines(g)
+    ---@type ProductionMachine[]
+    local machines = {}
+    local manual_mode = g.real_manual_mode
+    for _, grecipe in pairs(g.selection) do
+        local machine = grecipe.machine
+        if manual_mode then
+            table.insert(machines, machine)
+        else
+            if machine and machine.count and machine.count > math_precision then
+                table.insert(machines, machine)
+            end
+        end
+    end
+    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
+    return machines
+end
+
 ---@param g Graph
 ---@param setup_flow LuaGuiElement
 ---@param summary_flow LuaGuiElement
@@ -875,38 +950,33 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     machine_container.clear()
     if not g.selection then return end
 
-    local error_panel = machine_container.parent.parent.error_panel
+    local error_panel = tools.get_child(machine_container.parent, "error_panel")
     if error_panel then
         error_panel.clear()
     end
 
     if g.production_failed then
-        if not error_panel or not g.production_recipes_failed then
-            return
+        if error_panel and not g.production_recipes_failed then
+            product_panel.update_error_panel(g, error_panel)
         end
-        error_panel.visible = true
-        machine_scroll.visible = false
-        summary_flow.visible = false
-
-        product_panel.update_error_panel(g, error_panel)
-        return
+    else
+        if error_panel then
+            error_panel.visible = false
+        end
     end
 
-    error_panel.visible = false
     machine_scroll.visible = true
     summary_flow.visible = true
 
     ---@type ProductionMachine[]
-    local machines = {}
-    for _, grecipe in pairs(g.selection) do
-        local machine = grecipe.machine
-        if machine and machine.count and machine.count > math_precision then
-            table.insert(machines, machine)
+    local machines = get_machines(g)
+    local manual_mode = g.real_manual_mode
+
+    if manual_mode then
+        if not g.manual_mode then
+            summary_flow.visible = false
         end
     end
-    if #machines == 0 then return end
-
-    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
 
     if g.visibility == commons.visibility_layers then
         local visible_layers = g.visible_layers or {}
@@ -921,8 +991,22 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
 
     local count_per_machine = {}
     local count_per_module = {}
+    local color_values
+    if manual_mode then
+        local inputs = g.product_inputs or {}
+        local outputs = g.product_outputs or {}
+        color_values = {}
+        for name, value in pairs(outputs) do
+            color_values[name] = value - (inputs[name] or 0);
+        end
+        for name, value in pairs(inputs) do
+            if not color_values[name] then
+                color_values[name] = -value
+            end
+        end
+    end
     for _, machine in pairs(machines) do
-        create_product_line(machine_container, machine)
+        create_product_line(machine_container, machine, manual_mode, color_values)
 
         local count = math.ceil(machine.count)
         if count > 0 and machine.machine then
@@ -1022,7 +1106,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
         else
             item = name
         end
-        if item then
+        if item and prototypes.item[item] then
             local sitem              = { name = item, quality = quality }
             local crafted            = craft_queue[item] or 0
             local in_inventory_count = inv and inv.get_item_count(sitem) or 0
@@ -1306,11 +1390,13 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
+
+        local element = e.element
+        local player = game.players[e.player_index]
+        if not element or not element.valid then return end
+
         if e.button == defines.mouse_button_type.left then
-            if not (e.shift or not e.control or e.alt) then
-                local element = e.element
-                local player = game.players[e.player_index]
-                if not element or not element.valid then return end
+            if not (e.shift or e.control or e.alt) then
 
                 local recipe_name = element.tags.recipe_name --[[@as string]]
                 if not recipe_name then return end
@@ -1318,11 +1404,14 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
 
                 local g = gutils.get_graph(player)
                 drawing.draw_target(g, g.recipes[recipe_name])
+            elseif e.shift then
+                local recipe_name = element.tags.recipe_name --[[@as string]]
+                player.begin_crafting { recipe = recipe_name, count = 1 }
+            elseif e.control then
+                local recipe_name = element.tags.recipe_name --[[@as string]]
+                player.begin_crafting { recipe = recipe_name, count = 10 }
             end
         elseif e.button == defines.mouse_button_type.right then
-            local player = game.players[e.player_index]
-            local element = e.element
-            if not element.valid then return end
 
             local recipe_name = element.tags.recipe_name --[[@as string]]
             local g = gutils.get_graph(player)
@@ -1411,6 +1500,98 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         end
     end)
 
+tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local element = e.element
+        if not element or not element.valid then return end
+
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        if not recipe_name then return end
+
+        local grecipe = g.recipes[recipe_name]
+        local selected_machine = grecipe.machine
+        if not selected_machine then return end
+        if not (e.shift and e.control) then
+            local mcount = selected_machine.grecipe.mcount
+            if not mcount then
+                mcount = 0
+            end
+            local add = 1
+            if e.shift then
+                add = 10
+            elseif e.control then
+                add = 0.1
+            end
+            mcount = mcount + add
+            selected_machine.grecipe.mcount = mcount
+            local line = element.parent.parent
+            if line ~= nil then
+                line["machine"]["count"].caption = format_machine_count(mcount)
+            end
+
+            tools.fire_user_event(commons.production_data_change_event, { g = g })
+        else
+            local recipe = prototypes.recipe[recipe_name]
+            if #recipe.products > 0 then
+                local mcount
+                for _, p in pairs(recipe.products) do
+                    local product_id = p.type .. "/" .. p.name
+                    local input_amount = g.product_inputs[product_id]
+                    if input_amount and input_amount > 0 then
+                        local amount_per_machine = production.get_product_amount(selected_machine, p)
+                        local n = input_amount / amount_per_machine
+                        if not mcount or mcount < n then
+                            mcount = n
+                        end
+                    end
+                end
+                if mcount then
+                    selected_machine.grecipe.mcount = mcount
+                    tools.fire_user_event(commons.production_data_change_event, { g = g })
+                end
+            end
+        end
+    end)
+
+tools.on_named_event(np("dec_mcount"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local element = e.element
+        if not element or not element.valid then return end
+
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        if not recipe_name then return end
+
+        local grecipe = g.recipes[recipe_name]
+        local machine = grecipe.machine
+        if not machine then return end
+        local mcount = machine.grecipe.mcount
+        if not mcount then
+            mcount = 0
+        end
+        local add = 1
+        if e.shift then
+            add = 10
+        elseif e.control then
+            add = 0.1
+        end
+        mcount = mcount - add
+        if mcount < 0 then mcount = 0 end
+        machine.grecipe.mcount = mcount
+        local line = element.parent.parent
+        if line ~= nil then
+            line["machine"]["count"].caption = format_machine_count(mcount)
+        end
+        tools.fire_user_event(commons.production_data_change_event, { g = g })
+    end)
+
 tools.on_named_event(np("machine"), defines.events.on_gui_click,
 
     ---@param e EventData.on_gui_click
@@ -1467,9 +1648,9 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     end
                     bp_entity.items = {}
                     local stack_index = 0
-                    local module_inventory = defines.inventory.assembling_machine_modules
+                    local module_inventory = defines.inventory.crafter_modules
                     if machine.machine.type == "furnace" then
-                        module_inventory = defines.inventory.furnace_modules
+                        module_inventory = defines.inventory.crafter_modules
                     end
                     for id, count in pairs(item_map) do
                         local smodule = tools.id_to_signal(id)
@@ -1669,4 +1850,3 @@ tools.on_gui_click(np("goto"),
 msettings_panel.create_product_line = create_product_line
 
 return product_panel
-

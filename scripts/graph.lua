@@ -44,13 +44,17 @@ function graph.new(surface)
         show_hidden = false,
         show_only_researched = false,
         always_use_full_selection = true,
-        visibility = commons.visibility_all,
+        visibility = commons.visibility_selection,
         layout_on_selection = true,
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
         world_zoom_level = 2,
         line_gap = 0.2,
-        show_products = true
+        show_products = true,
+
+        product_line = 1,
+        recipe_order = 1,
+        current_col = 1,
     }
 end
 
@@ -443,6 +447,7 @@ function graph.layout_recipe(g, grecipe)
     local gcols = g.gcols
 
     local gname = grecipe.name
+    if not g.current_col then g.current_col = 1 end
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do

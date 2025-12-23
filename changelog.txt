@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.14
+Date: 22. 12. 2025.
+  Changes:
+    - Add manual mode to compute input/output. Now it is possible to set individually the count of each machine
+---------------------------------------------------------------------------------------------------
 Version: 2.0.13
 Date: 20. 04. 2025.
   Bugfixes:
@@ -8,7 +13,7 @@ Date: 20. 04. 2025.
 Version: 2.0.12
 Date: 29. 03. 2025.
   Changes:
-    -  Add modules in the list of required items 
+    - Add modules in the list of required items 
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.11
 Date: 24. 03. 2025.

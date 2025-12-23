@@ -67,3 +67,19 @@ styles[prefix .. "_button_free"] = {
     type = "button_style",
     size = 36
 }
+
+styles[prefix .. "_mini_button"] = {
+    type = "button_style",
+    parent = "flib_slot_button_default",
+    padding = 0,
+    margin = 0
+}
+
+styles[prefix .. "_flow"] = {
+    type = "vertical_flow_style",
+    padding = 0,
+    vertical_spacing = 0,
+    margin = 0
+}
+
+

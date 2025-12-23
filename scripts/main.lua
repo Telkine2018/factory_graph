@@ -104,6 +104,11 @@ function main.enter(player, recipe_name)
         vars.graph = g
         local recipes = player.force.recipes
         graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
+        if g.visibility == commons.visibility_selection then
+            for _, grecipe in pairs(g.recipes) do
+                grecipe.visible = nil
+            end
+        end
         graph.do_layout(g)
         graph.create_recipe_objects(g)
     end

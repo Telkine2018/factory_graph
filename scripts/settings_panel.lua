@@ -156,6 +156,9 @@ function settings_panel.create(player_index)
     flow.add { type = "line" }
     flow.add { type = "line" }
 
+    flow.add { type = "label", caption = { np("manual_mode") } }
+    flow.add { type = "checkbox", state = not not g.manual_mode, name = "manual_mode" }
+
     flow.add { type = "label", caption = { np("use_machine_in_inventory") } }
     flow.add { type = "checkbox", state = not not g.use_machine_in_inventory, name = "use_machine_in_inventory" }
 
@@ -322,6 +325,7 @@ local function save(player, frame)
     local signal = field_table.current_layer.elem_value --[[@as SignalID]]
     g.current_layer = tools.signal_to_sprite(signal)
     g.use_machine_in_inventory = field_table.use_machine_in_inventory.state
+    g.manual_mode = field_table.manual_mode.state
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
     g.preferred_beacon = tools.signal_to_id(field_table.preferred_beacon.elem_value --[[@as SignalFilter]])
