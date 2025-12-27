@@ -943,13 +943,14 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     machine_container.clear()
     if not g.selection then return end
 
-    local error_panel = tools.get_child(machine_container.parent, "error_panel")
+    local error_panel = tools.get_child(setup_flow.parent, "error_panel")
     if error_panel then
         error_panel.clear()
     end
 
-    if g.production_failed then
-        if error_panel and not g.production_recipes_failed then
+    if g.production_failed and not g.manual_mode then
+        if error_panel and g.production_recipes_failed then
+            error_panel.visible = true
             product_panel.update_error_panel(g, error_panel)
         end
     else
