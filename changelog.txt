@@ -2,7 +2,9 @@
 Version: 2.0.14
 Date: 22. 12. 2025.
   Changes:
-    - Add manual mode to compute input/output. Now it is possible to set individually the count of each machine
+    - Add manual mode to compute input/output. In the manual mode, it is possible to set individually the count of each machine.
+    - The manual mode is active when there are no target products or when the automatic computation failed
+    - The manual mode can be always activated with the <M> button in the production panel
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.13
 Date: 20. 04. 2025.

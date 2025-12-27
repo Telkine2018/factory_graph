@@ -538,7 +538,8 @@ local saved_reciped_fields = {
     "name",
     "production_config", "line",
     "col",
-    "layer"
+    "layer",
+    "mcount"
 }
 
 gutils.saved_graph_fields = saved_graph_fields
@@ -685,6 +686,7 @@ function gutils.clear(g)
         grecipe.computed_config = nil
         grecipe.machine = nil
         grecipe.layer = nil
+        grecipe.mcount = nil
     end
 end
 

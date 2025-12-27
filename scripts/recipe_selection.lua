@@ -263,6 +263,15 @@ function recipe_selection.open(g, options)
     local label                                = flow1.add { type = "label", caption = { np("choose_recipe") } }
     label.style.top_padding                    = 7
     local b                                    = flow1.add { type = "choose-elem-button", elem_type = "recipe", name = "choose_recipe" }
+    local filters                               = { }
+    if g.show_only_researched then
+        table.insert(filters, { filter = 'enabled', mode = 'and' })
+    end
+    if not g.show_hidden then
+        table.insert(filters, { filter = 'hidden', invert = true, mode = 'and' })
+    end
+    if #filters > 0 then b.elem_filters = filters end
+
     tools.set_name_handler(b, np("choose_recipe"))
 
     local signal

@@ -905,6 +905,26 @@ function production.clear(g)
     gutils.fire_production_data_change(g)
 end
 
+---@param g Graph
+---@return ProductionMachine[]
+function production.get_machines(g)
+    ---@type ProductionMachine[]
+    local machines = {}
+    local manual_mode = g.real_manual_mode
+    for _, grecipe in pairs(g.selection) do
+        local machine = grecipe.machine
+        if manual_mode then
+            table.insert(machines, machine)
+        else
+            if machine and machine.count and machine.count > math_precision then
+                table.insert(machines, machine)
+            end
+        end
+    end
+    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
+    return machines
+end
+
 tools.on_nth_tick(30, function()
     local production_queue = storage.production_queue
     if not production_queue then

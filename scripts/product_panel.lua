@@ -86,16 +86,27 @@ function product_panel.create(player_index)
             local b
 
             b = flow.add {
-                type = "button",
+                type = "sprite-button",
+                tooltip = { np("manual_mode_tooltip") },
+                sprite="virtual-signal/signal-M" ,
+                toggled = not not g.manual_mode,
+                style = "frame_action_button"
+            }
+            tools.set_name_handler(b, np("manual_mode"))
+
+            b = flow.add {
+                type = "sprite-button",
                 tooltip = { np("tag_used_tooltip") },
-                caption = { np("tag_used") },
+                sprite="virtual-signal/signal-T" ,
+                style = "frame_action_button"
             }
             tools.set_name_handler(b, np("tag_used"))
 
             b = flow.add {
-                type = "button",
+                type = "sprite-button",
                 tooltip = { np("unselect_tooltip") },
-                caption = { np("unselect") },
+                sprite="virtual-signal/signal-U" ,
+                style = "frame_action_button"
             }
             tools.set_name_handler(b, np("unselect"))
 
@@ -205,7 +216,8 @@ local function set_output_value(g, product_name, qtlabel)
 
         local input, output
         local is_computed
-        if not value then
+        local balanced
+        if not value or g.real_manual_mode then
             if g.product_outputs then
                 output = g.product_outputs[product_name] or 0
                 is_computed = true
@@ -213,21 +225,20 @@ local function set_output_value(g, product_name, qtlabel)
 
                 output = fround(output)
                 input = fround(input)
-                if g.real_manual_mode then
-                    value = output - input
-                else
-                    if output >= input then
-                        value = output
-                    else
-                        value = -input
-                    end
+
+                value = output - input
+                if math.abs(value) <= math_precision  then
+                    value = output
+                    balanced = true
                 end
             end
         end
 
         if value and math.abs(value) > math_precision then
             value = fround(value)
-            if is_computed and value > 0 then
+            if balanced then
+                caption = mark .. "[color=cyan]" .. luautil.format_number(value, true) .. "[/color]"
+            elseif is_computed and value > 0 then
                 caption = mark .. "[color=green]" .. luautil.format_number(value, true) .. "[/color]"
             elseif is_computed then
                 caption = mark .. "[color=red]" .. luautil.format_number(-value, true) .. "[/color]"
@@ -918,25 +929,7 @@ local function get_summary_labels(count, in_inventory_count, in_network_count, c
 end
 
 
----@param g Graph
----@return ProductionMachine[]
-local function get_machines(g)
-    ---@type ProductionMachine[]
-    local machines = {}
-    local manual_mode = g.real_manual_mode
-    for _, grecipe in pairs(g.selection) do
-        local machine = grecipe.machine
-        if manual_mode then
-            table.insert(machines, machine)
-        else
-            if machine and machine.count and machine.count > math_precision then
-                table.insert(machines, machine)
-            end
-        end
-    end
-    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
-    return machines
-end
+local get_machines = production.get_machines
 
 ---@param g Graph
 ---@param setup_flow LuaGuiElement
@@ -1008,7 +1001,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     for _, machine in pairs(machines) do
         create_product_line(machine_container, machine, manual_mode, color_values)
 
-        local count = math.ceil(machine.count)
+        local count = math.ceil(machine.count or 0)
         if count > 0 and machine.machine then
             local machine_id = tools.signal_to_id { name = machine.machine.name, quality = machine.machine_quality }
             ---@cast machine_id -nil
@@ -1526,6 +1519,7 @@ tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
             elseif e.control then
                 add = 0.1
             end
+            mcount = math.floor(mcount / add) * add
             mcount = mcount + add
             selected_machine.grecipe.mcount = mcount
             local line = element.parent.parent
@@ -1582,6 +1576,7 @@ tools.on_named_event(np("dec_mcount"), defines.events.on_gui_click,
         elseif e.control then
             add = 0.1
         end
+        mcount = math.floor(mcount / add) * add
         mcount = mcount - add
         if mcount < 0 then mcount = 0 end
         machine.grecipe.mcount = mcount
@@ -1825,6 +1820,28 @@ tools.on_named_event(np("tag_used"), defines.events.on_gui_click,
         end
         graph.refresh(g.player, true)
         gutils.fire_selection_change(g)
+    end)
+
+
+tools.on_named_event(np("manual_mode"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local frame = player.gui.screen[product_panel_name]
+        if not frame then return end
+
+        local g = gutils.get_graph(player)
+        g.manual_mode = not g.manual_mode
+        e.element.toggled = not not g.manual_mode
+        if g.manual_mode then
+            if table_size(g.iovalues) > 0 and not g.production_failed then
+                local machines = production.get_machines(g)
+                for _, machine in pairs(machines) do
+                    machine.grecipe.mcount = machine.count
+                end
+            end
+        end
+        tools.fire_user_event(commons.production_data_change_event, { g = g })
     end)
 
 tools.on_gui_click(np("goto"),
