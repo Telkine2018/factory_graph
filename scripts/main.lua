@@ -206,6 +206,11 @@ function main.enter_surface(player, recipe_name)
     local surface_name = surface_prefix .. player.index
     local surface = game.surfaces[surface_name]
 
+    local starting_points = nil
+    if script.active_mods["rso-mod"] then
+        starting_points = { { x = 0, y = 0 } }
+    end
+
     if not surface then
         local settings = {
             height = 1000,
@@ -214,7 +219,7 @@ function main.enter_surface(player, recipe_name)
             default_enable_all_autoplace_controls = false,
             cliff_settings = { cliff_elevation_0 = 1024 },
             starting_area = "none",
-            starting_points = {},
+            starting_points = starting_points,
             terrain_segmentation = "none",
             autoplace_settings = {
                 entity = { treat_missing_as_default = false, frequency = "none" },
