@@ -1094,6 +1094,7 @@ local round_digit = 2
 ---@param value number
 ---@return number
 local function fround(value)
+    if not value then return 0 end
     if abs(value) <= math_precision then
         return 0
     end
