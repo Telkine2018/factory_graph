@@ -109,8 +109,6 @@ function production.compute_machine(g, grecipe, config)
         local recipe_name = grecipe.name
         local recipe = prototypes.recipe[recipe_name]
 
-        local previous_machine = grecipe.machine
-
         local smachine = tools.id_to_signal(config.machine_name)
         ---@cast smachine -nil
 
@@ -121,7 +119,8 @@ function production.compute_machine(g, grecipe, config)
             grecipe = grecipe,
             recipe = recipe,
             machine = prototypes.entity[smachine.name],
-            config = config
+            config = config,
+            recipe_quality = config.recipe_quality
         }
 
         machine.modules = {}

@@ -26,7 +26,7 @@ tools.add_panel_name(settings_panel_name)
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
     local filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } }
-    local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality",  elem_filters =  filters }
+    local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(machine_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("preferred_machines"))
@@ -37,8 +37,8 @@ end
 ---@param module_name string?
 ---@return LuaGuiElement
 local function add_module_button(container, module_name)
-    local filters ={ { filter = "type", type = "module" } }
-    local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters =  filters }
+    local filters = { { filter = "type", type = "module" } }
+    local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(module_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("preferred_modules"))
@@ -183,6 +183,23 @@ function settings_panel.create(player_index)
     local pbeacon_module_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_beacon_modules" }
     set_module_buttons(g, pbeacon_module_flow, g.preferred_beacon_modules)
 
+    if script.active_mods["quality"] then
+        flow.add { type = "label", caption = { np("recipe_quality") } }
+
+        local qualities = {}
+        local current_quality = 1
+        local index = 1
+        for _, q in pairs(prototypes.quality) do
+            if not q.hidden then
+                table.insert(qualities, q.localised_name)
+                if q.name == g.default_recipe_quality then
+                    current_quality = index
+                end
+                index = index + 1
+            end
+        end
+        flow.add { type = "drop-down", items = qualities, selected_index = current_quality, name = "default_recipe_quality" }
+    end
     local bpanel = frame.add { type = "flow", direction = "horizontal" }
     local b = bpanel.add { type = "button", caption = { np("save") } }
     tools.set_name_handler(b, np("save"))
@@ -311,7 +328,7 @@ local function save(player, frame)
     g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
     g.show_only_researched = field_table.show_only_researched.state
     g.show_hidden = field_table.show_hidden.state
-    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap  then
+    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap then
         g.grid_size = grid_size_value
         g.line_gap = line_gap_value
         graph.refresh(player, true)
@@ -332,6 +349,19 @@ local function save(player, frame)
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
     g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
 
+    local default_quality = field_table.default_recipe_quality
+    local index = default_quality.selected_index
+    if index then
+        for _, q in pairs(prototypes.quality) do
+            if not q.hidden then
+                index = index - 1
+                if index == 0 then
+                    g.default_recipe_quality = q.name
+                    break
+                end
+            end
+        end
+    end
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
@@ -368,10 +398,11 @@ local function save(player, frame)
     if show_hidden_change then
         graph.deferred_update(player, { selection_changed = true, do_layout = true })
     elseif layer_change or need_selection_change then
-        graph.deferred_update(player, { 
-            do_redraw = true, 
-            center_on_graph = false, 
-            selection_changed = true })
+        graph.deferred_update(player, {
+            do_redraw = true,
+            center_on_graph = false,
+            selection_changed = true
+        })
     else
         gutils.fire_production_data_change(g)
     end

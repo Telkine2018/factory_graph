@@ -337,6 +337,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
         end
     end
     config.beacon_count = g.preferred_beacon_count or 0
+    config.recipe_quality = g.default_recipe_quality
     return config
 end
 

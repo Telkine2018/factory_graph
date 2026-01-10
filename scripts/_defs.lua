@@ -73,6 +73,7 @@ local tools = require("scripts.tools")
 ---@field iovalues {[string]:number|boolean}
 ---@field color_index integer
 ---@field use_machine_in_inventory boolean?
+---@field default_recipe_quality string?
 
 ---@class Graph : GraphRuntime, GraphConfig, GraphProduction, GraphSettings
 
@@ -158,11 +159,13 @@ local tools = require("scripts.tools")
 ---@field beacon_name string?
 ---@field beacon_modules string[]?
 ---@field beacon_count integer?
+---@field recipe_quality string?
 
 ---@class ProductionMachine
 ---@field name string
 ---@field machine_quality string
 ---@field grecipe GRecipe
+---@field recipe_quality string?
 ---@field config ProductionConfig
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype

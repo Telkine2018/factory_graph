@@ -1623,16 +1623,22 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     gutils.exit(player)
                 end
 
-                ---@cast machine -nil
+                local recipe_quality = machine.recipe_quality
+                if not script.active_mods["quality"] then
+                    recipe_quality = nil
+                end
 
+                ---@cast machine -nil
                 local bp_entity = {
 
                     entity_number = 1,
                     name = machine.machine.name,
                     quality = machine.machine_quality,
                     position = { 0.5, 0.5 },
-                    recipe = recipe_name
+                    recipe = recipe_name,
+                    recipe_quality = recipe_quality
                 }
+
                 if machine.modules then
                     local item_map = {}
                     local index = 1
