@@ -88,7 +88,7 @@ function product_panel.create(player_index)
             b = flow.add {
                 type = "sprite-button",
                 tooltip = { np("manual_mode_tooltip") },
-                sprite="virtual-signal/signal-M" ,
+                sprite = "virtual-signal/signal-M",
                 toggled = not not g.manual_mode,
                 style = "frame_action_button"
             }
@@ -97,7 +97,7 @@ function product_panel.create(player_index)
             b = flow.add {
                 type = "sprite-button",
                 tooltip = { np("tag_used_tooltip") },
-                sprite="virtual-signal/signal-T" ,
+                sprite = "virtual-signal/signal-T",
                 style = "frame_action_button"
             }
             tools.set_name_handler(b, np("tag_used"))
@@ -105,7 +105,7 @@ function product_panel.create(player_index)
             b = flow.add {
                 type = "sprite-button",
                 tooltip = { np("unselect_tooltip") },
-                sprite="virtual-signal/signal-U" ,
+                sprite = "virtual-signal/signal-U",
                 style = "frame_action_button"
             }
             tools.set_name_handler(b, np("unselect"))
@@ -198,13 +198,15 @@ end
 ---@param g Graph
 ---@param product_name string
 ---@param qtlabel LuaGuiElement
+---@param toplabel LuaGuiElement
 ---@return number?
-local function set_output_value(g, product_name, qtlabel)
+local function set_output_value(g, product_name, qtlabel, toplabel)
     ---@type any
     local value = g.iovalues[product_name]
     local caption
     local is_unlinked
     local mark = ""
+    local toplabel_caption = ""
     if value == 0 then
         caption = "0"
     else
@@ -217,29 +219,35 @@ local function set_output_value(g, product_name, qtlabel)
         local input, output
         local is_computed
         local balanced
-        if not value or g.real_manual_mode then
+        local is_target
+        local iovalue = g.iovalues[product_name]
+        if not g.real_manual_mode and type(iovalue) == "number" then
+            value = g.iovalues[product_name]
+            is_target = true
+        elseif not value or g.real_manual_mode then
             if g.product_outputs then
                 output = g.product_outputs[product_name] or 0
                 is_computed = true
                 input = g.product_inputs[product_name] or 0
 
-                output = fround(output)
-                input = fround(input)
-
                 value = output - input
-                if math.abs(value) <= math_precision  then
-                    value = output
+                if math.abs(value) <= math_precision then
+                    value = fround(output)
                     balanced = true
+                else
+                    value = fround(value)
                 end
             end
         end
 
         if value and math.abs(value) > math_precision then
             value = fround(value)
-            if balanced then
-                caption = mark .. "[color=cyan]" .. luautil.format_number(value, true) .. "[/color]"
+            if is_target then
+                caption = mark .. "[color=white]" .. luautil.format_number(value, true) .. "[/color]"
+            elseif balanced then
+                caption = mark .. "[color=blue]" .. luautil.format_number(value, true) .. "[/color]"
             elseif is_computed and value > 0 then
-                caption = mark .. "[color=green]" .. luautil.format_number(value, true) .. "[/color]"
+                caption = mark .. "[color=yellow]" .. luautil.format_number(value, true) .. "[/color]"
             elseif is_computed then
                 caption = mark .. "[color=red]" .. luautil.format_number(-value, true) .. "[/color]"
             else
@@ -248,7 +256,12 @@ local function set_output_value(g, product_name, qtlabel)
         elseif is_unlinked then
             caption = "*"
         end
+
+        if not is_target and iovalue and type(iovalue) == "number" then
+            toplabel_caption = "[color=white]" .. luautil.format_number(iovalue, true) .. "[/color]"
+        end
     end
+    toplabel.caption = toplabel_caption
     if caption then
         qtlabel.caption = caption
         return value
@@ -311,7 +324,8 @@ function product_panel.create_product_tables(player)
             tools.set_name_handler(b, np("product"), { product_name = product_name, label = product.label })
 
             local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-            local value = set_output_value(g, product_name, qtlabel)
+            local toplabel = b.add { type = "label", style = label_style_top, name = "toplabel", ignored_by_interaction = true }
+            local value = set_output_value(g, product_name, qtlabel, toplabel)
 
             b.style.size = 36
             b.style.vertical_align = "top"
@@ -362,7 +376,7 @@ local function update_products(g)
             for _, line in pairs(product_table.children) do
                 local b = line.product_button
                 local product_name = b.tags.product_name --[[@as string]]
-                local value = set_output_value(g, product_name, b.label)
+                local value = set_output_value(g, product_name, b.label, b.toplabel)
                 if g.iovalues[product_name] then
                     b.style = red_button
                 else
@@ -847,7 +861,8 @@ function product_panel.update_error_panel(g, error_panel)
                     end
 
                     local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
-                    set_output_value(g, product.name, qtlabel)
+                    local toplabel = b.add { type = "label", style = label_style_top, name = "toplabel", ignored_by_interaction = true }
+                    set_output_value(g, product.name, qtlabel, toplabel)
 
                     tools.set_name_handler(b, np("error-unlock-product"), { product_name = product.name })
                     b.style.size = 30
@@ -991,7 +1006,12 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
         local outputs = g.product_outputs or {}
         color_values = {}
         for name, value in pairs(outputs) do
-            color_values[name] = value - (inputs[name] or 0);
+            local dif = value - (inputs[name] or 0);
+            if math.abs(dif) <= math_precision then
+                color_values[name] = 0
+            else
+                color_values[name] = dif
+            end
         end
         for name, value in pairs(inputs) do
             if not color_values[name] then
@@ -1391,7 +1411,6 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
 
         if e.button == defines.mouse_button_type.left then
             if not (e.shift or e.control or e.alt) then
-
                 local recipe_name = element.tags.recipe_name --[[@as string]]
                 if not recipe_name then return end
                 gutils.move_to_recipe(player, recipe_name, e.control)
@@ -1406,7 +1425,6 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
                 player.begin_crafting { recipe = recipe_name, count = 10 }
             end
         elseif e.button == defines.mouse_button_type.right then
-
             local recipe_name = element.tags.recipe_name --[[@as string]]
             local g = gutils.get_graph(player)
             recipe_selection.open(g, { recipe = g.recipes[recipe_name] })
@@ -1494,6 +1512,96 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         end
     end)
 
+---@param g Graph
+---@param recipe_name string
+---@param inputs table<string, number>
+local function recompute_machine(g, recipe_name, inputs)
+    local grecipe = g.recipes[recipe_name]
+    local selected_machine = grecipe.machine
+    if not selected_machine then return end
+
+    local recipe = prototypes.recipe[recipe_name]
+    if #recipe.products > 0 then
+        local mcount
+        for _, p in pairs(recipe.products) do
+            local product_id = p.type .. "/" .. p.name
+            local input_amount = inputs[product_id] or 0
+
+            if recipe.ingredients then
+                for _, i in pairs(recipe.ingredients) do
+                    local ingredient_id = i.type .. "/" .. i.name
+                    if ingredient_id == product_id then
+                        goto next_product
+                    end
+                end
+            end
+
+            if g.iovalues[product_id] == true then
+                goto next_product
+            end
+            local is_target
+            if type(g.iovalues[product_id]) == "number" then
+                input_amount = input_amount + g.iovalues[product_id]
+                is_target = true
+            end
+            if input_amount and input_amount > 0 then
+                local amount_per_machine = production.get_product_amount(selected_machine, p)
+                local n = input_amount / amount_per_machine
+                if is_target then
+                    mcount = n
+                    break
+                end
+                if not mcount or mcount < n then
+                    mcount = n
+                end
+            end
+            ::next_product::
+        end
+        if mcount then
+            selected_machine.grecipe.mcount = mcount
+            return true
+        end
+    end
+end
+
+---@param g Graph
+---@param recipe_name string
+local function recompute_upto(g, recipe_name)
+    local machines = production.get_machines(g)
+    local found
+    for index = 1, #machines do
+        local machine = machines[index]
+        if machine.grecipe.name == recipe_name then
+            found = index
+            break
+        end
+    end
+
+    local tail = {}
+    for index = found + 1, #machines do
+        table.insert(tail, machines[index])
+    end
+    production.compute_products(g, tail, true)
+
+    local inputs = g.product_inputs
+
+    for index = found, 1, -1 do
+        local machine = machines[index]
+        local recipe_name = machine.grecipe.name
+        if recompute_machine(g, recipe_name, inputs) then
+            production.compute_products(g, { machine }, true)
+            for name, count in pairs(g.product_inputs) do
+                inputs[name] = (inputs[name] or 0) + count
+            end
+            for name, count in pairs(g.product_outputs) do
+                inputs[name] = (inputs[name] or 0) - count
+            end
+        end
+    end
+    production.compute_products(g, machines, true)
+end
+
+
 tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
@@ -1530,25 +1638,8 @@ tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
 
             tools.fire_user_event(commons.production_data_change_event, { g = g })
         else
-            local recipe = prototypes.recipe[recipe_name]
-            if #recipe.products > 0 then
-                local mcount
-                for _, p in pairs(recipe.products) do
-                    local product_id = p.type .. "/" .. p.name
-                    local input_amount = g.product_inputs[product_id]
-                    if input_amount and input_amount > 0 then
-                        local amount_per_machine = production.get_product_amount(selected_machine, p)
-                        local n = input_amount / amount_per_machine
-                        if not mcount or mcount < n then
-                            mcount = n
-                        end
-                    end
-                end
-                if mcount then
-                    selected_machine.grecipe.mcount = mcount
-                    tools.fire_user_event(commons.production_data_change_event, { g = g })
-                end
-            end
+            recompute_upto(g, recipe_name)
+            tools.fire_user_event(commons.production_compute_event, { g = g })
         end
     end)
 
@@ -1571,14 +1662,20 @@ tools.on_named_event(np("dec_mcount"), defines.events.on_gui_click,
         if not mcount then
             mcount = 0
         end
-        local add = 1
-        if e.shift then
-            add = 10
-        elseif e.control then
-            add = 0.1
+
+        if e.shift and e.control then
+            mcount = 0
+        else
+            local add = 1
+            if e.shift then
+                add = 10
+            elseif e.control then
+                add = 0.1
+            end
+            mcount = math.floor(mcount / add) * add
+            mcount = mcount - add
         end
-        mcount = math.floor(mcount / add) * add
-        mcount = mcount - add
+
         if mcount < 0 then mcount = 0 end
         machine.grecipe.mcount = mcount
         local line = element.parent.parent
@@ -1841,10 +1938,20 @@ tools.on_named_event(np("manual_mode"), defines.events.on_gui_click,
         g.manual_mode = not g.manual_mode
         e.element.toggled = not not g.manual_mode
         if g.manual_mode then
-            if table_size(g.iovalues) > 0 and not g.production_failed then
+            if not (e.control) and not (e.shift) then
+                if table_size(g.iovalues) > 0 and not g.production_failed then
+                    local machines = production.get_machines(g)
+                    for _, machine in pairs(machines) do
+                        machine.grecipe.mcount = machine.count
+                    end
+                end
+            else
                 local machines = production.get_machines(g)
                 for _, machine in pairs(machines) do
-                    machine.grecipe.mcount = machine.count
+                    machine.grecipe.mcount = 0
+                end
+                if e.shift then
+                    g.iovalues = {}
                 end
             end
         end

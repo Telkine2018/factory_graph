@@ -14,7 +14,8 @@ styles[prefix .. "_count_label_bottom"] = {
 styles[prefix .. "_count_label_top"] = {
     type = "label_style",
     parent = prefix .. "_count_label_bottom",
-    vertical_align = "top"
+    vertical_align = "top",
+    horizontal_align = "left"
 }
 
 styles[prefix .. "_count_label_center"] = {

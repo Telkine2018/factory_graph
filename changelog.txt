@@ -3,6 +3,7 @@ Version: 2.0.17
 Date: 10. 01. 2026.
   Features:
     - Add recipe quality in setting to set quality of product in blueprint
+    - Change de <shift><control>(+) in the setup to recompute the machine count from the first recipe of the setup up to this recipe
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.16
 Date: 02. 01. 2026.

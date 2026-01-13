@@ -315,6 +315,8 @@ function production.compute_products(g, machines, manual_mode)
     end
 end
 
+
+
 ---@param g Graph
 ---@return {[string]:GRecipe}?
 function production.compute_recipes(g)
