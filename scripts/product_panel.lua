@@ -1512,96 +1512,6 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         end
     end)
 
----@param g Graph
----@param recipe_name string
----@param inputs table<string, number>
-local function recompute_machine(g, recipe_name, inputs)
-    local grecipe = g.recipes[recipe_name]
-    local selected_machine = grecipe.machine
-    if not selected_machine then return end
-
-    local recipe = prototypes.recipe[recipe_name]
-    if #recipe.products > 0 then
-        local mcount
-        for _, p in pairs(recipe.products) do
-            local product_id = p.type .. "/" .. p.name
-            local input_amount = inputs[product_id] or 0
-
-            if recipe.ingredients then
-                for _, i in pairs(recipe.ingredients) do
-                    local ingredient_id = i.type .. "/" .. i.name
-                    if ingredient_id == product_id then
-                        goto next_product
-                    end
-                end
-            end
-
-            if g.iovalues[product_id] == true then
-                goto next_product
-            end
-            local is_target
-            if type(g.iovalues[product_id]) == "number" then
-                input_amount = input_amount + g.iovalues[product_id]
-                is_target = true
-            end
-            if input_amount and input_amount > 0 then
-                local amount_per_machine = production.get_product_amount(selected_machine, p)
-                local n = input_amount / amount_per_machine
-                if is_target then
-                    mcount = n
-                    break
-                end
-                if not mcount or mcount < n then
-                    mcount = n
-                end
-            end
-            ::next_product::
-        end
-        if mcount then
-            selected_machine.grecipe.mcount = mcount
-            return true
-        end
-    end
-end
-
----@param g Graph
----@param recipe_name string
-local function recompute_upto(g, recipe_name)
-    local machines = production.get_machines(g)
-    local found
-    for index = 1, #machines do
-        local machine = machines[index]
-        if machine.grecipe.name == recipe_name then
-            found = index
-            break
-        end
-    end
-
-    local tail = {}
-    for index = found + 1, #machines do
-        table.insert(tail, machines[index])
-    end
-    production.compute_products(g, tail, true)
-
-    local inputs = g.product_inputs
-
-    for index = found, 1, -1 do
-        local machine = machines[index]
-        local recipe_name = machine.grecipe.name
-        if recompute_machine(g, recipe_name, inputs) then
-            production.compute_products(g, { machine }, true)
-            for name, count in pairs(g.product_inputs) do
-                inputs[name] = (inputs[name] or 0) + count
-            end
-            for name, count in pairs(g.product_outputs) do
-                inputs[name] = (inputs[name] or 0) - count
-            end
-        end
-    end
-    production.compute_products(g, machines, true)
-end
-
-
 tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
@@ -1636,9 +1546,10 @@ tools.on_named_event(np("inc_mcount"), defines.events.on_gui_click,
                 line["machine"]["count"].caption = format_machine_count(mcount)
             end
 
-            tools.fire_user_event(commons.production_data_change_event, { g = g })
+            production.compute_products(g, nil, true)
+            tools.fire_user_event(commons.production_compute_event, { g = g })
         else
-            recompute_upto(g, recipe_name)
+            production.recompute_manual_all(g, recipe_name)
             tools.fire_user_event(commons.production_compute_event, { g = g })
         end
     end)
@@ -1682,7 +1593,8 @@ tools.on_named_event(np("dec_mcount"), defines.events.on_gui_click,
         if line ~= nil then
             line["machine"]["count"].caption = format_machine_count(mcount)
         end
-        tools.fire_user_event(commons.production_data_change_event, { g = g })
+        production.compute_products(g, nil, true)
+        tools.fire_user_event(commons.production_compute_event, { g = g })
     end)
 
 tools.on_named_event(np("machine"), defines.events.on_gui_click,
