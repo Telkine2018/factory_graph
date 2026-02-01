@@ -226,9 +226,9 @@ local function set_output_value(g, product_name, qtlabel, toplabel)
             is_target = true
         elseif not value or g.real_manual_mode then
             if g.product_outputs then
-                output = g.product_outputs[product_name] or 0
+                output = (g.product_outputs and g.product_outputs[product_name]) or 0
                 is_computed = true
-                input = g.product_inputs[product_name] or 0
+                input = (g.product_inputs and g.product_inputs[product_name]) or 0
 
                 value = output - input
                 if math.abs(value) <= math_precision then
@@ -587,6 +587,9 @@ tools.on_named_event(np("qty"), defines.events.on_gui_text_changed,
 
         local text = e.element.text
         local value = nil
+        if not g.product_outputs then
+            g.product_outputs = {}
+        end
         if #text > 0 then
             value = tonumber(text)
             g.iovalues[product_name] = value

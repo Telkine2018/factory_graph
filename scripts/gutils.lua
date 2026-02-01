@@ -690,4 +690,32 @@ function gutils.clear(g)
     end
 end
 
+---@param g Graph
+function gutils.clean_iovalues(g)
+
+    if not g.selection then return end
+
+    local all_products = {}
+    local to_remove = {}
+    for _, grecipe in pairs(g.selection) do
+        for _, i in pairs(grecipe.ingredients) do
+            all_products[i.name] = true
+        end
+        for _, p in pairs(grecipe.products) do
+            all_products[p.name] = true
+        end
+    end
+
+    for name, _ in pairs(g.iovalues) do
+        if not all_products[name] then
+            to_remove[name] = true
+        end
+    end
+    
+    for name, _ in pairs(to_remove) do
+        g.iovalues[name] = nil
+    end
+
+end
+
 return gutils

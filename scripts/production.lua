@@ -364,6 +364,7 @@ function production.compute_matrix(g)
     end
 
     g.real_manual_mode = g.manual_mode
+    gutils.clean_iovalues(g)
 
     local failed = nil
 
