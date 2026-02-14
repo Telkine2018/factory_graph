@@ -350,14 +350,16 @@ local function save(player, frame)
     g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
 
     local default_quality = field_table.default_recipe_quality
-    local index = default_quality.selected_index
-    if index then
-        for _, q in pairs(prototypes.quality) do
-            if not q.hidden then
-                index = index - 1
-                if index == 0 then
-                    g.default_recipe_quality = q.name
-                    break
+    if default_quality then
+        local index = default_quality.selected_index
+        if index then
+            for _, q in pairs(prototypes.quality) do
+                if not q.hidden then
+                    index = index - 1
+                    if index == 0 then
+                        g.default_recipe_quality = q.name
+                        break
+                    end
                 end
             end
         end
