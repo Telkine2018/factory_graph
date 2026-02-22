@@ -97,7 +97,7 @@ function machinedb.is_machine_enabled(force, machine_name)
             end
         end
     else
-        return true
+        return not entity.hidden
     end
     return false
 end
