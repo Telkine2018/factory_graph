@@ -1280,10 +1280,15 @@ function product_panel.request_items(player, item, total_count, quality)
     ---@cast id -nil
     local current = request_table[id]
 
+    local has_quality = script.active_mods["quality"]
     if current then
         section.set_slot(current.slot_index,
             {
-                value = { name = item, quality = quality },
+                value = {
+                    name = item,
+                    quality = has_quality and quality or nil,
+                    comparator = has_quality and "=" or nil
+                },
                 min = total_count,
                 max = total_count
             })
@@ -1303,7 +1308,15 @@ function product_panel.request_items(player, item, total_count, quality)
         id = id
     }
     request_table[id] = current
-    section.set_slot(current.slot_index, { value = { name = item, quality = quality }, min = total_count, max = total_count })
+    section.set_slot(current.slot_index, {
+        value = {
+            name = item,
+            quality = has_quality and quality or nil,
+            comparator = has_quality and "=" or nil
+        },
+        min = total_count,
+        max = total_count
+    })
 end
 
 tools.on_event(defines.events.on_player_main_inventory_changed,

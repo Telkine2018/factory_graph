@@ -38,6 +38,7 @@ local function install_modules(container, g, config, grecipe)
     local recipe = prototypes.recipe[grecipe.name]
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
+    local allowed_module_categories2 = assembly_machine.allowed_module_categories
     for _, module in pairs(modules) do
         for effect, value in pairs(module.module_effects) do
             if not assembly_machine.allowed_effects[effect] then
@@ -49,6 +50,9 @@ local function install_modules(container, g, config, grecipe)
                 end
             end
             if allowed_module_categories and not allowed_module_categories[module.category] then
+                goto skip
+            end
+            if allowed_module_categories2 and not allowed_module_categories2[module.category] then
                 goto skip
             end
         end

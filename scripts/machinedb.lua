@@ -13,6 +13,7 @@ local gutils = require("scripts.gutils")
 ---@class ModuleInfo
 ---@field name string
 ---@field effects ModuleEffects
+---@field category string
 
 ---@class MachineDb
 ---@field machines {[string]:MachineInfo}
@@ -74,7 +75,8 @@ function machinedb.initialize()
             ---@type ModuleInfo
             local module_info = {
                 name = module_name,
-                effects = module.module_effects
+                effects = module.module_effects,
+                category = module.category
             }
             machinedb.modules[module_name] = module_info
         end
@@ -240,6 +242,10 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local recipe_allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
+    local allowed_module_categories2
+    if found_machine then
+        allowed_module_categories2 = prototypes.entity[found_machine.name].allowed_module_categories
+    end
 
     for _, module_id in pairs(preferred_modules) do
         local msignal = tools.id_to_signal(module_id)
@@ -262,6 +268,9 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
             end
         end
         if allowed_module_categories and not allowed_module_categories[module.category] then
+            goto skip
+        end
+        if allowed_module_categories2 and not allowed_module_categories2[module.category] then
             goto skip
         end
 
@@ -293,6 +302,9 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
                 end
             end
             if allowed_module_categories and not allowed_module_categories[module.category] then
+                goto skip
+            end
+            if allowed_module_categories2 and not allowed_module_categories2[module.category] then
                 goto skip
             end
 
