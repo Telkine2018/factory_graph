@@ -1,12 +1,12 @@
-local luautil = require("__core__/lualib/util")
+local luautil    = require("__core__/lualib/util")
 
-local commons = require("scripts.commons")
-local tools = require("scripts.tools")
-local gutils = require("scripts.gutils")
-local machinedb = require("scripts.machinedb")
-local production     = require("scripts.production")
+local commons    = require("scripts.commons")
+local tools      = require("scripts.tools")
+local gutils     = require("scripts.gutils")
+local machinedb  = require("scripts.machinedb")
+local production = require("scripts.production")
 
-local prefix = commons.prefix
+local prefix     = commons.prefix
 
 local function np(name)
     return prefix .. "-msettings." .. name
@@ -86,7 +86,7 @@ local function install_modules(container, g, config, grecipe)
             end
         end
 
-        local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
+        local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality",
             elem_filters = { { filter = "name", name = allowed } } }
         b.elem_value = smodule
         tools.set_name_handler(b, np("module_button"), { count = count })
@@ -136,7 +136,7 @@ local function install_beacon_modules(container, g, config, grecipe)
             if config.beacon_modules and config.beacon_modules[i] then
                 smodule = tools.id_to_signal(config.beacon_modules[i])
             end
-            local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
+            local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality",
                 elem_filters = { { filter = "name", name = allowed } } }
             b.elem_value = smodule
             tools.set_name_handler(b, np("module_button"), { count = count })
@@ -234,10 +234,10 @@ function msettings.create(player_index, grecipe)
             search_surface = nil
         end
         for _, m in pairs(machines) do
-            if not g.show_only_researched or 
-                    machinedb.is_machine_enabled(force, m.name)  or
-                    (search_surface and search_surface.count_entities_filtered{name=m.name} > 0)
-                     then
+            if not g.show_only_researched or
+                machinedb.is_machine_enabled(force, m.name) or
+                (search_surface and search_surface.count_entities_filtered { name = m.name } > 0)
+            then
                 table.insert(machine_names, m.name)
             end
         end
@@ -256,7 +256,7 @@ function msettings.create(player_index, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
     b = field_table.add { type = "choose-elem-button", elem_type = "entity-with-quality", name = "beacon",
-        elem_filters = { { filter = "type", type = "beacon" } } }
+        elem_filters = { { filter = "type", type = "beacon" }, { filter = "hidden", hidden = true, mode = "and", invert=true } } }
     signal = tools.id_to_signal(config.beacon_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("beacon"), { recipe_name = grecipe.name })
@@ -561,7 +561,6 @@ function msettings.report(player)
     label = report_table.add { type = "label", caption = "[color=cyan]" .. luautil.format_number(energy, true) .. "W[/color]" }
     label.style.width = 100
     label.style.horizontal_align = "right"
-
 end
 
 ---@param player LuaPlayer
@@ -591,7 +590,6 @@ tools.register_user_event(commons.open_current_selection,
 
 ---@param e EventData.on_lua_shortcut
 local function on_control_click(e)
-
     local player = game.players[e.player_index]
     msettings.open_selection(player)
 end

@@ -25,7 +25,11 @@ tools.add_panel_name(settings_panel_name)
 ---@param machine_name string?
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
-    local filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } }
+    local filters = {
+        { filter = "type",   type = "assembling-machine" },
+        { filter = "type",   type = "furnace" },
+        { filter = "hidden", hidden = true,              mode = "and", invert = true }
+    }
     local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(machine_name)
     b.elem_value = signal
@@ -37,7 +41,10 @@ end
 ---@param module_name string?
 ---@return LuaGuiElement
 local function add_module_button(container, module_name)
-    local filters = { { filter = "type", type = "module" } }
+    local filters = {
+        { filter = "type",   type = "module" },
+        { filter = "hidden", hidden = true,  mode = "and", invert = true }
+    }
     local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(module_name)
     b.elem_value = signal
@@ -171,7 +178,10 @@ function settings_panel.create(player_index)
     set_module_buttons(g, pmodule_flow, g.preferred_modules)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
-    b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = { { filter = "type", type = "beacon" } },
+    b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality",
+        elem_filters = { 
+            { filter = "type", type = "beacon" }, 
+            { filter = "hidden", hidden = true, mode = "and", invert = true } },
         name = "preferred_beacon" }
     b.elem_value = tools.id_to_signal(g.preferred_beacon)
 
