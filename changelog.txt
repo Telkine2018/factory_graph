@@ -3,7 +3,7 @@ Version: 2.0.20
 Date: 15. 02. 2026.
   Bugfixes:
     - manage hidden entity
-    - Fix module category filtering (for Pyanodon use)
+    - Fix module/beacon filtering (for Pyanodon use)
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.19
 Date: 14. 02. 2026.

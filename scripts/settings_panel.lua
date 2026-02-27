@@ -28,7 +28,7 @@ local function add_machine_button(container, machine_name)
     local filters = {
         { filter = "type",   type = "assembling-machine" },
         { filter = "type",   type = "furnace" },
-        { filter = "hidden", hidden = true,              mode = "and", invert = true }
+        { filter = "hidden", mode = "and",               invert = true }
     }
     local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(machine_name)
@@ -43,7 +43,7 @@ end
 local function add_module_button(container, module_name)
     local filters = {
         { filter = "type",   type = "module" },
-        { filter = "hidden", hidden = true,  mode = "and", invert = true }
+        { filter = "hidden", mode = "and",   invert = true }
     }
     local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(module_name)
@@ -179,9 +179,9 @@ function settings_panel.create(player_index)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
     b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality",
-        elem_filters = { 
-            { filter = "type", type = "beacon" }, 
-            { filter = "hidden", hidden = true, mode = "and", invert = true } },
+        elem_filters = {
+            { filter = "type",   type = "beacon" },
+            { filter = "hidden", mode = "and",   invert = true } },
         name = "preferred_beacon" }
     b.elem_value = tools.id_to_signal(g.preferred_beacon)
 

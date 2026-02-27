@@ -34,7 +34,7 @@ local function install_modules(container, g, config, grecipe)
     end
 
     local allowed = {}
-    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
+    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
     local recipe = prototypes.recipe[grecipe.name]
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
@@ -106,7 +106,7 @@ local function install_beacon_modules(container, g, config, grecipe)
 
         local count = beacon.module_inventory_size
         local allowed = {}
-        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
+        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } , { filter = "hidden", mode = "and", invert = true }}
 
         local recipe = prototypes.recipe[grecipe.name]
         local allowed_effects = recipe.allowed_effects
@@ -256,7 +256,7 @@ function msettings.create(player_index, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
     b = field_table.add { type = "choose-elem-button", elem_type = "entity-with-quality", name = "beacon",
-        elem_filters = { { filter = "type", type = "beacon" }, { filter = "hidden", hidden = true, mode = "and", invert=true } } }
+        elem_filters = { { filter = "type", type = "beacon" }, { filter = "hidden", mode = "and", invert = true } } }
     signal = tools.id_to_signal(config.beacon_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("beacon"), { recipe_name = grecipe.name })
