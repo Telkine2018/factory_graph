@@ -588,13 +588,6 @@ tools.register_user_event(commons.open_current_selection,
         msettings.open_selection(player);
     end)
 
----@param e EventData.on_lua_shortcut
-local function on_control_click(e)
-    local player = game.players[e.player_index]
-    msettings.open_selection(player)
-end
-script.on_event(prefix .. "-control-click", on_control_click)
-
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine
 function msettings.create_product_line(container, machine)

@@ -124,8 +124,9 @@ end
 
 ---@param g Graph
 function drawing.clear_selection(g)
-    if g.selected_recipe then
-        dash_lines(g, g.selected_recipe, false)
+    if g.lock_selected_recipe and not g.selection_lock then
+        dash_lines(g, g.lock_selected_recipe, false)
+        g.lock_selected_recipe = nil
     end
     g.graph_select_ids = gutils.destroy_drawing(g.graph_select_ids)
     g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
@@ -1286,6 +1287,24 @@ function drawing.unmark_all(g)
     drawing.draw_layers(g)
 end
 
+---@param e EventData.on_lua_shortcut
+local function on_control_click(e)
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    if player.surface ~= g.surface then return end
+
+    g.selection_lock = not g.selection_lock
+    if not g.selection_lock then
+        local entity = player.selected
+        drawing.select_entity(g, entity)
+    end
+end
+script.on_event(prefix .. "-control-click", on_control_click)
+
+
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)
     local player_index = e.player_index
@@ -1301,7 +1320,17 @@ local function on_selected_entity_changed(e)
     if not g then return end
 
     local entity = player.selected
+    drawing.select_entity(g, entity)
+end
 
+
+--- Select an entity
+---@param g Graph
+---@param entity LuaEntity
+function drawing.select_entity(g, entity)
+
+    local surface = g.surface
+    local player = g.player
     if (g.selector_id) then
         g.selector_id.destroy()
         g.selector_id = nil
@@ -1337,8 +1366,11 @@ local function on_selected_entity_changed(e)
                             scale = 0.4
                         }
                         draw_connected_by_product(g, grecipe, product)
-                        dash_lines(g, grecipe, false)
-                        dash_line_for_product(product, true)
+                        if not g.selection_lock then
+                            dash_lines(g, grecipe, false)
+                            dash_line_for_product(product, true)
+                            g.lock_selected_recipe = grecipe
+                        end
                     end
                 end
             end
@@ -1372,8 +1404,11 @@ local function on_selected_entity_changed(e)
                 g.selected_recipe = grecipe
                 g.selected_recipe_entity = entity
                 g.move_recipe = nil
-                draw_selected_entity(player, entity, grecipe)
-                dash_lines(g, grecipe, true)
+                draw_selected_entity(g.player, entity, grecipe)
+                if not g.selection_lock then
+                    dash_lines(g, grecipe, true)
+                    g.lock_selected_recipe = grecipe
+                end
             end
         end
     end

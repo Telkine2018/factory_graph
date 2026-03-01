@@ -18,6 +18,7 @@ local tools = require("scripts.tools")
 ---@field graph_select_ids LuaRenderObject[]?
 ---@field highlighted_recipes_ids LuaRenderObject[]?
 ---@field selected_recipe GRecipe?
+---@field lock_selected_recipe GRecipe?
 ---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
 ---@field selector_product_name string?             @ selected product
 ---@field product_selectors {[string]:LuaEntity}    @ product name => entity
@@ -37,6 +38,7 @@ local tools = require("scripts.tools")
 ---@field recipes_productivities {[string]:number}?
 ---@field manual_mode boolean                           # manual mode asked by user
 ---@field real_manual_mode boolean                      # manual mode computed
+---@field selection_lock boolean?                       # selection display is locked
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"

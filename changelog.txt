@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.21
+Date: 01. 03. 2026.
+  Features:
+    - mouse <CONTROL><CLICK> on a recipe or a product in the graph will lock the display of dash lines
+    - another <CONTROL><CLICK> will unlock the display of dash lines
+    - it is now a lot easier to analyze wide graph
+---------------------------------------------------------------------------------------------------
 Version: 2.0.20
 Date: 15. 02. 2026.
   Bugfixes:
