@@ -1,6 +1,8 @@
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.21
 Date: 01. 03. 2026.
+  Bugfixes:
+    - Fix invalid mark of machine with recipe
   Features:
     - mouse <CONTROL><CLICK> on a recipe or a product in the graph will lock the display of dash lines
     - another <CONTROL><CLICK> will unlock the display of dash lines

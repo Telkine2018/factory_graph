@@ -1750,8 +1750,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                                 surface = surface,
                                 color = color,
                                 left_top = { entity = entity, offset = { -w, -h } },
-                                right_bottom = { entity = entity, right_bottom_offset = { w, h } },
-                                width = 2, time_to_live = 2 * 60
+                                right_bottom = { entity = entity, offset = { w, h } },
+                                width = 2, time_to_live = 5 * 60
                             }
                             count = count + 1
                         end
