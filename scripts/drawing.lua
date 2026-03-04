@@ -1156,8 +1156,8 @@ local function highlight_recipes(g, recipes, color)
     end
 end
 
-local ingredient_color = { 1, 0, 0 }
-local production_color = { 255, 106, 0 }
+local ingredient_color = colors.ingredient
+local production_color = colors.production
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -1294,16 +1294,39 @@ local function on_control_click(e)
     local g = gutils.get_graph(player);
     if not g then return end
 
-    if player.surface ~= g.surface then return end
-
-    g.selection_lock = not g.selection_lock
-    if not g.selection_lock then
-        local entity = player.selected
-        drawing.select_entity(g, entity)
+    if player.surface == g.surface then
+        g.selection_lock = not g.selection_lock
+        if not g.selection_lock then
+            local entity = player.selected
+            drawing.select_entity(g, entity)
+        end
     end
 end
-script.on_event(prefix .. "-control-click", on_control_click)
 
+local function on_control_click4(e)
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    local selected = player.selected
+    if selected == nil then return end
+
+    if player.surface == g.surface then return end
+
+    local type = selected.type
+    if type ~= "furnace" and type ~= "assembling-machine" then return end
+
+    local entity = selected
+    local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+
+    if recipe then
+        drawing.show_machine(player, recipe.name)
+    end
+end
+
+script.on_event(prefix .. "-control-click", on_control_click)
+script.on_event(prefix .. "-control-click4", on_control_click4)
 
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)
@@ -1328,7 +1351,6 @@ end
 ---@param g Graph
 ---@param entity LuaEntity
 function drawing.select_entity(g, entity)
-
     local surface = g.surface
     local player = g.player
     if (g.selector_id) then
@@ -1416,6 +1438,7 @@ function drawing.select_entity(g, entity)
         tools.fire_user_event(commons.graph_selection_change_event, { g = g })
     end
 end
+
 tools.on_event(defines.events.on_selected_entity_changed, on_selected_entity_changed)
 
 ---@param e EventData.on_gui_opened

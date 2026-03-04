@@ -407,9 +407,9 @@ local function save(player, frame)
     end
 
     g.visible_layers = visible_layers
-    if show_hidden_change then
+    if show_hidden_change or layer_change then
         graph.deferred_update(player, { selection_changed = true, do_layout = true })
-    elseif layer_change or need_selection_change then
+    elseif need_selection_change then
         graph.deferred_update(player, {
             do_redraw = true,
             center_on_graph = false,

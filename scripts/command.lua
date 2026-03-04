@@ -149,7 +149,10 @@ tools.on_named_event(np("visibility"), defines.events.on_gui_selection_state_cha
         local g = gutils.get_graph(player)
         local old_visibility = g.visibility
         g.visibility = e.element.selected_index
-        if old_visibility == commons.visibility_all or g.visibility == commons.visibility_all then
+        if old_visibility == commons.visibility_all or 
+                g.visibility == commons.visibility_all or
+                g.visibility == commons.visibility_layers or
+                old_visibility == commons.visibility_layers   then
             graph.deferred_update(player, {
                 do_layout = true,
                 center_on_graph = true

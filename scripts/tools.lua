@@ -56,8 +56,8 @@ end
 function tools.is_tracing() return tracing end
 
 ---@param o any
-function tools.strip(o) 
-    local s = string.gsub(serpent.block(o), "%s", "") 
+function tools.strip(o)
+    local s = string.gsub(serpent.block(o), "%s", "")
     return s
 end
 
@@ -684,6 +684,40 @@ function tools.signal_to_sprite(signal)
     end
 end
 
+---@param signal (SignalID | SignalFilter) ?
+---@return string?
+function tools.signal_to_sprite2(signal)
+    if not signal then return nil end
+    local type = signal.type
+    if type == "virtual" then
+        return "virtual-signal." .. signal.name
+    elseif type == nil then
+        return "item." .. signal.name
+    else
+        return type .. "." .. signal.name
+    end
+end
+
+---@param s (SignalID | SignalFilter)
+---@return string
+function tools.text_sprite(s)
+    local type = s.type
+    if type == nil then
+        type = "item"
+    elseif type == "virtual" then
+        type = "virtual-signal"
+    end
+
+    local quality = s.quality
+    local text
+    if type == "item" and quality then
+        text = "[item=" .. s.name .. ",quality=" .. quality .. "] "
+    else
+        text = "[" .. type .. "=" .. s.name .. "] "
+    end
+    return text
+end
+
 local gmatch = string.gmatch
 
 ---@param sprite string?
@@ -1147,7 +1181,7 @@ end
 
 -------------------------------------
 
----@param signal SignalFilter 
+---@param signal SignalFilter
 ---@return string?
 function tools.signal_to_id(signal)
     if not signal then return nil end
@@ -1165,14 +1199,13 @@ function tools.id_to_signal(signalid)
     if type(signalid) ~= "string" then return signalid end
     local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
     local type, name = split()
-    local comparator, quality = split() 
+    local comparator, quality = split()
     if name ~= nil then
         return { type = type, name = name, comparator = comparator, quality = quality }
     else
         return { type = "item", name = signalid }
     end
 end
-
 
 ---@param signalid string?
 ---@return string?
@@ -1190,20 +1223,20 @@ function tools.id_to_filter(signalid)
     if type(signalid) ~= "string" then return signalid end
     local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
     local type, name = split()
-    local comparator, quality = split() 
+    local comparator, quality = split()
     if not type or type == "item" then
         if not quality or quality == "normal" then
             return name
         end
         return { type = "item", name = name, comparator = comparator or "=", quality = quality }
     end
-    return { type = type, name = name, comparator="=", quality="normal" }
+    return { type = type, name = name, comparator = "=", quality = "normal" }
 end
 
 ---@param name string
 ---@return SignalFilter
 function tools.build_virtual_signal(name)
-    return { type = "virtual", name = name, comparator="=", quality="normal" }
+    return { type = "virtual", name = name, comparator = "=", quality = "normal" }
 end
 
 return tools

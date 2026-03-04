@@ -1,6 +1,7 @@
 local luautil = require("__core__/lualib/util")
 
 local commons = require("scripts.commons")
+local colors = require("scripts.colors")
 local tools = require("scripts.tools")
 local translations = require("scripts.translations")
 local gutils = require("scripts.gutils")
@@ -1727,40 +1728,162 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                 if string.find(player.surface.name, commons.surface_prefix_filter) then
                     gutils.exit(player)
                 end
-
-                local g = gutils.get_graph(player)
                 local recipe_name = e.element.tags.recipe_name --[[@as string]]
-                if not recipe_name then return end
-                local grecipe = g.recipes[recipe_name]
-
-                local machine = grecipe.machine
-                if not machine or not machine.machine then return end
-
-                local surface = player.surface
-                local entities = surface.find_entities_filtered { name = machine.machine.name, position = player.position, radius = 1000 }
-                local count = 0
-                if #entities > 0 then
-                    local color = { 0, 1, 1 }
-                    for _, entity in pairs(entities) do
-                        local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
-                        if crecipe and crecipe.name == recipe_name then
-                            local w = entity.tile_width / 2
-                            local h = entity.tile_height / 2
-                            rendering.draw_rectangle {
-                                surface = surface,
-                                color = color,
-                                left_top = { entity = entity, offset = { -w, -h } },
-                                right_bottom = { entity = entity, offset = { w, h } },
-                                width = 2, time_to_live = 5 * 60
-                            }
-                            count = count + 1
-                        end
-                    end
-                end
-                player.print({ np("machine_report"), count })
+                product_panel.show_machine(player, recipe_name)
             end
         end
     end)
+
+local ingredient_color = colors.ingredient
+local production_color = colors.production
+local display_time = 5 * 60
+
+---@param player LuaPlayer
+---@param recipe_name string?
+function product_panel.show_machine(player, recipe_name)
+    local g = gutils.get_graph(player)
+    if not recipe_name then return end
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe then return end
+
+    local machine = grecipe.machine
+    if not machine or not machine.machine then return end
+
+    local surface = player.surface
+    local entities = surface.find_entities_filtered {
+        type = { "furnace", "assembling-machine", "rocket-silo" },
+        position = player.position, radius = 100
+    }
+    local count = 0
+    if #entities > 0 then
+        local main_color = colors.main
+        local ingredient_color = colors.ingredient
+        local product_color = colors.production
+
+        local i_map = {}
+        for _, i in pairs(grecipe.ingredients) do
+            for r_name, r in pairs(i.product_of) do
+                i_map[r_name] = { recipe = r, product = i }
+            end
+        end
+
+        local p_map = {}
+        for _, p in pairs(grecipe.products) do
+            for r_name, r in pairs(p.ingredient_of) do
+                p_map[r_name] = { recipe = r, product = p }
+            end
+        end
+
+        i_map[recipe_name] = nil
+        p_map[recipe_name] = nil
+
+        local function draw_entity(entity, color)
+            local w = entity.tile_width / 2
+            local h = entity.tile_height / 2
+            rendering.draw_rectangle {
+                surface = surface,
+                color = color,
+                left_top = { entity = entity, offset = { -w, -h } },
+                right_bottom = { entity = entity, offset = { w, h } },
+                width = 2,
+                time_to_live = display_time
+            }
+        end
+
+        local main_entity
+        local ingredient_links = {}
+        local product_links = {}
+        local player_pos = player.position
+        local dist
+        for _, entity in pairs(entities) do
+            local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+            if crecipe then
+                local cname = crecipe.name
+                if cname == recipe_name then
+                    draw_entity(entity, main_color)
+                    local newdist = tools.distance(player_pos, entity.position)
+                    if not main_entity or newdist < dist then
+                        main_entity = entity
+                        dist = newdist
+                    end
+                    count = count + 1
+                elseif i_map[cname] then
+                    draw_entity(entity, ingredient_color)
+                    local p = i_map[cname]
+                    table.insert(ingredient_links, { entity = entity, recipe = p.recipe, product = p.product })
+                elseif p_map[cname] then
+                    draw_entity(entity, product_color)
+                    local p = p_map[cname]
+                    table.insert(product_links, { entity = entity, recipe = p.recipe, product = p.product })
+                end
+            end
+        end
+        if main_entity then
+            local mp = main_entity.position
+            local mx = mp.x
+            local my = mp.y
+            local function draw_link(color, other, product)
+                local op = other.position
+                local ox = op.x
+                local oy = op.y
+                rendering.draw_line {
+                    color = color,
+                    from = mp,
+                    to = op,
+                    surface = surface,
+                    time_to_live = display_time,
+                    width = 2,
+                    draw_on_ground = false
+                }
+
+                local textpos = { x = (mx + ox) / 2, y = (my + oy) / 2 }
+
+                local radius = 1
+                rendering.draw_circle {
+                    surface = surface,
+                    color = { 0, 0, 0 },
+                    filled = true,
+                    time_to_live = display_time,
+                    radius = radius,
+                    target = textpos
+                }
+
+                rendering.draw_circle {
+                    surface = surface,
+                    color = color,
+                    filled = false,
+                    time_to_live = display_time,
+                    radius = radius,
+                    target = textpos,
+                    width = 2,
+                }
+
+                local text = tools.text_sprite(tools.id_to_signal(product.name))
+                rendering.draw_text {
+                    text = text,
+                    surface = surface,
+                    target = textpos,
+                    color = color,
+                    orientation = 0,
+                    alignment = "center",
+                    vertical_alignment = "middle",
+                    time_to_live = display_time,
+                    use_rich_text = true,
+                    scale = 1.8
+                }
+            end
+            for _, i in pairs(ingredient_links) do
+                draw_link(ingredient_color, i.entity, i.product)
+            end
+            for _, p in pairs(product_links) do
+                draw_link(product_color, p.entity, p.product)
+            end
+        end
+    end
+    player.print({ np("machine_report"), count })
+end
+
+drawing.show_machine = product_panel.show_machine
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
@@ -1896,14 +2019,19 @@ tools.on_gui_click(np("goto"),
         if not recipe or not recipe.visible then
             return
         end
-        local position = gutils.get_recipe_position(g, recipe)
-        drawing.draw_target(g, recipe)
-        if e.control then
-            player.teleport(position, g.surface, false)
+
+        if g.surface == player.surface then
+            local position = gutils.get_recipe_position(g, recipe)
+            drawing.draw_target(g, recipe)
+            if e.control then
+                player.teleport(position, g.surface, false)
+            else
+                gutils.move_view(player, position)
+            end
+            product_panel.close(player)
         else
-            gutils.move_view(player, position)
+            product_panel.show_machine(player, recipe_name)
         end
-        product_panel.close(player)
     end)
 
 msettings_panel.create_product_line = create_product_line
