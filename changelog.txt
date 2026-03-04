@@ -7,6 +7,8 @@ Date: 01. 03. 2026.
     - mouse <CONTROL><CLICK> on a recipe or a product in the graph will lock the display of dash lines
     - another <CONTROL><CLICK> will unlock the display of dash lines
     - it is now a lot easier to analyze wide graph
+    - <SHIFT><CONTROL><RIGHT-CLICK> on a machine (in real view) show other machines sharing product or ingredients
+    - <MIDDLE-CLICK> on a machine switch to graph view and show the recipe of the machine
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.20
 Date: 15. 02. 2026.

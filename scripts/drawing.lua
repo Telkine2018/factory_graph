@@ -1303,6 +1303,25 @@ local function on_control_click(e)
     end
 end
 
+---@param player LuaPlayer
+local function show_machine_from_selection(player)
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    local entity = player.selected
+    if not entity or not entity.valid then return end
+
+    if not recipe_entity_names[entity.name] then return end
+
+    ---@type GRecipe
+    local grecipe = g.entity_map[entity.unit_number]
+    if not grecipe then return end
+
+    gutils.exit(player)
+    drawing.show_machine(player, grecipe.name)
+end
+
+--- Show connected machine to current one
 local function on_control_click4(e)
     local player = game.players[e.player_index]
 
@@ -1310,23 +1329,51 @@ local function on_control_click4(e)
     if not g then return end
 
     local selected = player.selected
-    if selected == nil then return end
+    if selected == nil or not selected.valid then return end
 
-    if player.surface == g.surface then return end
+    if player.surface ~= g.surface then
+        local type = selected.type
+        if type ~= "furnace" and type ~= "assembling-machine" then return end
 
-    local type = selected.type
-    if type ~= "furnace" and type ~= "assembling-machine" then return end
+        local entity = selected
+        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
 
-    local entity = selected
-    local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+        if recipe then
+            drawing.show_machine(player, recipe.name)
+        end
+    else
+        show_machine_from_selection(player)
+    end
+end
 
-    if recipe then
-        drawing.show_machine(player, recipe.name)
+--- Select a recipe in graph
+local function on_control_click5(e)
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    local selected = player.selected
+    if selected == nil or not selected.valid then return end
+
+    if player.surface ~= g.surface then
+        local type = selected.type
+        if type ~= "furnace" and type ~= "assembling-machine" then return end
+
+        local entity = selected
+        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+        if recipe then
+            player.print("Recipe:" .. recipe.name)
+            gutils.enter(player, recipe.name)
+        end
+    else
+        show_machine_from_selection(player)
     end
 end
 
 script.on_event(prefix .. "-control-click", on_control_click)
 script.on_event(prefix .. "-control-click4", on_control_click4)
+script.on_event(prefix .. "-control-click5", on_control_click5)
 
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)

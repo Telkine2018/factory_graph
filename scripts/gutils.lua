@@ -666,7 +666,8 @@ end
 function gutils.exit(player) end
 
 ---@param player LuaPlayer
-function gutils.enter(player) end
+---@param recipe_name string?
+function gutils.enter(player, recipe_name) end
 
 ---@param g Graph
 function gutils.clear(g)

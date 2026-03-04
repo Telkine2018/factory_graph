@@ -37,9 +37,16 @@ add({
 add({
   type = "custom-input",
   key_sequence = "CONTROL + SHIFT + mouse-button-2",
-  alternative_key_sequence  = "mouse-button-3",
   name = prefix .. "-control-click4"
 })
+
+add({
+  type = "custom-input",
+  key_sequence = "mouse-button-3",
+  name = prefix .. "-control-click5"
+})
+
+
 
 if mods["space-exploration"] then
   add({
