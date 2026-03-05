@@ -2020,17 +2020,26 @@ tools.on_gui_click(np("goto"),
             return
         end
 
-        if g.surface == player.surface then
-            local position = gutils.get_recipe_position(g, recipe)
-            drawing.draw_target(g, recipe)
-            if e.control then
-                player.teleport(position, g.surface, false)
+        if not e.shift then
+            if g.surface == player.surface then
+                local position = gutils.get_recipe_position(g, recipe)
+                drawing.draw_target(g, recipe)
+                if e.control then
+                    player.teleport(position, g.surface, false)
+                else
+                    gutils.move_view(player, position)
+                end
+                product_panel.close(player)
             else
-                gutils.move_view(player, position)
+                product_panel.show_machine(player, recipe_name)
             end
-            product_panel.close(player)
         else
-            product_panel.show_machine(player, recipe_name)
+            if g.surface == player.surface then
+                gutils.exit(player)
+                product_panel.show_machine(player, recipe_name)
+            else
+                gutils.enter(player, recipe_name)
+            end
         end
     end)
 
