@@ -725,6 +725,7 @@ end
 
 local colors = commons.colors
 local display_time = 5 * 60
+local text_dist = 30
 
 ---@param player LuaPlayer
 ---@param recipe_name string?
@@ -825,8 +826,15 @@ function gutils.show_machine(player, recipe_name, move_player)
                     width = 2,
                     draw_on_ground = false
                 }
-
-                local textpos = { x = (mx + ox) / 2, y = (my + oy) / 2 }
+                local dd = tools.distance(mp, op)
+                local textpos
+                if dd < text_dist then
+                    textpos = { x = (mx + ox) / 2, y = (my + oy) / 2 }
+                else
+                    local ux = mx + (ox - mx) / dd * text_dist / 2
+                    local uy = my + (oy - my) / dd * text_dist / 2
+                    textpos = { x = ux, y = uy }
+                end
 
                 local radius = 1
                 rendering.draw_circle {
