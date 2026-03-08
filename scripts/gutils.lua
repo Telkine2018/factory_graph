@@ -4,6 +4,12 @@ local translations = require("scripts.translations")
 
 local gutils = {}
 
+local recipe_entity_names = commons.recipe_entity_names
+
+local function np(name)
+    return commons.prefix .. "-gutils." .. name
+end
+
 ---@param ids LuaRenderObject[]?
 ---@return nil
 function gutils.destroy_drawing(ids)
@@ -693,7 +699,6 @@ end
 
 ---@param g Graph
 function gutils.clean_iovalues(g)
-
     if not g.selection then return end
 
     local all_products = {}
@@ -712,11 +717,272 @@ function gutils.clean_iovalues(g)
             to_remove[name] = true
         end
     end
-    
+
     for name, _ in pairs(to_remove) do
         g.iovalues[name] = nil
     end
+end
 
+local colors = commons.colors
+local display_time = 5 * 60
+
+---@param player LuaPlayer
+---@param recipe_name string?
+---@param move_player boolean?
+function gutils.show_machine(player, recipe_name, move_player)
+    local g = gutils.get_graph(player)
+    if not recipe_name then return end
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe then return end
+
+    local machine = grecipe.machine
+    if not machine or not machine.machine then return end
+
+    local surface = player.surface
+    local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
+    local entities = surface.find_entities_filtered {
+        type = { "furnace", "assembling-machine", "rocket-silo" },
+        position = player.position, radius = show_machine_radius
+    }
+    local count = 0
+    if #entities > 0 then
+        local main_color = colors.main
+        local ingredient_color = colors.ingredient
+        local product_color = colors.production
+
+        local i_map = {}
+        for _, i in pairs(grecipe.ingredients) do
+            for r_name, r in pairs(i.product_of) do
+                i_map[r_name] = { recipe = r, product = i }
+            end
+        end
+
+        local p_map = {}
+        for _, p in pairs(grecipe.products) do
+            for r_name, r in pairs(p.ingredient_of) do
+                p_map[r_name] = { recipe = r, product = p }
+            end
+        end
+
+        i_map[recipe_name] = nil
+        p_map[recipe_name] = nil
+
+        local function draw_entity(entity, color)
+            local w = entity.tile_width / 2
+            local h = entity.tile_height / 2
+            rendering.draw_rectangle {
+                surface = surface,
+                color = color,
+                left_top = { entity = entity, offset = { -w, -h } },
+                right_bottom = { entity = entity, offset = { w, h } },
+                width = 2,
+                time_to_live = display_time
+            }
+        end
+
+        local main_entity
+        local ingredient_links = {}
+        local product_links = {}
+        local player_pos = player.position
+        local dist
+        for _, entity in pairs(entities) do
+            local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
+            if crecipe then
+                local cname = crecipe.name
+                if cname == recipe_name then
+                    draw_entity(entity, main_color)
+                    local newdist = tools.distance(player_pos, entity.position)
+                    if not main_entity or newdist < dist then
+                        main_entity = entity
+                        dist = newdist
+                    end
+                    count = count + 1
+                elseif i_map[cname] then
+                    draw_entity(entity, ingredient_color)
+                    local p = i_map[cname]
+                    table.insert(ingredient_links, { entity = entity, recipe = p.recipe, product = p.product })
+                elseif p_map[cname] then
+                    draw_entity(entity, product_color)
+                    local p = p_map[cname]
+                    table.insert(product_links, { entity = entity, recipe = p.recipe, product = p.product })
+                end
+            end
+        end
+        if main_entity then
+            local mp = main_entity.position
+            local mx = mp.x
+            local my = mp.y
+            local function draw_link(color, other, product)
+                local op = other.position
+                local ox = op.x
+                local oy = op.y
+                rendering.draw_line {
+                    color = color,
+                    from = mp,
+                    to = op,
+                    surface = surface,
+                    time_to_live = display_time,
+                    width = 2,
+                    draw_on_ground = false
+                }
+
+                local textpos = { x = (mx + ox) / 2, y = (my + oy) / 2 }
+
+                local radius = 1
+                rendering.draw_circle {
+                    surface = surface,
+                    color = { 0, 0, 0 },
+                    filled = true,
+                    time_to_live = display_time,
+                    radius = radius,
+                    target = textpos
+                }
+
+                rendering.draw_circle {
+                    surface = surface,
+                    color = color,
+                    filled = false,
+                    time_to_live = display_time,
+                    radius = radius,
+                    target = textpos,
+                    width = 2,
+                }
+
+                local text = tools.text_sprite(tools.id_to_signal(product.name))
+                rendering.draw_text {
+                    text = text,
+                    surface = surface,
+                    target = textpos,
+                    color = color,
+                    orientation = 0,
+                    alignment = "center",
+                    vertical_alignment = "middle",
+                    time_to_live = display_time,
+                    use_rich_text = true,
+                    scale = 1.8
+                }
+            end
+            for _, i in pairs(ingredient_links) do
+                draw_link(ingredient_color, i.entity, i.product)
+            end
+            for _, p in pairs(product_links) do
+                draw_link(product_color, p.entity, p.product)
+            end
+            if move_player and main_entity then
+                if tools.distance(player.position, main_entity.position) > 30 then
+                    player.set_controller {
+                        type = defines.controllers.remote,
+                        position = main_entity.position,
+                        surface = player.surface
+                    }
+                end
+            end
+        end
+    end
+    player.print({ np("machine_report"), count })
+end
+
+---@param player LuaPlayer
+---@return GRecipe?
+---@return Graph?
+function gutils.get_selected_recipe_in_graph(player)
+
+    local g = gutils.get_graph(player);
+    if not g then return nil end
+
+    local entity = player.selected
+    if not entity or not entity.valid then return nil end
+
+    if not recipe_entity_names[entity.name] then return nil end
+
+    ---@type GRecipe
+    local grecipe = g.entity_map[entity.unit_number]
+    if not grecipe then return nil end
+
+    return grecipe, g
+end
+
+---@param player LuaPlayer
+function gutils.show_machine_from_selection(player)
+
+    ---@type GRecipe
+    local grecipe, g = gutils.get_selected_recipe_in_graph(player)
+    if not grecipe then return end
+
+    gutils.refresh_machine_list(g, grecipe.name)
+    gutils.exit(player)
+    gutils.show_machine(player, grecipe.name, true)
+end
+
+---@param g Graph
+---@param recipe_name string?
+function gutils.refresh_machine_list(g, recipe_name)
+    ---@type BackgroundCommand
+    local command = {
+        event_name = commons.refresh_machine_list,
+        player = g.player,
+        g = g,
+        recipe_name = recipe_name,
+    }
+    tools.background_exec(command)
+end
+
+---@param player LuaPlayer
+---@return {[string]:boolean}
+function gutils.get_scanned_recipes(player)
+    local surface = gutils.get_real_surface(player)
+    local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
+    local entities = surface.find_entities_filtered {
+        type = { "furnace", "assembling-machine", "rocket-silo" },
+        position = player.position, radius = show_machine_radius
+    }
+    ---@type {[string]:boolean}
+    local result = {}
+    for _, entity in pairs(entities) do
+        local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
+        if crecipe then
+            result[crecipe.name] = true
+        end
+    end
+    return result
+end
+
+---@param player LuaPlayer
+---@return LuaSurface
+function gutils.get_real_surface(player)
+
+    local vars = tools.get_vars(player)
+    local character = vars.character
+    if character and character.valid then
+        return character.surface
+    end
+    if vars.extern_surface and vars.extern_surface.valid then
+        return vars.extern_surface 
+    end
+    return game.surfaces("nauvis")
+end
+
+function gutils.clear_scanned_recipes()
+    for _, player in pairs(game.players) do
+        local vars = tools.get_vars(player)
+        vars.scanned_recipes = nil
+        local g = gutils.get_graph(player)
+        if g then
+            gutils.refresh_machine_list(g, nil)
+        end
+    end
+end
+
+tools.register_user_event(commons.clear_scanned_recipes, gutils.clear_scanned_recipes)
+
+function gutils.post_clear_scanned_recipes() 
+
+    ---@type BackgroundCommand
+    local command = {
+        event_name = commons.clear_scanned_recipes,
+        player = nil
+    }
+    tools.background_exec(command)
 end
 
 return gutils

@@ -214,3 +214,4 @@ local tools = require("scripts.tools")
 ---@field update_command  boolean?
 ---@field no_recipe_selection_update boolean?
 ---@field update_product_list boolean?
+

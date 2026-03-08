@@ -37,6 +37,9 @@ local commons = {
     graph_selection_change_event = "graph_selection_change",
     open_recipe_selection = "open_recipe_selection",
     open_current_selection = "open_current_selection",
+    refresh_machine_list = "refresh_machine_list",
+    clear_scanned_recipes = "clear_scanned_recipes",
+    show_implemented = "show_implemented",
 
     math_precision = 0.000001,
     production_failures = {
@@ -67,6 +70,7 @@ commons.buttons = {
 commons.buttons.ingredient = commons.buttons.cyan
 commons.buttons.product = commons.buttons.orange
 commons.buttons.recipe = commons.buttons.blue
+commons.buttons.tag = commons.buttons.default
 
 commons.buttons.positive = commons.buttons.green
 commons.buttons.negative = commons.buttons.red
@@ -77,5 +81,17 @@ commons.surface_prefix_filter = "^" .. commons.surface_prefix
 ---@param name string
 ---@return string
 function commons.png(name) return (commons.graphic_path):format(name) end
+
+commons.colors = {}
+local colors = commons.colors
+colors.ingredient = { 1, 0, 0 }
+colors.production = { 255, 106, 0 }
+colors.main = { 1, 1, 0 }
+
+commons.recipe_entity_names = {
+    [commons.recipe_symbol_name] = true,
+    [commons.product_symbol_name] = true,
+    [commons.unresearched_symbol_name] = true,
+}
 
 return commons

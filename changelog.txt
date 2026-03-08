@@ -4,13 +4,14 @@ Date: 01. 03. 2026.
   Bugfixes:
     - Fix invalid mark of machine with recipe
   Features:
-    - mouse <CONTROL><CLICK> on a recipe or a product in the graph will lock the display of dash lines
-    - another <CONTROL><CLICK> will unlock the display of dash lines
-    - it is now a lot easier to analyze wide graph
-    - <SHIFT><CONTROL><RIGHT-CLICK> on a machine (in real view) show other machines sharing product or ingredients
-    - <MIDDLE-CLICK> on a machine switch to graph view and show the recipe of the machine
-    - on the graph view, <MIDDLE-CLICK> on a recipe exit graph view and highlight the machines which run the recipe
-    - <SHIFT><LEFT-CLICK> on the production panel switch between the graph view and nauvis view and highlight the recipe
+    - mouse <CONTROL><LEFT-CLICK> on a recipe or a product in the graph will lock the display of dash lines
+    - another <CONTROL><LEFT-CLICK> will unlock the display of dash lines
+    - in the real view, <SHIFT><CONTROL><RIGHT-CLICK> on a machine show other machines sharing product or ingredients
+    - in the graph view <SHIFT><CONTROL><RIGHT-CLICK> on a recipe, highlight the recipe in the production panel
+    - in the real view, <MIDDLE-CLICK> on a machine switch to graph view and show the recipe of the machine
+    - in the graph view, <MIDDLE-CLICK> on a recipe exit the graph view and highlight the machines which run the recipe
+    - the "goto" button in the production panel and the machine panel have advanced function for navigation
+    - the production panel displays the layer of recipe, with a green backgroud if the recipe have some machine
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.20
 Date: 15. 02. 2026.

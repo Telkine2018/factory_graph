@@ -263,7 +263,7 @@ function recipe_selection.open(g, options)
     local label                                = flow1.add { type = "label", caption = { np("choose_recipe") } }
     label.style.top_padding                    = 7
     local b                                    = flow1.add { type = "choose-elem-button", elem_type = "recipe", name = "choose_recipe" }
-    local filters                               = { }
+    local filters                              = {}
     if g.show_only_researched then
         table.insert(filters, { filter = 'enabled', mode = 'and' })
     end
@@ -738,18 +738,23 @@ tools.on_gui_click(np("goto"),
         local recipe_name = line.tags.recipe_name
 
         local g = gutils.get_graph(player)
-        local recipe = g.recipes[recipe_name]
-        if not recipe.visible then
+        local grecipe = g.recipes[recipe_name]
+        if not grecipe or not grecipe.visible then
             return
         end
-        local position = gutils.get_recipe_position(g, recipe)
 
-        drawing.draw_target(g, recipe)
-
-        if e.control then
-            player.teleport(position, g.surface, false)
+        if player.surface == g.surface then
+            local position = gutils.get_recipe_position(g, grecipe)
+            drawing.draw_target(g, grecipe)
+            if e.control then
+                player.teleport(position, g.surface, false)
+            else
+                gutils.move_view(player, position)
+            end
+            gutils.refresh_machine_list(g, recipe_name)
         else
-            gutils.move_view(player, position)
+            gutils.show_machine(player, recipe_name, true)
+            gutils.refresh_machine_list(g, recipe_name)
         end
     end)
 

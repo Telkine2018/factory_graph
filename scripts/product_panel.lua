@@ -22,6 +22,7 @@ local default_button_style = prefix .. "_button_default"
 local default_button_label_style = prefix .. "_count_label_bottom"
 
 local arrow_sprite_white = prefix .. "_arrow-white"
+local arrow_sprite_green = prefix .. "_arrow-green"
 local arrow_sprite_black = prefix .. "_arrow"
 
 local math_precision = commons.math_precision
@@ -30,6 +31,8 @@ local abs = math.abs
 local product_button_style = commons.buttons.product
 local ingredient_button_style = commons.buttons.ingredient
 local recipe_button_style = commons.buttons.recipe
+local layer_button_style = commons.buttons.default
+local active_layer_button_style = commons.buttons.green
 
 local green_button = commons.buttons.green
 local red_button = commons.buttons.red
@@ -38,11 +41,12 @@ local default_button = commons.buttons.default
 local mini_size = 16
 local mini_style = prefix .. "_mini_button"
 
-
 local function np(name)
     return prefix .. "-product-panel." .. name
 end
 
+local goto_button_name = np("goto_button")
+local layer_button_name = np("layer")
 local product_panel_name = np("frame")
 local input_qty_name = np("frame")
 local location_name = np("location")
@@ -82,7 +86,7 @@ function product_panel.create(player_index)
         title                = get_production_title(g),
         is_draggable         = true,
         close_button_name    = np("close"),
-        close_button_tooltip = np("close_button_tooltip"),
+        close_button_tooltip = { np("close_button_tooltip") },
         title_menu_func      = function(flow)
             local b
 
@@ -195,6 +199,83 @@ function product_panel.create(player_index)
         product_frame.visible = false
     end
 end
+
+local default_button_style = commons.prefix .. "_small_slot_button_default"
+local selected_button_style = commons.prefix .. "_small_slot_button_green"
+
+---@param player LuaPlayer
+---@return {[string]:boolean}
+function product_panel.get_scanned_recipes(player)
+    local vars = tools.get_vars(player)
+
+    ---@type {[string]:boolean}?
+    local scanned_recipes = vars.scanned_recipes
+    if not scanned_recipes then
+        scanned_recipes = gutils.get_scanned_recipes(player)
+        vars.scanned_recipes = scanned_recipes
+    end
+    return scanned_recipes
+end
+
+---Register commons.show_current_recipe event
+---@param data any
+tools.register_user_event(commons.refresh_machine_list, function(data)
+    ---@type Graph
+    local g = data.g
+    if not g then return end
+    local player = g.player
+    local recipe_name = data.recipe_name --[[@as string]]
+
+    local ppanel = player.gui.screen[product_panel_name]
+    if not ppanel then return end
+
+    local machine_container = tools.get_child(ppanel, "machine_container")
+    if not machine_container then return end
+
+    local scanned_recipes = product_panel.get_scanned_recipes(player)
+    local visu
+    for _, line in pairs(machine_container.children) do
+        local recipe_row = line["recipe_row"]
+        if recipe_row then
+            local goto_button = recipe_row[goto_button_name]
+            local layer_button = line[layer_button_name]
+
+            local sprite = arrow_sprite_white
+            local style = default_button_style
+            local line_recipe_name = line.tags.recipe_name
+            if recipe_name then
+                if line_recipe_name == recipe_name then
+                    sprite = arrow_sprite_green
+                    visu = goto_button
+                    style = selected_button_style
+                end
+                if goto_button.sprite ~= sprite then
+                    goto_button.sprite = sprite
+                end
+                if goto_button.style.name ~= style then
+                    goto_button.style = style
+                end
+                goto_button.style.size = 24
+                goto_button.style.margin = 5
+            end
+
+            if layer_button then
+                local layer_style = layer_button_style
+                if scanned_recipes[line_recipe_name] then
+                    layer_style = active_layer_button_style
+                end
+                if layer_button.style.name ~= layer_style then
+                    layer_button.style = layer_style
+                end
+                local grecipe = g.recipes[line_recipe_name]
+                layer_button.elem_value  = tools.sprite_to_signal(grecipe.layer)
+            end
+        end
+    end
+    if visu then
+        machine_container.parent.scroll_to_element(visu, "in-view")
+    end
+end)
 
 ---@param g Graph
 ---@param product_name string
@@ -456,6 +537,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_click,
                 ::skip::
             end
             drawing.draw_layers(g)
+            gutils.refresh_machine_list(g)
         elseif not (e.button ~= defines.mouse_button_type.left or e.control or e.shift) then
             local vinput = get_vinput(e.element.parent)
             if not vinput then return end
@@ -665,13 +747,16 @@ end
 ---@param machine ProductionMachine
 ---@param manual_mode boolean ?
 ---@param color_values  {[string]:number}?
-local function create_product_line(container, machine, manual_mode, color_values)
+---@param active boolean?
+local function create_product_line(container, machine, manual_mode, color_values, active)
     local line1 = container.add { type = "flow", direction = "horizontal" }
     line1.style.minimal_height = 40
+    line1.tags = { recipe_name = machine.recipe.name }
 
     local count
+    local grecipe = machine.grecipe
     if manual_mode then
-        count = machine.grecipe.mcount
+        count = grecipe.mcount
     else
         count = machine.count
     end
@@ -712,11 +797,30 @@ local function create_product_line(container, machine, manual_mode, color_values
     frecipe.locked = true
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
+    local slayer = nil
+    if grecipe.layer then
+        slayer = tools.sprite_to_signal(grecipe.layer)
+    end
+    local flayer = line1.add {
+        type = "choose-elem-button",
+        elem_type = "signal",
+        signal = slayer,
+        style = layer_button_style,
+        name = layer_button_name,
+        tooltip = { np("layer-tooltip")}
+    }
+    flayer.style.right_margin = 5
+    flayer.locked = true
+    if active then
+        flayer.style = active_layer_button_style
+    end
+    -- tools.set_name_handler(frecipe, np("tag"), { recipe_name = machine.name })
+
     line = line1.add { type = "line", direction = "vertical" }
     line.style.left_margin = 5
     line.style.right_margin = 8
 
-    local recipe_row = line1.add { type = "table", column_count = 7 }
+    local recipe_row = line1.add { type = "table", column_count = 7, name = "recipe_row" }
 
     for _, ingredient in pairs(machine.recipe.ingredients) do
         local type = ingredient.type
@@ -726,7 +830,12 @@ local function create_product_line(container, machine, manual_mode, color_values
             local value = color_values[ingredient_name] or 0
             if value >= 0 then style = green_button else style = red_button end
         end
-        b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = ingredient.name, fluid = ingredient.name, style = style }
+        b = recipe_row.add { type = "choose-elem-button",
+            elem_type = type,
+            item = ingredient.name,
+            fluid = ingredient.name,
+            style = style
+        }
         b.locked = true
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name })
 
@@ -739,7 +848,7 @@ local function create_product_line(container, machine, manual_mode, color_values
     -- local col2 = container.add { type = "flow", direction = "horizontal" }
     local b = recipe_row.add {
         type = "sprite-button",
-        name = np("goto"),
+        name = goto_button_name,
         tooltip = { np("goto-tooltip") },
         mouse_button_filter = { "left" },
         sprite = arrow_sprite_white,
@@ -1023,8 +1132,11 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
             end
         end
     end
+
+    local scanned_recipes = product_panel.get_scanned_recipes(player)
     for _, machine in pairs(machines) do
-        create_product_line(machine_container, machine, manual_mode, color_values)
+        local active = scanned_recipes[machine.grecipe.name]
+        create_product_line(machine_container, machine, manual_mode, color_values, active)
 
         local count = math.ceil(machine.count or 0)
         if count > 0 and machine.machine then
@@ -1729,161 +1841,10 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     gutils.exit(player)
                 end
                 local recipe_name = e.element.tags.recipe_name --[[@as string]]
-                product_panel.show_machine(player, recipe_name)
+                gutils.show_machine(player, recipe_name)
             end
         end
     end)
-
-local ingredient_color = colors.ingredient
-local production_color = colors.production
-local display_time = 5 * 60
-
----@param player LuaPlayer
----@param recipe_name string?
-function product_panel.show_machine(player, recipe_name)
-    local g = gutils.get_graph(player)
-    if not recipe_name then return end
-    local grecipe = g.recipes[recipe_name]
-    if not grecipe then return end
-
-    local machine = grecipe.machine
-    if not machine or not machine.machine then return end
-
-    local surface = player.surface
-    local entities = surface.find_entities_filtered {
-        type = { "furnace", "assembling-machine", "rocket-silo" },
-        position = player.position, radius = 100
-    }
-    local count = 0
-    if #entities > 0 then
-        local main_color = colors.main
-        local ingredient_color = colors.ingredient
-        local product_color = colors.production
-
-        local i_map = {}
-        for _, i in pairs(grecipe.ingredients) do
-            for r_name, r in pairs(i.product_of) do
-                i_map[r_name] = { recipe = r, product = i }
-            end
-        end
-
-        local p_map = {}
-        for _, p in pairs(grecipe.products) do
-            for r_name, r in pairs(p.ingredient_of) do
-                p_map[r_name] = { recipe = r, product = p }
-            end
-        end
-
-        i_map[recipe_name] = nil
-        p_map[recipe_name] = nil
-
-        local function draw_entity(entity, color)
-            local w = entity.tile_width / 2
-            local h = entity.tile_height / 2
-            rendering.draw_rectangle {
-                surface = surface,
-                color = color,
-                left_top = { entity = entity, offset = { -w, -h } },
-                right_bottom = { entity = entity, offset = { w, h } },
-                width = 2,
-                time_to_live = display_time
-            }
-        end
-
-        local main_entity
-        local ingredient_links = {}
-        local product_links = {}
-        local player_pos = player.position
-        local dist
-        for _, entity in pairs(entities) do
-            local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
-            if crecipe then
-                local cname = crecipe.name
-                if cname == recipe_name then
-                    draw_entity(entity, main_color)
-                    local newdist = tools.distance(player_pos, entity.position)
-                    if not main_entity or newdist < dist then
-                        main_entity = entity
-                        dist = newdist
-                    end
-                    count = count + 1
-                elseif i_map[cname] then
-                    draw_entity(entity, ingredient_color)
-                    local p = i_map[cname]
-                    table.insert(ingredient_links, { entity = entity, recipe = p.recipe, product = p.product })
-                elseif p_map[cname] then
-                    draw_entity(entity, product_color)
-                    local p = p_map[cname]
-                    table.insert(product_links, { entity = entity, recipe = p.recipe, product = p.product })
-                end
-            end
-        end
-        if main_entity then
-            local mp = main_entity.position
-            local mx = mp.x
-            local my = mp.y
-            local function draw_link(color, other, product)
-                local op = other.position
-                local ox = op.x
-                local oy = op.y
-                rendering.draw_line {
-                    color = color,
-                    from = mp,
-                    to = op,
-                    surface = surface,
-                    time_to_live = display_time,
-                    width = 2,
-                    draw_on_ground = false
-                }
-
-                local textpos = { x = (mx + ox) / 2, y = (my + oy) / 2 }
-
-                local radius = 1
-                rendering.draw_circle {
-                    surface = surface,
-                    color = { 0, 0, 0 },
-                    filled = true,
-                    time_to_live = display_time,
-                    radius = radius,
-                    target = textpos
-                }
-
-                rendering.draw_circle {
-                    surface = surface,
-                    color = color,
-                    filled = false,
-                    time_to_live = display_time,
-                    radius = radius,
-                    target = textpos,
-                    width = 2,
-                }
-
-                local text = tools.text_sprite(tools.id_to_signal(product.name))
-                rendering.draw_text {
-                    text = text,
-                    surface = surface,
-                    target = textpos,
-                    color = color,
-                    orientation = 0,
-                    alignment = "center",
-                    vertical_alignment = "middle",
-                    time_to_live = display_time,
-                    use_rich_text = true,
-                    scale = 1.8
-                }
-            end
-            for _, i in pairs(ingredient_links) do
-                draw_link(ingredient_color, i.entity, i.product)
-            end
-            for _, p in pairs(product_links) do
-                draw_link(product_color, p.entity, p.product)
-            end
-        end
-    end
-    player.print({ np("machine_report"), count })
-end
-
-drawing.show_machine = product_panel.show_machine
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
@@ -1975,6 +1936,7 @@ tools.on_named_event(np("tag_used"), defines.events.on_gui_click,
         end
         graph.refresh(g.player, true)
         gutils.fire_selection_change(g)
+        gutils.refresh_machine_list(g)
     end)
 
 
@@ -2009,7 +1971,7 @@ tools.on_named_event(np("manual_mode"), defines.events.on_gui_click,
         tools.fire_user_event(commons.production_data_change_event, { g = g })
     end)
 
-tools.on_gui_click(np("goto"),
+tools.on_gui_click(goto_button_name,
     ---@param e EventData.on_gui_click
     function(e)
         local player = game.players[e.player_index]
@@ -2029,20 +1991,36 @@ tools.on_gui_click(np("goto"),
                 else
                     gutils.move_view(player, position)
                 end
-                product_panel.close(player)
+                -- product_panel.close(player)
             else
-                product_panel.show_machine(player, recipe_name)
+                gutils.show_machine(player, recipe_name, true)
             end
         else
             if g.surface == player.surface then
                 gutils.exit(player)
-                product_panel.show_machine(player, recipe_name)
+                gutils.show_machine(player, recipe_name, true)
             else
                 gutils.enter(player, recipe_name)
             end
         end
+        if recipe_name then
+            gutils.refresh_machine_list(g, recipe_name)
+        end
     end)
 
 msettings_panel.create_product_line = create_product_line
+
+
+tools.on_configuration_changed(
+---@param data ConfigurationChangedData
+    function(data)
+        for _, player in pairs(game.players) do
+            if (player.gui.screen[product_panel_name]) then
+                product_panel.close(player)
+            end
+        end
+    end)
+
+
 
 return product_panel

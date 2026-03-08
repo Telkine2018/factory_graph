@@ -135,7 +135,7 @@ local function on_switch_surface_by_key(e)
         if type == "assembling-machine" or type == "furnace" then
             recipe = selected.get_recipe()
             if not recipe and type == "furnace" then
-                recipe = selected.previous_recipe
+                recipe = selected.previous_recipe and  selected.previous_recipe.name
             end
         end
     end
@@ -661,7 +661,7 @@ local function import_entities(e, clear)
         if entity.type == "assembling-machine" or entity.type == "furnace" then
             local recipe = entity.get_recipe()
             if not recipe and entity.type == "furnace" then
-                recipe = entity.previous_recipe.name
+                recipe = entity.previous_recipe and entity.previous_recipe.name
             end
             if recipe then
                 g.selection[recipe.name] = g.recipes[recipe.name]

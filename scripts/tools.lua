@@ -1239,4 +1239,36 @@ function tools.build_virtual_signal(name)
     return { type = "virtual", name = name, comparator = "=", quality = "normal" }
 end
 
+
+---@class BackgroundCommand
+---@field event_name string
+---@field player LuaPlayer?
+
+---@param command BackgroundCommand
+function tools.background_exec(command) 
+    if not storage.background_queue then
+        storage.background_queue = {data}
+    else
+        local queue = storage.background_queue --[[@as BackgroundCommand[] ]]
+        for _, cmd in pairs(queue) do
+            if cmd.player == command.player and cmd.event_name == command.event_name then
+                return
+            end
+        end
+        table.insert(queue, command)
+    end
+end
+
+if script then
+    tools.on_nth_tick(10, function(data) 
+        local queue = storage.background_queue
+        if not queue or table_size(queue) == 0 then
+            return
+        end
+        local command = table.remove(queue, 1)
+        local event_name = command.event_name
+        tools.fire_user_event(event_name, command)
+    end)
+end
+
 return tools

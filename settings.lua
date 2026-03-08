@@ -34,6 +34,14 @@ data:extend(
 			default_value = true
 		},
 		{
+			type = "int-setting",
+			name = prefix .. "-scan-radius",
+			setting_type = "runtime-per-user",
+			default_value = 150,
+			minimum_value = 50,
+			maximum_value = 1000
+		},
+		{
 			type = "string-setting",
 			setting_type = "runtime-global",
 			name = prefix .. "-auto_layout",

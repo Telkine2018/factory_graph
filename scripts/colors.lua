@@ -5,9 +5,9 @@ local gutils = require("scripts.gutils")
 
 local colors = {}
 
-colors.ingredient = { 1, 0, 0 }
-colors.production = { 255, 106, 0 }
-colors.main = { 1, 1, 0 }
+colors.ingredient = commons.colors.ingredient
+colors.production = commons.colors.production
+colors.main = commons.colors.main
 
 local color_func = {
     [0] = function(c, x, m) return { c, x, 0 } end,

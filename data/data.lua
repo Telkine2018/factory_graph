@@ -169,6 +169,16 @@ add(sprite)
 
 sprite = {
   type = "sprite",
+  name = prefix .. "_arrow-green",
+  filename = png("arrow-green"),
+  width = 16,
+  height = 16
+}
+add(sprite)
+
+
+sprite = {
+  type = "sprite",
   name = prefix .. "_refresh_black",
   filename = png("refresh_black"),
   width = 32,

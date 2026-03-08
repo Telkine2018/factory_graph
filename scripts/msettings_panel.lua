@@ -520,7 +520,7 @@ function msettings.report(player)
     if grecipe then
         machine = grecipe.machine
     end
-    if machine and machine.count < 0 then
+    if machine and (not machine.count or machine.count < 0) then
         machine = nil
     end
     if not machine then
@@ -575,6 +575,7 @@ function msettings.open_selection(player)
     if not grecipe then return end
 
     if not grecipe.is_product then
+        gutils.refresh_machine_list(g, grecipe.name)
         msettings.create(player.index, grecipe)
     else
         local product = g.products[grecipe.name]

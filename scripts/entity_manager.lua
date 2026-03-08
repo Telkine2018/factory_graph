@@ -11,17 +11,29 @@ local entity_manager = {}
 local surface_prefix_filter = commons.surface_prefix_filter
 local entity_names = { commons.recipe_symbol_name, commons.unresearched_symbol_name, commons.product_symbol_name }
 
+local assembly_mask = {
+    ["furnace"] = true,
+    ["assembling-machine"] = true,
+    ["rocket-silo"] = true
+}
+
 local build_entity_filter = {
     { filter = 'name', name = commons.recipe_symbol_name },
     { filter = 'name', name = commons.product_symbol_name },
     { filter = 'name', name = commons.unresearched_symbol_name },
     { filter = 'name', name = "entity-ghost" },
+    { filter = 'type', type = "furnace" },
+    { filter = 'type', type = "assembling-machine" },
+    { filter = 'type', type = "rocket-silo" }
 }
 
 local mine_entity_filter = {
     { filter = 'name', name = commons.recipe_symbol_name },
     { filter = 'name', name = commons.product_symbol_name },
     { filter = 'name', name = commons.unresearched_symbol_name },
+    { filter = 'type', type = "furnace" },
+    { filter = 'type', type = "assembling-machine" },
+    { filter = 'type', type = "rocket-silo" }
 }
 
 ---@param e  EventData.on_player_mined_entity
@@ -30,6 +42,10 @@ local function do_mine(e, to_cursor)
     local entity = e.entity
 
     if not entity or not entity.valid then return end
+    if assembly_mask[entity.type] then
+        gutils.post_clear_scanned_recipes();
+        return
+    end
 
     local surface = entity.surface
     local surface_name = surface.name
@@ -49,7 +65,7 @@ local function do_mine(e, to_cursor)
     ---@cast grecipe GRecipe
 
     if not grecipe then return end
-    
+
     if grecipe.visible then
         graph.remove_recipe_visibility(g, grecipe)
         grecipe.entity = nil
@@ -90,6 +106,10 @@ tools.on_event(defines.events.script_raised_destroy, on_mined, mine_entity_filte
 ---@param  revive boolean?
 local function on_build(entity, e, revive)
     if not entity or not entity.valid then return end
+    if assembly_mask[entity.type] then
+        gutils.post_clear_scanned_recipes();
+        return
+    end
 
     local position = entity.position
     local surface = entity.surface

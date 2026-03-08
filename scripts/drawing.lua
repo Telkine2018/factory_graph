@@ -52,11 +52,7 @@ local select_modes = {
     "ingredient_and_product"
 }
 
-local recipe_entity_names = {
-    [commons.recipe_symbol_name] = true,
-    [commons.product_symbol_name] = true,
-    [commons.unresearched_symbol_name] = true,
-}
+local recipe_entity_names = commons.recipe_entity_names
 
 local null_value
 
@@ -1303,25 +1299,7 @@ local function on_control_click(e)
     end
 end
 
----@param player LuaPlayer
-local function show_machine_from_selection(player)
-    local g = gutils.get_graph(player);
-    if not g then return end
-
-    local entity = player.selected
-    if not entity or not entity.valid then return end
-
-    if not recipe_entity_names[entity.name] then return end
-
-    ---@type GRecipe
-    local grecipe = g.entity_map[entity.unit_number]
-    if not grecipe then return end
-
-    gutils.exit(player)
-    drawing.show_machine(player, grecipe.name)
-end
-
---- Show connected machine to current one
+--- Show detail on 
 local function on_control_click4(e)
     local player = game.players[e.player_index]
 
@@ -1336,18 +1314,23 @@ local function on_control_click4(e)
         if type ~= "furnace" and type ~= "assembling-machine" then return end
 
         local entity = selected
-        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
 
         if recipe then
-            drawing.show_machine(player, recipe.name)
+            gutils.refresh_machine_list(g, recipe.name)
+            gutils.show_machine(player, recipe.name, true)
         end
     else
-        show_machine_from_selection(player)
+        local grecipe = gutils.get_selected_recipe_in_graph(player)
+        if grecipe then
+            gutils.refresh_machine_list(g, grecipe.name)
+        end
     end
 end
 
 --- Select a recipe in graph
 local function on_control_click5(e)
+    ---@type LuaPlayer
     local player = game.players[e.player_index]
 
     local g = gutils.get_graph(player);
@@ -1361,13 +1344,13 @@ local function on_control_click5(e)
         if type ~= "furnace" and type ~= "assembling-machine" then return end
 
         local entity = selected
-        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe)
+        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
         if recipe then
-            player.print("Recipe:" .. recipe.name)
+            gutils.refresh_machine_list(g, recipe.name)
             gutils.enter(player, recipe.name)
         end
     else
-        show_machine_from_selection(player)
+        gutils.show_machine_from_selection(player)
     end
 end
 
@@ -1611,6 +1594,7 @@ local function on_control_click2(e)
         local current_layer = g.current_layer or "virtual-signal/signal-yellow"
         g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
         drawing.draw_layers(g)
+        gutils.refresh_machine_list(g)
     end
 end
 
