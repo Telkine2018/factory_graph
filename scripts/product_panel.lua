@@ -1068,6 +1068,8 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
     local player = g.player
     local vars = tools.get_vars(player)
 
+    gutils.reset_scanned_recipes(player)
+
     machine_container.clear()
     if not g.selection then return end
 

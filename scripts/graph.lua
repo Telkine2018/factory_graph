@@ -1184,6 +1184,7 @@ function graph.load_saving(g, data)
             selection[grecipe.name] = current
             current.layer = tools.check_sprite(grecipe.layer)
             current.mcount = grecipe.mcount
+            current.production_config = grecipe.production_config
             if grecipe.col then
                 set_recipe_location(g, current, grecipe.col, grecipe.line)
             end

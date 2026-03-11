@@ -1299,7 +1299,31 @@ local function on_control_click(e)
     end
 end
 
---- Show detail on 
+---@param player LuaPlayer
+local function open_query(player)
+    local product_name
+    if player.cursor_stack and player.cursor_stack.count > 0 then
+        product_name = player.cursor_stack.name
+    elseif player.cursor_ghost and player.cursor_ghost.name  then
+        product_name = player.cursor_ghost.name.name
+    else
+        local selected = player.selected
+        if selected and selected.valid then
+            local items = selected.prototype.items_to_place_this
+            if items and #items > 0 then
+                product_name = items[1].name
+            end
+        end
+    end
+    if product_name then
+        tools.fire_user_event(commons.query_product, {
+            player = player,
+            product_name = "item/" .. product_name
+        })
+    end
+end
+
+--- Show detail on
 local function on_control_click4(e)
     local player = game.players[e.player_index]
 
@@ -1307,18 +1331,22 @@ local function on_control_click4(e)
     if not g then return end
 
     local selected = player.selected
-    if selected == nil or not selected.valid then return end
+    if selected == nil or not selected.valid then 
+        open_query(player)
+        return 
+    end
 
     if player.surface ~= g.surface then
         local type = selected.type
-        if type ~= "furnace" and type ~= "assembling-machine" then return end
-
-        local entity = selected
-        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
-
-        if recipe then
-            gutils.refresh_machine_list(g, recipe.name)
-            gutils.show_machine(player, recipe.name, true)
+        if type ~= "furnace" and type ~= "assembling-machine" then
+            open_query(player)
+        else
+            local entity = selected
+            local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
+            if recipe then
+                gutils.refresh_machine_list(g, recipe.name)
+                gutils.show_machine(player, recipe.name, true)
+            end
         end
     else
         local grecipe = gutils.get_selected_recipe_in_graph(player)

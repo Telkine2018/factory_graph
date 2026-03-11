@@ -791,16 +791,20 @@ tools.on_named_event(np("choose_recipe"), defines.events.on_gui_elem_changed,
     end)
 
 ---@param player LuaPlayer
----@param name string
-function recipe_selection.process_query(player, name)
+---@param product_name string
+function recipe_selection.process_query(player, product_name)
     local g = gutils.get_graph(player)
 
     local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then
+        recipe_selection.open(g, { product = g.products[product_name] })
+        return
+    end
     local faction = tools.get_child(frame, np("action"))
     local action = faction and faction.selected_index or 1
     local recipes = {}
 
-    local gproduct = g.products[name]
+    local gproduct = g.products[product_name]
     if gproduct then
         if action == 1 then
             for _, grecipe in pairs(gproduct.ingredient_of) do
@@ -810,7 +814,7 @@ function recipe_selection.process_query(player, name)
                 recipes[grecipe.name] = grecipe
             end
         elseif action == 2 then
-            local target_products = { [name] = gproduct }
+            local target_products = { [product_name] = gproduct }
             local found_products = gutils.get_output_products(g)
             while (true) do
                 local _, product = next(target_products)
@@ -1029,6 +1033,13 @@ tools.register_user_event(commons.open_recipe_selection, function(data)
     local g = data.g
     recipe_selection.open(g, data)
 end)
+
+tools.register_user_event(commons.query_product, function(data) 
+    local product_name = data.product_name
+    local player = data.player
+    recipe_selection.process_query(player, product_name)
+end
+)
 
 drawing.open_recipe_selection = recipe_selection.open
 graph.update_recipe_selection = recipe_selection.update_recipes

@@ -31,6 +31,7 @@ local commons = {
     visibility_layers = 3,
     add_debug_info = false,
 
+    -- Commands
     selection_change_event = "selection_change",
     production_compute_event = "production_compute",
     production_data_change_event = "production_data_change",
@@ -40,6 +41,8 @@ local commons = {
     refresh_machine_list = "refresh_machine_list",
     clear_scanned_recipes = "clear_scanned_recipes",
     show_implemented = "show_implemented",
+    query_product = "query_product",
+
 
     math_precision = 0.000001,
     production_failures = {

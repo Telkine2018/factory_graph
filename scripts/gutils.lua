@@ -739,11 +739,11 @@ function gutils.show_machine(player, recipe_name, move_player)
     local machine = grecipe.machine
     if not machine or not machine.machine then return end
 
-    local surface = player.surface
+    local surface, player_position = gutils.get_real_surface(player)
     local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
     local entities = surface.find_entities_filtered {
         type = { "furnace", "assembling-machine", "rocket-silo" },
-        position = player.position, radius = show_machine_radius
+        position = player_position, radius = show_machine_radius
     }
     local count = 0
     if #entities > 0 then
@@ -784,7 +784,7 @@ function gutils.show_machine(player, recipe_name, move_player)
         local main_entity
         local ingredient_links = {}
         local product_links = {}
-        local player_pos = player.position
+        local player_pos = player_position
         local dist
         for _, entity in pairs(entities) do
             local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
@@ -876,7 +876,7 @@ function gutils.show_machine(player, recipe_name, move_player)
             for _, p in pairs(product_links) do
                 draw_link(product_color, p.entity, p.product)
             end
-            if move_player and main_entity then
+            if move_player and main_entity and surface == player.surface then
                 if tools.distance(player.position, main_entity.position) > 30 then
                     player.set_controller {
                         type = defines.controllers.remote,
@@ -938,39 +938,53 @@ end
 ---@param player LuaPlayer
 ---@return {[string]:boolean}
 function gutils.get_scanned_recipes(player)
-    local surface = gutils.get_real_surface(player)
+    local vars = tools.get_vars(player)
+
+    ---@type {[string]:boolean}?
+    local scanned_recipes = vars.scanned_recipes
+    if scanned_recipes then
+        return scanned_recipes
+    end
+
+    local surface, player_position = gutils.get_real_surface(player)
     local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
     local entities = surface.find_entities_filtered {
         type = { "furnace", "assembling-machine", "rocket-silo" },
-        position = player.position, radius = show_machine_radius
+        position = player_position, radius = show_machine_radius
     }
+
     ---@type {[string]:boolean}
-    local result = {}
+    scanned_recipes = {}
     for _, entity in pairs(entities) do
         local crecipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
         if crecipe then
-            result[crecipe.name] = true
+            scanned_recipes[crecipe.name] = true
         end
     end
-    return result
+    vars.scanned_recipes = scanned_recipes
+    return scanned_recipes
 end
 
 ---@param player LuaPlayer
 ---@return LuaSurface
+---@return MapPosition
 function gutils.get_real_surface(player)
 
     local vars = tools.get_vars(player)
-    local character = vars.character
-    if character and character.valid then
-        return character.surface
+    local surface = player.surface
+    local g = gutils.get_graph(player)
+    if surface ~= g.surface then
+        return surface, player.position
+    else
+        if vars.extern_surface and vars.extern_surface.valid then
+            return vars.extern_surface , vars.extern_position or player.position
+        end
+        return game.surfaces("nauvis"), player.position
     end
-    if vars.extern_surface and vars.extern_surface.valid then
-        return vars.extern_surface 
-    end
-    return game.surfaces("nauvis")
 end
 
-function gutils.clear_scanned_recipes()
+function gutils.clear_scanned_recipes(data)
+
     for _, player in pairs(game.players) do
         local vars = tools.get_vars(player)
         vars.scanned_recipes = nil
@@ -983,7 +997,20 @@ end
 
 tools.register_user_event(commons.clear_scanned_recipes, gutils.clear_scanned_recipes)
 
-function gutils.post_clear_scanned_recipes() 
+---@param player LuaPlayer
+---@param refresh boolean?
+function gutils.reset_scanned_recipes(player, refresh)
+    local vars = tools.get_vars(player)
+    vars.scanned_recipes = nil
+    if refresh then
+        local g = gutils.get_graph(player)
+        if g then
+            gutils.refresh_machine_list(g, nil)
+        end
+    end
+end
+
+function gutils.post_clear_scanned_recipes()
 
     ---@type BackgroundCommand
     local command = {
@@ -992,5 +1019,26 @@ function gutils.post_clear_scanned_recipes()
     }
     tools.background_exec(command)
 end
+
+tools.on_event(defines.events.on_player_changed_position, 
+---@param e EventData.on_player_changed_position
+function(e)
+    local player = game.players[e.player_index]
+    local surface = gutils.get_real_surface(player)
+    if surface ~= player.surface then return end
+
+    local vars = tools.get_vars(player)
+    local player_position = player.position
+
+    local position = vars.scanned_position
+    if position then
+        if math.max(math.abs(position.x - player_position.x), math.abs(position.y - player_position.y)) < 10 then
+            return
+        end
+    end
+    vars.scanned_position = player_position
+    gutils.reset_scanned_recipes(player, true)
+end
+)
 
 return gutils

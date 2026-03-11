@@ -478,6 +478,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             local data = helpers.json_to_table(json) --[[@as SavingData]]
             graph.import_saving(g, data)
         end
+        gutils.reset_scanned_recipes(player, true)
     end)
 
 tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
