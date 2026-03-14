@@ -1282,6 +1282,9 @@ function tools.find_missing_ingredients(character, item, count)
     local inv = character.get_main_inventory()
     if not inv then return nil end
 
+    local crafting_categories = character.prototype.crafting_categories
+    if not crafting_categories then return nil end
+
     local contents = inv.get_contents();
     local content_map = {}
 
@@ -1296,15 +1299,13 @@ function tools.find_missing_ingredients(character, item, count)
     local missing = {}
     local to_process = { [item] = count }
 
-    local crafting_categories = character.prototype.crafting_categories
-    if not crafting_categories then return nil end
-
     local filters = {}
     local recipe_ref = { filter = "name", name = item }
     table.insert(filters, { filter = "hidden", mode = "and", invert = true })
     table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
 
     local used = {}
+    local checking = {}
     while (true) do
         local name, count = next(to_process)
         if not name then break end
@@ -1312,10 +1313,11 @@ function tools.find_missing_ingredients(character, item, count)
         to_process[name] = nil
         local content_count = (content_map[name] or 0)
         local remaining = content_count - count
-        if remaining >= 0 then
+        if remaining >= 0 or checking[name] then
             content_map[name] = remaining
             used[name] = (used[name] or 0) + count
         else
+            checking[name] = true
             if content_count > 0 then
                 used[name] = (used[name] or 0) + content_count
             end
@@ -1354,6 +1356,9 @@ function tools.find_missing_ingredients(character, item, count)
                 end
             end
             if not done then
+                if name == item then
+                    return nil,nil
+                end
                 missing[name] = (missing[name] or 0) + needed
             end
         end

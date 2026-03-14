@@ -1602,13 +1602,13 @@ function product_panel.create_parts_tooltip(player, machine_entity)
     if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
-            local missing, used = gutils.find_missing_ingredients(player, machine_item, 1)
+            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, 1)
 
             if not used then
                 local machine_recipes =
                     prototypes.get_recipe_filtered { {
                         filter = "has-product-item",
-                        elem_filters = { { filter = "name", name = machine_item } } } }
+                        elem_filters = { { filter = "name", name = machine_item.name } } } }
 
                 local machine_recipe
                 for _, mp in pairs(machine_recipes) do
@@ -1665,6 +1665,13 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         end
 
         if machine and machine.machine then
+            if #parts > 16 then
+                local newparts = {}
+                for i = 1, 16 do
+                    table.insert(newparts, parts[i])
+                end
+                parts = newparts
+            end
             e.element.tooltip = { np("machine-tooltip"), { "", tools.fround(machine.count), " x ", machine.machine.localised_name }, parts }
         else
             e.element.tooltip = { np("machine-tooltip"), "" }
