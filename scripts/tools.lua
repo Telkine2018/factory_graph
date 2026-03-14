@@ -1271,4 +1271,94 @@ if script then
     end)
 end
 
+
+---@param character LuaEntity
+---@param  item string
+---@param  count integer
+---@return {[string]:integer}?
+---@return {[string]:integer}?
+function tools.find_missing_ingredients(character, item, count)
+
+    local inv = character.get_main_inventory()
+    if not inv then return nil end
+
+    local contents = inv.get_contents();
+    local content_map = {}
+
+    -- Get normal content
+    for _, elem in pairs(contents) do
+        if elem.quality == "normal" or not elem.quality then
+            content_map[elem.name] = elem.count
+        end
+    end
+    content_map[item] = 0
+
+    local missing = {}
+    local to_process = { [item] = count }
+
+    local crafting_categories = character.prototype.crafting_categories
+    if not crafting_categories then return nil end
+
+    local filters = {}
+    local recipe_ref = { filter = "name", name = item }
+    table.insert(filters, { filter = "hidden", mode = "and", invert = true })
+    table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
+
+    local used = {}
+    while (true) do
+        local name, count = next(to_process)
+        if not name then break end
+
+        to_process[name] = nil
+        local content_count = (content_map[name] or 0)
+        local remaining = content_count - count
+        if remaining >= 0 then
+            content_map[name] = remaining
+            used[name] = (used[name] or 0) + count
+        else
+            if content_count > 0 then
+                used[name] = (used[name] or 0) + content_count
+            end
+            content_map[name] = nil
+
+            recipe_ref.name = name
+            local recipes = prototypes.get_recipe_filtered(filters)
+            local needed = -remaining
+
+            local iter = 1
+            local done
+            for _, recipe in pairs(recipes) do
+                if crafting_categories[recipe.category] then
+                    -- Get iteration count of recipe
+                    for _, product in pairs(recipe.products) do
+                        if product.name == name then
+                            if product.amount then
+                                iter = math.ceil(needed / product.amount)
+                            else
+                                iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
+                            end
+                            break
+                        end
+                    end
+
+                    for _, ingredient in pairs(recipe.ingredients) do
+                        if ingredient.type == "item" then
+                            local amount = ingredient.amount * iter
+                            to_process[ingredient.name] = (to_process[ingredient.name] or 0) + amount
+                        else
+                            return nil, nil
+                        end
+                    end
+                    done = true
+                    break
+                end
+            end
+            if not done then
+                missing[name] = (missing[name] or 0) + needed
+            end
+        end
+    end
+    return missing, used
+end
+
 return tools
