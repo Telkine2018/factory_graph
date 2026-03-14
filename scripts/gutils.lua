@@ -740,6 +740,7 @@ function gutils.show_machine(player, recipe_name, move_player)
     if not machine or not machine.machine then return end
 
     local surface, player_position = gutils.get_real_surface(player)
+    if not surface or not player_position then return end
     local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
     local entities = surface.find_entities_filtered {
         type = { "furnace", "assembling-machine", "rocket-silo" },
@@ -947,6 +948,7 @@ function gutils.get_scanned_recipes(player)
     end
 
     local surface, player_position = gutils.get_real_surface(player)
+    if not surface or not player_position then return {} end
     local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value
     local entities = surface.find_entities_filtered {
         type = { "furnace", "assembling-machine", "rocket-silo" },
@@ -966,13 +968,14 @@ function gutils.get_scanned_recipes(player)
 end
 
 ---@param player LuaPlayer
----@return LuaSurface
----@return MapPosition
+---@return LuaSurface?
+---@return MapPosition?
 function gutils.get_real_surface(player)
 
     local vars = tools.get_vars(player)
     local surface = player.surface
     local g = gutils.get_graph(player)
+    if g == nil then return nil, nil end
     if surface ~= g.surface then
         return surface, player.position
     else
@@ -1025,6 +1028,7 @@ tools.on_event(defines.events.on_player_changed_position,
 function(e)
     local player = game.players[e.player_index]
     local surface = gutils.get_real_surface(player)
+    if not surface then return end 
     if surface ~= player.surface then return end
 
     local vars = tools.get_vars(player)
