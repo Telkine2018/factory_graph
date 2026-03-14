@@ -106,24 +106,6 @@ end
 
 local is_machine_enabled = machinedb.is_machine_enabled
 
----@param player LuaPlayer
----@return LuaInventory?
-local function get_player_inventory(player)
-    ---@type LuaEntity
-    local character = player.character
-    local vars = tools.get_vars(player)
-    if not character and vars.saved_character and vars.saved_character.valid then
-        character = vars.saved_character
-    end
-
-    ---@type LuaInventory?
-    local inv
-    if character then
-        return character.get_main_inventory()
-    end
-    return nil
-end
-
 ---@param g Graph
 ---@param recipe_name string
 ---@param enabled_cache {[string]:boolean}
@@ -148,7 +130,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     local inv
     if g.use_machine_in_inventory then
-        inv = get_player_inventory(g.player)
+        inv = gutils.get_player_inventory(g.player)
     end
 
     if not preferred_machines then

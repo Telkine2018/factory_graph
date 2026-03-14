@@ -895,8 +895,7 @@ end
 ---@return GRecipe?
 ---@return Graph?
 function gutils.get_selected_recipe_in_graph(player)
-
-    local g = gutils.get_graph(player);
+    local g = gutils.get_graph(player)
     if not g then return nil end
 
     local entity = player.selected
@@ -913,7 +912,6 @@ end
 
 ---@param player LuaPlayer
 function gutils.show_machine_from_selection(player)
-
     ---@type GRecipe
     local grecipe, g = gutils.get_selected_recipe_in_graph(player)
     if not grecipe then return end
@@ -971,7 +969,6 @@ end
 ---@return LuaSurface?
 ---@return MapPosition?
 function gutils.get_real_surface(player)
-
     local vars = tools.get_vars(player)
     local surface = player.surface
     local g = gutils.get_graph(player)
@@ -980,14 +977,13 @@ function gutils.get_real_surface(player)
         return surface, player.position
     else
         if vars.extern_surface and vars.extern_surface.valid then
-            return vars.extern_surface , vars.extern_position or player.position
+            return vars.extern_surface, vars.extern_position or player.position
         end
         return game.surfaces("nauvis"), player.position
     end
 end
 
 function gutils.clear_scanned_recipes(data)
-
     for _, player in pairs(game.players) do
         local vars = tools.get_vars(player)
         vars.scanned_recipes = nil
@@ -1014,7 +1010,6 @@ function gutils.reset_scanned_recipes(player, refresh)
 end
 
 function gutils.post_clear_scanned_recipes()
-
     ---@type BackgroundCommand
     local command = {
         event_name = commons.clear_scanned_recipes,
@@ -1023,26 +1018,147 @@ function gutils.post_clear_scanned_recipes()
     tools.background_exec(command)
 end
 
-tools.on_event(defines.events.on_player_changed_position, 
----@param e EventData.on_player_changed_position
-function(e)
-    local player = game.players[e.player_index]
-    local surface = gutils.get_real_surface(player)
-    if not surface then return end 
-    if surface ~= player.surface then return end
+tools.on_event(defines.events.on_player_changed_position,
+    ---@param e EventData.on_player_changed_position
+    function(e)
+        local player = game.players[e.player_index]
+        local surface = gutils.get_real_surface(player)
+        if not surface then return end
+        if surface ~= player.surface then return end
 
-    local vars = tools.get_vars(player)
-    local player_position = player.position
+        local vars = tools.get_vars(player)
+        local player_position = player.position
 
-    local position = vars.scanned_position
-    if position then
-        if math.max(math.abs(position.x - player_position.x), math.abs(position.y - player_position.y)) < 10 then
-            return
+        local position = vars.scanned_position
+        if position then
+            if math.max(math.abs(position.x - player_position.x), math.abs(position.y - player_position.y)) < 10 then
+                return
+            end
+        end
+        vars.scanned_position = player_position
+        gutils.reset_scanned_recipes(player, true)
+    end
+)
+
+---@param player LuaPlayer
+---@param  item string
+---@param  count integer
+---@return {[string]:integer}?
+---@return {[string]:integer}?
+function gutils.find_missing_ingredients(player, item, count)
+
+    local character = gutils.get_character(player)
+    if not character then return nil end
+
+    local inv = character.get_main_inventory()
+    if not inv then return nil end
+
+    local contents = inv.get_contents();
+    local content_map = {}
+
+    -- Get normal content
+    for _, elem in pairs(contents) do
+        if elem.quality == "normal" or not elem.quality then
+            content_map[elem.name] = elem.count
         end
     end
-    vars.scanned_position = player_position
-    gutils.reset_scanned_recipes(player, true)
+    content_map[item] = 0
+
+    local missing = {}
+    local to_process = { [item] = count }
+
+    local crafting_categories = character.prototype.crafting_categories
+    if not crafting_categories then return nil end
+
+    local filters = {}
+    local recipe_ref = { filter = "name", name = item }
+    table.insert(filters, { filter = "hidden", mode = "and", invert = true })
+    table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
+
+    local used = {}
+    while (true) do
+        local name, count = next(to_process)
+        if not name then break end
+
+        to_process[name] = nil
+        local content_count = (content_map[name] or 0)
+        local remaining = content_count - count
+        if remaining >= 0 then
+            content_map[name] = remaining
+            used[name] = (used[name] or 0) + count
+        else
+            if content_count > 0 then
+                used[name] = (used[name] or 0) + content_count
+            end
+            content_map[name] = nil
+
+            recipe_ref.name = name
+            local recipes = prototypes.get_recipe_filtered(filters)
+            local needed = -remaining
+
+            local iter = 1
+            local done
+            for _, recipe in pairs(recipes) do
+                if crafting_categories[recipe.category] then
+                    -- Get iteration count of recipe
+                    for _, product in pairs(recipe.products) do
+                        if product.name == name then
+                            if product.amount then
+                                iter = math.ceil(needed / product.amount)
+                            else
+                                iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
+                            end
+                            break
+                        end
+                    end
+
+                    for _, ingredient in pairs(recipe.ingredients) do
+                        if ingredient.type == "item" then
+                            local amount = ingredient.amount * iter
+                            to_process[ingredient.name] = (to_process[ingredient.name] or 0) + amount
+                        else
+                            return nil, nil
+                        end
+                    end
+                    done = true
+                    break
+                end
+            end
+            if not done then
+                missing[name] = (missing[name] or 0) + needed
+            end
+        end
+    end
+    return missing, used
 end
-)
+
+---@param player LuaPlayer
+---@return LuaInventory?
+function gutils.get_player_inventory(player)
+
+    local character = gutils.get_character(player)
+
+    ---@type LuaInventory?
+    local inv
+    if character then
+        return character.get_main_inventory()
+    end
+    return nil
+end
+
+---@param player LuaPlayer
+---@return LuaEntity?
+function gutils.get_character(player)
+    ---@type LuaEntity
+    local character = player.character
+    if character then return character end
+
+    local vars = tools.get_vars(player)
+    if not character and vars.saved_character and vars.saved_character.valid then
+        character = vars.saved_character
+    end
+    return character
+end
+
 
 return gutils

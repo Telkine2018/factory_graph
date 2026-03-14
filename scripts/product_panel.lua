@@ -267,8 +267,8 @@ tools.register_user_event(commons.refresh_machine_list, function(data)
                 if layer_button.style.name ~= layer_style then
                     layer_button.style = layer_style
                 end
-                local grecipe = g.recipes[line_recipe_name]
-                layer_button.elem_value  = tools.sprite_to_signal(grecipe.layer)
+                local grecipe           = g.recipes[line_recipe_name]
+                layer_button.elem_value = tools.sprite_to_signal(grecipe.layer)
             end
         end
     end
@@ -807,7 +807,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         signal = slayer,
         style = layer_button_style,
         name = layer_button_name,
-        tooltip = { np("layer-tooltip")}
+        tooltip = { np("layer-tooltip") }
     }
     flayer.style.right_margin = 5
     flayer.locked = true
@@ -1319,11 +1319,23 @@ function product_panel.craft_machine(player, item, count)
     end
     if #recipes > 0 then
         for name in pairs(recipes) do
-            local craft_count = player.begin_crafting { recipe = name, count = count }
-            local vars = tools.get_vars(player)
-            vars.current_craft_recipe = name
-            if craft_count > 0 then
-                break
+            local missing = gutils.find_missing_ingredients(player, item, count)
+            if missing and table_size(missing) > 0 then
+                for name, count in pairs(missing) do
+                    player.create_local_flying_text {
+                        text = { np("missing_ingredient"), count, "[item=" .. name .. "]" },
+                        color = { 1, 0, 0 },
+                        create_at_cursor = true,
+                        speed = 2
+                    }
+                end
+            else
+                local craft_count = player.begin_crafting { recipe = name, count = count }
+                local vars = tools.get_vars(player)
+                vars.current_craft_recipe = name
+                if craft_count > 0 then
+                    break
+                end
             end
         end
     end
@@ -1590,24 +1602,40 @@ function product_panel.create_parts_tooltip(player, machine_entity)
     if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
-            local machine_recipes =
-                prototypes.get_recipe_filtered { {
-                    filter = "has-product-item",
-                    elem_filters = { { filter = "name", name = machine_item } } } }
+            local missing, used = gutils.find_missing_ingredients(player, machine_item, 1)
 
-            local machine_recipe
-            for _, mp in pairs(machine_recipes) do
-                machine_recipe = mp
-                break
-            end
-            if machine_recipe then
-                local ingredients = machine_recipe.ingredients
-                for _, p in pairs(ingredients) do
-                    local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
-                    local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
-                    local ptext = {
-                        np("machine_product_tooltip"),
-                        amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
+            if not used then
+                local machine_recipes =
+                    prototypes.get_recipe_filtered { {
+                        filter = "has-product-item",
+                        elem_filters = { { filter = "name", name = machine_item } } } }
+
+                local machine_recipe
+                for _, mp in pairs(machine_recipes) do
+                    machine_recipe = mp
+                    break
+                end
+                if machine_recipe then
+                    local ingredients = machine_recipe.ingredients
+                    for _, p in pairs(ingredients) do
+                        local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
+                        local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
+                        local ptext = {
+                            np("machine_product_tooltip"),
+                            amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
+                        table.insert(parts, ptext)
+                    end
+                end
+            else
+                table.insert(parts, { np("from_inventory") })
+                for name, count in pairs(missing) do
+                    local label = gutils.get_product_name(player, "item/" .. name)
+                    local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
+                    table.insert(parts, ptext)
+                end
+                for name, count in pairs(used) do
+                    local label = gutils.get_product_name(player, "item/" .. name)
+                    local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
                     table.insert(parts, ptext)
                 end
             end
