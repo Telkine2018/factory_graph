@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.23
+Date: 14. 03. 2026.
+  Bugfixes:
+    - fix module config on migration.
+  Features:
+    - In tooltip of machine, show missing ingredient to hand craft machine
+    - In machine highlight, sHow connection for any recipe and not only the machine of the current setup
+---------------------------------------------------------------------------------------------------
 Version: 2.0.22
 Date: 14. 03. 2026.
   Bugfixes:

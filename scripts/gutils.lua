@@ -736,9 +736,6 @@ function gutils.show_machine(player, recipe_name, move_player)
     local grecipe = g.recipes[recipe_name]
     if not grecipe then return end
 
-    local machine = grecipe.machine
-    if not machine or not machine.machine then return end
-
     local surface, player_position = gutils.get_real_surface(player)
     if not surface or not player_position then return end
     local show_machine_radius = settings.get_player_settings(player)["factory_graph-scan-radius"].value

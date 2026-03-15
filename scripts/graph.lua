@@ -123,12 +123,14 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                     failed = failed or (pconfig.beacon_name and not prototypes.entity[tools.extract_name(pconfig.beacon_name)])
                     if pconfig.machine_modules then
                         for _, module in pairs(pconfig.machine_modules) do
-                            failed = failed or (module and not prototypes.item[module])
+                            local module_name = tools.extract_name(module)
+                            failed = failed or (module and not prototypes.item[module_name])
                         end
                     end
                     if pconfig.beacon_modules then
                         for _, module in pairs(pconfig.beacon_modules) do
-                            failed = failed or (module and not prototypes.item[module])
+                            local module_name = tools.extract_name(module)
+                            failed = failed or (module and not prototypes.item[module_name])
                         end
                     end
                     if failed then

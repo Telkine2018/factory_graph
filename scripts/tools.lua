@@ -1239,15 +1239,14 @@ function tools.build_virtual_signal(name)
     return { type = "virtual", name = name, comparator = "=", quality = "normal" }
 end
 
-
 ---@class BackgroundCommand
 ---@field event_name string
 ---@field player LuaPlayer?
 
 ---@param command BackgroundCommand
-function tools.background_exec(command) 
+function tools.background_exec(command)
     if not storage.background_queue then
-        storage.background_queue = {data}
+        storage.background_queue = { data }
     else
         local queue = storage.background_queue --[[@as BackgroundCommand[] ]]
         for _, cmd in pairs(queue) do
@@ -1260,7 +1259,7 @@ function tools.background_exec(command)
 end
 
 if script then
-    tools.on_nth_tick(10, function(data) 
+    tools.on_nth_tick(10, function(data)
         local queue = storage.background_queue
         if not queue or table_size(queue) == 0 then
             return
@@ -1278,7 +1277,6 @@ end
 ---@return {[string]:integer}?
 ---@return {[string]:integer}?
 function tools.find_missing_ingredients(character, item, count)
-
     local inv = character.get_main_inventory()
     if not inv then return nil end
 
@@ -1314,8 +1312,13 @@ function tools.find_missing_ingredients(character, item, count)
         local content_count = (content_map[name] or 0)
         local remaining = content_count - count
         if remaining >= 0 or checking[name] then
-            content_map[name] = remaining
-            used[name] = (used[name] or 0) + count
+            if remaining > 0 then
+                content_map[name] = remaining
+                used[name] = (used[name] or 0) + count
+            elseif content_count > 0 then
+                content_map[name] = 0
+                used[name] = (used[name] or 0) + content_count
+            end
         else
             checking[name] = true
             if content_count > 0 then
@@ -1330,6 +1333,13 @@ function tools.find_missing_ingredients(character, item, count)
             local iter = 1
             local done
             for _, recipe in pairs(recipes) do
+                if not character.force.recipes[recipe.name].enabled or recipe.hidden then
+                    goto skip
+                end
+                if item ~= name and not recipe.allow_as_intermediate then
+                    goto skip
+                end
+                if recipe.hidden_from_player_crafting then goto skip end
                 if crafting_categories[recipe.category] then
                     -- Get iteration count of recipe
                     for _, product in pairs(recipe.products) do
@@ -1344,6 +1354,9 @@ function tools.find_missing_ingredients(character, item, count)
                     end
 
                     for _, ingredient in pairs(recipe.ingredients) do
+                        if ingredient.name == name then
+                            goto skip
+                        end
                         if ingredient.type == "item" then
                             local amount = ingredient.amount * iter
                             to_process[ingredient.name] = (to_process[ingredient.name] or 0) + amount
@@ -1354,10 +1367,11 @@ function tools.find_missing_ingredients(character, item, count)
                     done = true
                     break
                 end
+                ::skip::
             end
             if not done then
                 if name == item then
-                    return nil,nil
+                    return nil, nil
                 end
                 missing[name] = (missing[name] or 0) + needed
             end
