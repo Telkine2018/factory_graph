@@ -850,7 +850,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         type = "sprite-button",
         name = goto_button_name,
         tooltip = { np("goto-tooltip") },
-        mouse_button_filter = { "left" },
+        mouse_button_filter = { "left", "right" },
         sprite = arrow_sprite_white,
         hovered_sprite = arrow_sprite_black,
         tags = { recipe_name = machine.name }
@@ -2019,29 +2019,35 @@ tools.on_gui_click(goto_button_name,
             return
         end
 
-        if not e.shift then
-            if g.surface == player.surface then
-                local position = gutils.get_recipe_position(g, recipe)
-                drawing.draw_target(g, recipe)
-                if e.control then
-                    player.teleport(position, g.surface, false)
+        if e.button == defines.mouse_button_type.left then
+            if not e.shift then
+                if g.surface == player.surface then
+                    local position = gutils.get_recipe_position(g, recipe)
+                    drawing.draw_target(g, recipe)
+                    if e.control then
+                        player.teleport(position, g.surface, false)
+                    else
+                        gutils.move_view(player, position)
+                    end
+                    -- product_panel.close(player)
                 else
-                    gutils.move_view(player, position)
+                    gutils.show_machine(player, recipe_name, true)
                 end
-                -- product_panel.close(player)
-            else
-                gutils.show_machine(player, recipe_name, true)
+            elseif e.shift and not e.control then
+                if g.surface == player.surface then
+                    gutils.exit(player)
+                    gutils.show_machine(player, recipe_name, true)
+                else
+                    gutils.enter(player, recipe_name)
+                end
             end
-        else
-            if g.surface == player.surface then
-                gutils.exit(player)
-                gutils.show_machine(player, recipe_name, true)
-            else
-                gutils.enter(player, recipe_name)
+            if recipe_name then
+                gutils.refresh_machine_list(g, recipe_name)
             end
-        end
-        if recipe_name then
-            gutils.refresh_machine_list(g, recipe_name)
+        elseif e.button == defines.mouse_button_type.right then
+            if not (e.shift or e.control or e.alt) then
+                tools.fire_user_event(commons.open_recipe_selection, { g = g, recipe = g.recipes[recipe_name], player = player })
+            end
         end
     end)
 

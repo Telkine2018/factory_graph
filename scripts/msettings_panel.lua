@@ -106,7 +106,7 @@ local function install_beacon_modules(container, g, config, grecipe)
 
         local count = beacon.module_inventory_size
         local allowed = {}
-        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } , { filter = "hidden", mode = "and", invert = true }}
+        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
 
         local recipe = prototypes.recipe[grecipe.name]
         local allowed_effects = recipe.allowed_effects
@@ -214,6 +214,18 @@ function msettings.create(player_index, grecipe)
     local field_table = config_frame.add { type = "table", column_count = 2, name = "field_table" }
 
     config = tools.table_dup(config)
+
+    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = grecipe.name } })
+    if #technologies > 0 then
+        local label = field_table.add { type = "label", caption = { np("technologies") } }
+        local tech_flow = field_table.add { type = "flow" }
+        for techname, _ in pairs(technologies) do
+            local b_tech = tech_flow.add { type = "choose-elem-button", elem_type = "technology", technology = techname }
+            b_tech.locked = true
+            b_tech.style.size = 32
+            tools.set_name_handler(b_tech, np("technology"), { technology = techname })
+        end
+    end
 
     local is_default = grecipe.production_config == nil
     local label = field_table.add { type = "label", caption = { np("default_config") } }
@@ -498,6 +510,16 @@ tools.on_named_event(np("module_button"), defines.events.on_gui_elem_changed,
 tools.on_named_event(np("close"), defines.events.on_gui_click,
     function(e)
         msettings.close(game.players[e.player_index])
+    end)
+
+tools.on_named_event(np("technology"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local technology = e.element.tags.technology
+        if not (e.shift or e.control or e.alt) then
+            player.open_technology_gui(technology)
+        end
     end)
 
 function msettings.report(player)

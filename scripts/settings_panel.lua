@@ -75,6 +75,58 @@ local function set_module_buttons(g, pmodule_flow, modules)
     add_module_button(pmodule_flow)
 end
 
+---@param player LuaPlayer
+---@return string[]
+local function create_list_pack(player)
+    local labs = prototypes.get_entity_filtered{{filter="type", type="lab"}}
+    local packeds = {}
+
+    for _, lab in pairs(labs) do
+        local inputs = lab.lab_inputs
+        for _, item in pairs(inputs) do
+            packeds[item] = true
+        end
+    end
+
+    local pack_list = {}
+    for pack, _ in pairs(packeds) do
+        table.insert(pack_list, pack)
+    end
+    return pack_list
+end
+
+---@param container LuaGuiElement
+---@param all_packs string[]
+---@param pack_name string?
+---@return LuaGuiElement
+local function add_pack_button(container, all_packs, pack_name)
+    
+    if not all_packs then
+        local player = game.players[container.player_index]
+        all_packs = create_list_pack(player)
+    end
+
+    local filters = {
+        { filter="name", name=all_packs}
+    }
+    local b = container.add { type = "choose-elem-button", elem_type = "item", elem_filters = filters }
+    b.elem_value = pack_name
+    tools.set_name_handler(b, np("lab_pack"))
+    return b
+end
+
+---@param g Graph
+---@param pack_flow LuaGuiElement
+local function set_lab_packs(g, pack_flow)
+    local all_packs = create_list_pack(g.player)
+    if g.lab_packs then
+        for _, pack in pairs(g.lab_packs) do
+            add_pack_button(pack_flow, all_packs, pack)
+        end
+    end
+    add_pack_button(pack_flow, all_packs)
+end
+
 ---@param player_index integer
 function settings_panel.create(player_index)
     local player = game.players[player_index]
@@ -210,6 +262,11 @@ function settings_panel.create(player_index)
         end
         flow.add { type = "drop-down", items = qualities, selected_index = current_quality, name = "default_recipe_quality" }
     end
+
+    flow.add { type = "label", caption = { np("lab_packs") } }
+    local pack_flow = flow.add { type = "table", direction = "horizontal", name = "lab_packs", column_count = 6 }
+    set_lab_packs(g, pack_flow)
+
     local bpanel = frame.add { type = "flow", direction = "horizontal" }
     local b = bpanel.add { type = "button", caption = { np("save") } }
     tools.set_name_handler(b, np("save"))
@@ -225,6 +282,8 @@ function settings_panel.create(player_index)
 
 
     frame.force_auto_center()
+
+    create_list_pack(player)
 end
 
 ---@param e EventData.on_gui_click
@@ -301,6 +360,18 @@ tools.on_named_event(np("preferred_modules"), defines.events.on_gui_elem_changed
         blist_on_gui_elem_changed(e, add_module_button)
     end)
 
+tools.on_named_event(np("lab_pack"), defines.events.on_gui_click,
+---@param e EventData.on_gui_click
+function(e)
+    blist_on_click(e, add_pack_button)
+end)
+
+tools.on_named_event(np("lab_pack"), defines.events.on_gui_elem_changed,
+    ---@param e EventData.on_gui_elem_changed
+    function(e)
+        blist_on_gui_elem_changed(e, add_pack_button)
+    end)
+
 tools.on_named_event(np("close"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
@@ -355,6 +426,7 @@ local function save(player, frame)
     g.manual_mode = field_table.manual_mode.state
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
+    g.lab_packs = blist_values(field_table.lab_packs)
     g.preferred_beacon = tools.signal_to_id(field_table.preferred_beacon.elem_value --[[@as SignalFilter]])
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
     g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)

@@ -14,6 +14,7 @@ local command = require("scripts.command")
 local machinedb = require("scripts.machinedb")
 local product_panel = require("scripts.product_panel")
 local saving = require("scripts.saving")
+local recipe_selection = require("scripts.recipe_selection")
 
 local main = {}
 
@@ -135,7 +136,7 @@ local function on_switch_surface_by_key(e)
         if type == "assembling-machine" or type == "furnace" then
             recipe = selected.get_recipe()
             if not recipe and type == "furnace" then
-                recipe = selected.previous_recipe and  selected.previous_recipe.name
+                recipe = selected.previous_recipe and selected.previous_recipe.name
             end
         end
     end
@@ -148,8 +149,9 @@ script.on_event(prefix .. "-alt_k", on_switch_surface_by_key)
 
 ---@param e EventData.on_gui_click
 function on_switch_click(e)
+
+    local player = game.players[e.player_index]
     if e.button == defines.mouse_button_type.left then
-        local player = game.players[e.player_index]
         if not (e.button ~= defines.mouse_button_type.left or e.control or e.shift or e.alt) then
             switch_surface(player)
         elseif not (e.button ~= defines.mouse_button_type.left or not e.control or e.shift or e.alt) then
@@ -184,6 +186,12 @@ function on_switch_click(e)
                 end
                 ::no_use::
             end
+        end
+    elseif e.button == defines.mouse_button_type.right then
+        if not (e.control or e.shift or e.alt) then
+            local g = gutils.get_graph(player)
+            if not g then return end
+            recipe_selection.open(g, {})
         end
     end
 end

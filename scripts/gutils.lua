@@ -327,6 +327,40 @@ function gutils.filter_non_product_recipe(recipes)
     return new_recipes
 end
 
+---@generic KEY
+---@param recipes table<KEY, GRecipe>
+---@param g Graph
+---@return table<KEY, GRecipe>
+function gutils.filter_lab_pack(recipes, g)
+
+    local lab_packs = g.lab_packs
+    if lab_packs == nil or #lab_packs == 0 then return recipes end
+    local lab_filter = {}
+    for _, lab in pairs(lab_packs) do
+        lab_filter[lab] = true
+    end
+    local new_recipes = {}
+    for index, recipe in pairs(recipes) do
+        local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = recipe.name } })
+        if #technologies > 0 then
+            for _, tech in pairs(technologies) do
+                for _, ingredient in pairs(tech.research_unit_ingredients) do
+                    if not lab_filter[ingredient.name] then
+                        goto skip
+                    end
+                end
+            end
+        else
+            if not g.recipes[recipe.name].enabled then
+                goto skip
+            end
+        end
+        new_recipes[recipe.name] = recipe
+        ::skip::
+    end
+    return new_recipes
+end
+
 ---@param grecipe GRecipe
 function gutils.get_connected_recipe(grecipe)
     local result = gutils.get_connected_ingredients(grecipe)
@@ -1040,7 +1074,6 @@ tools.on_event(defines.events.on_player_changed_position,
 ---@param player LuaPlayer
 ---@return LuaInventory?
 function gutils.get_player_inventory(player)
-
     local character = gutils.get_character(player)
 
     ---@type LuaInventory?
