@@ -97,4 +97,6 @@ commons.recipe_entity_names = {
     [commons.unresearched_symbol_name] = true,
 }
 
+commons.general_button_size = 48 
+
 return commons

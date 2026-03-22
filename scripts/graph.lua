@@ -73,6 +73,10 @@ local function get_product(g, name)
         g.products[name] = product
     end
     product.used = true
+    local product_recipe = g.recipes[name]
+    if product_recipe then
+        product_recipe.used = true
+    end
     return product
 end
 

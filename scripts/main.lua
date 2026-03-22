@@ -310,6 +310,7 @@ function main.enter_surface(player, recipe_name)
             player.zoom = zoom
         end
     end
+    if not player_position then return surface end
     player.teleport(player_position, surface, false)
     vars.extern_force = extern_force
     if grecipe then

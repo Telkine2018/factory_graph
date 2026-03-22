@@ -26,13 +26,14 @@ local cb_name = np("cb")
 
 -- tools.add_panel_name(recipe_selection_frame_name)
 
-local sprite_button_size = 30
+local general_button_size = commons.general_button_size
 
 local action_used_in_recipe = 1
 local action_path_to_build = 2
 local action_consumer = 3
 local action_producer = 4
 local action_in_selection = 5
+
 
 ---@param g Graph
 ---@param options RecipeSelectionOptions
@@ -210,12 +211,17 @@ end
 ---@field nohistory boolean?
 ---@field related_to_product boolean?
 ---@field action integer
+---@field if_opened boolean?
 
 ---@param g Graph
 ---@param options RecipeSelectionOptions
 function recipe_selection.open(g, options)
     local player = g.player
     local player_index = player.index
+
+    if options.if_opened then
+        if not player.gui.screen[recipe_selection_frame_name] then return end
+    end
 
     if not options.nohistory then
         push_history(player, options.product, options.recipe, options.action)
@@ -351,8 +357,8 @@ function recipe_selection.open(g, options)
     b = search_text_flow.add { type = "button", tooltip = { np("select-all-tooltip") }, caption = { np("select-all") }, name = np("select-all") }
 
     local scroll = inner_frame.add { type = "scroll-pane", horizontal_scroll_policy = "always", vertical_scroll_policy = "always" }
-    scroll.style.minimal_height = 400
-    scroll.style.maximal_height = 900
+    scroll.style.minimal_height = 200
+    scroll.style.maximal_height = 600
     scroll.style.minimal_width = 500
     scroll.style.maximal_width = 900
 
@@ -496,31 +502,37 @@ local function set_recipes_to_selection(player)
     return recipes, not_visible
 end
 
+---@param player LuaPlayer
+---@param recipe_name  string?
+local function select_recipe(player, recipe_name)
+    local g = gutils.get_graph(player)
+
+    local _, not_visible = set_recipes_to_selection(player)
+    for _, grecipe in pairs(not_visible) do
+        grecipe.visible = true
+        graph.insert_recipe(g, grecipe)
+    end
+    graph.create_recipe_objects(g)
+    if g.rs_recipe and g.rs_recipe.visible then
+        gutils.select_current_recipe(g, g.rs_recipe)
+    end
+    graph.deferred_update(player, {
+        selection_changed = true,
+        do_layout = g.layout_on_selection,
+        center_on_recipe = recipe_name,
+        draw_target = true,
+        no_recipe_selection_update = true
+    })
+end
+
 tools.on_named_event(cb_name, defines.events.on_gui_checked_state_changed,
     function(e)
         local player = game.players[e.player_index]
-        local g = gutils.get_graph(player)
-
-        local _, not_visible = set_recipes_to_selection(player)
-        for _, grecipe in pairs(not_visible) do
-            grecipe.visible = true
-            graph.insert_recipe(g, grecipe)
-        end
-        graph.create_recipe_objects(g)
-        if g.rs_recipe and g.rs_recipe.visible then
-            gutils.select_current_recipe(g, g.rs_recipe)
-        end
         local recipe_name
         if e.element.state then
             recipe_name = e.element.tags.recipe_name --[[@as string]]
         end
-        graph.deferred_update(player, {
-            selection_changed = true,
-            do_layout = g.layout_on_selection,
-            center_on_recipe = recipe_name,
-            draw_target = true,
-            no_recipe_selection_update = true
-        })
+        select_recipe(player, recipe_name)
     end)
 
 ---@param player_index integer|uint32
@@ -535,6 +547,7 @@ function recipe_selection.close(player_index)
     end
 end
 
+
 ---@param g Graph
 ---@param remaining_pane LuaGuiElement
 function recipe_selection.display_remaining(g, remaining_pane)
@@ -542,8 +555,10 @@ function recipe_selection.display_remaining(g, remaining_pane)
     local inputs = gutils.get_product_flow(g, g.selection)
     for _, gproduct in pairs(inputs) do
         if not gproduct.is_root then
-            local b = gutils.create_product_button(remaining_pane, gproduct.name)
-            b.style.size = sprite_button_size
+            local b, type, name = gutils.create_product_button(remaining_pane, gproduct.name)
+            b.style.size = general_button_size
+            b.elem_tooltip = { type = type, name = name }
+            b.tooltip = {np("remaining_tooltip")}
             tools.set_name_handler(b, np("remaining"), { product_name = gproduct.name })
         end
     end
@@ -692,7 +707,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             local b_recipe = recipe_col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
             b_recipe.style = recipe_button_style
             b_recipe.locked = true
-            b_recipe.style.size = 28
+            b_recipe.style.size = general_button_size
             tools.set_name_handler(b_recipe, np("recipe"), { recipe_name = recipe_name })
 
             local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = recipe_name } })
@@ -700,9 +715,31 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 for _, tech in pairs(technologies) do
                     local b_tech = recipe_col1.add { type = "choose-elem-button", elem_type = "technology", technology = tech.name }
                     b_tech.locked = true
-                    b_tech.style.size = 28
+                    b_tech.style.size = general_button_size
+                    b_tech.tooltip = { np("tech_tooltip") }
+                    b_tech.elem_tooltip = { type = "technology", name = tech.name }
+
                     tools.set_name_handler(b_tech, np("technology"), { technology = tech.name })
                 end
+            end
+
+            local machines = machinedb.get_machines_for_recipe(recipe_name)
+            if machines and #machines > 0 then
+                local machine_names = {}
+                for _, machineinfo in pairs(machines) do
+                    table.insert(machine_names, machineinfo.name)
+                end
+                local b_machine = recipe_col1.add {
+                    type = "choose-elem-button",
+                    elem_type = "entity",
+                    elem_filters = { { filter = "name", name = machine_names } }
+                }
+                b_machine.style.size = general_button_size
+                b_machine.elem_value = machines[1].name
+                b_machine.elem_tooltip = { type = "entity", name = machines[1].name }
+                b_machine.tooltip = { np("machine_tooltip") }
+
+                tools.set_name_handler(b_machine, np("machine"), { recipe_name = recipe_name })
             end
 
             local cb = recipe_col1.add {
@@ -721,10 +758,12 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             recipe_col2.style.left_margin = 10
             local ingredient_table = recipe_col2.add { type = "table", column_count = 5 }
             for _, def in pairs(i_table) do
-                local b = gutils.create_product_button(ingredient_table, def.name)
+                local b, type, name = gutils.create_product_button(ingredient_table, def.name)
                 b.style = ingredient_button_style
-                b.style.size = sprite_button_size
+                b.style.size = general_button_size
                 b.style.margin = 0
+                b.elem_tooltip = { type = type, name = name }
+                b.tooltip = { np("ingredient_tooltip") }
                 tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
             end
             local arrow = recipe_col2.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
@@ -734,17 +773,19 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             for _, def in pairs(p_table) do
                 if not product_set[def.name] then
                     product_set[def.name] = true
-                    local b = gutils.create_product_button(product_table, def.name)
+                    local b, type, name = gutils.create_product_button(product_table, def.name)
                     b.style = product_button_style
-                    b.style.size = sprite_button_size
+                    b.style.size = general_button_size
                     b.style.margin = 0
+                    b.elem_tooltip = { type = type, name = name }
+                    b.tooltip = { np("production_tooltip") }
                     tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
                 end
             end
             recipe_col2.style.horizontally_stretchable = true
         else
             local b = gutils.create_product_button(recipe_col1, recipe_name)
-            b.style.size = sprite_button_size
+            b.style.size = general_button_size
 
             recipe_col1.add {
                 type = "checkbox",
@@ -794,13 +835,14 @@ tools.on_gui_click(np("goto"),
 
         local g = gutils.get_graph(player)
         local grecipe = g.recipes[recipe_name]
-        if not grecipe or not grecipe.visible then
+        if not grecipe then
             return
         end
 
-        if not e.shift then
+        if not (e.shift or e.control or e.alt) then
             if player.surface == g.surface then
                 local position = gutils.get_recipe_position(g, grecipe)
+                if not position then return end
                 drawing.draw_target(g, grecipe)
                 if e.control then
                     player.teleport(position, g.surface, false)
@@ -815,15 +857,6 @@ tools.on_gui_click(np("goto"),
         end
     end)
 
-
-tools.on_event(defines.events.on_gui_closed,
-    function(e)
-        local player = game.players[e.player_index]
-
-        if player.selected ~= e.entity then
-            recipe_selection.close(e.player_index --[[@as integer]])
-        end
-    end)
 
 tools.on_named_event(np("choose_recipe"), defines.events.on_gui_elem_changed,
     ---@param e EventData.on_gui_click
@@ -1068,8 +1101,11 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
         local player = game.players[e.player_index]
         local recipe_name = e.element.tags.recipe_name --[[@as string]]
 
-        gutils.set_cursor_stack(player, recipe_name)
-        recipe_selection.close(player.index)
+        local g = gutils.get_graph(player)
+        if g and g.surface == player.surface then
+            gutils.set_cursor_stack(player, recipe_name)
+            recipe_selection.close(player.index)
+        end
     end)
 
 tools.on_named_event(np("backward"), defines.events.on_gui_click,
@@ -1154,5 +1190,44 @@ tools.on_named_event(np("technology"), defines.events.on_gui_click,
             player.open_technology_gui(technology)
         end
     end)
+
+tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
+    ---@param e EventData.on_gui_elem_changed
+    function(e)
+        local player = game.players[e.player_index]
+        local selected = e.element.elem_value
+        if selected then
+            e.element.elem_tooltip = { type = "entity", name = selected }
+        else
+            e.element.elem_tooltip = nil
+        end
+    end)
+
+
+tools.on_named_event(np("machine"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        if e.control and not e.shift and not e.alt then
+            local selected = e.element.elem_value
+            if not selected then return end
+
+            local bp_entity = {
+                entity_number = 1,
+                name = selected,
+                position = { 0.5, 0.5 },
+                recipe = e.element.tags.recipe_name,
+
+            }
+            local cursor_stack = player.cursor_stack
+            if not cursor_stack then return end
+
+            cursor_stack.clear()
+            cursor_stack.set_stack { name = "blueprint", count = 1 }
+            cursor_stack.set_blueprint_entities { bp_entity }
+            player.cursor_stack_temporary = true
+        end
+    end)
+
 
 return recipe_selection

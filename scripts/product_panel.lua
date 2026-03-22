@@ -41,6 +41,8 @@ local default_button = commons.buttons.default
 local mini_size = 16
 local mini_style = prefix .. "_mini_button"
 
+local general_button_size = commons.general_button_size
+
 local function np(name)
     return prefix .. "-product-panel." .. name
 end
@@ -403,14 +405,15 @@ function product_panel.create_product_tables(player)
 
             local b = gutils.create_product_button(pline, product_name, "product_button")
             b.raise_hover_events = true
+            b.style.size = general_button_size
             tools.set_name_handler(b, np("product"), { product_name = product_name, label = product.label })
 
             local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
             local toplabel = b.add { type = "label", style = label_style_top, name = "toplabel", ignored_by_interaction = true }
             local value = set_output_value(g, product_name, qtlabel, toplabel)
 
-            b.style.size = 36
             b.style.vertical_align = "top"
+            b.style.size = general_button_size
 
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
             local label = vinput.add { type = "label", caption = product.label }
@@ -429,7 +432,7 @@ function product_panel.create_product_tables(player)
                     b.style = default_button
                 end
             end
-
+            b.style.size = general_button_size
             label.style.width = column_width
         end
     end
@@ -472,6 +475,7 @@ local function update_products(g)
                         b.style = default_button
                     end
                 end
+                b.style.size = general_button_size
             end
         end
     end
@@ -773,8 +777,12 @@ local function create_product_line(container, machine, manual_mode, color_values
         tooltip = { np("machine-tooltip") },
         name = "machine"
     }
-    b.elem_value = { name = machine.machine and machine.machine.name or nil, quality = machine.machine_quality }
+    b.style.size = general_button_size
+    local machine_name = machine.machine and machine.machine.name or nil
+    b.elem_value = { name = machine_name, quality = machine.machine_quality }
+    b.elem_tooltip = { type = "entity", name = machine_name }
     b.locked = true
+    b.style.size = general_button_size
     tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
     b.raise_hover_events = true
     local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true, name = "count" }
@@ -795,6 +803,7 @@ local function create_product_line(container, machine, manual_mode, color_values
     local frecipe = line1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
     frecipe.style.right_margin = 5
     frecipe.locked = true
+    frecipe.style.size = general_button_size
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
     local slayer = nil
@@ -814,6 +823,8 @@ local function create_product_line(container, machine, manual_mode, color_values
     if active then
         flayer.style = active_layer_button_style
     end
+    flayer.style.size = general_button_size
+
     -- tools.set_name_handler(frecipe, np("tag"), { recipe_name = machine.name })
 
     line = line1.add { type = "line", direction = "vertical" }
@@ -836,6 +847,7 @@ local function create_product_line(container, machine, manual_mode, color_values
             fluid = ingredient.name,
             style = style
         }
+        b.style.size = general_button_size
         b.locked = true
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name })
 
@@ -868,6 +880,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         end
 
         b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = style }
+        b.style.size = general_button_size
         b.locked = true
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name })
 
@@ -907,6 +920,7 @@ function product_panel.update_error_panel(g, error_panel)
 
         local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
         b.locked = true
+        b.style.size = general_button_size
         tools.set_name_handler(b, np("recipe_detail"), { recipe_name = machine.name })
 
         local flow = line.add { type = "flow", direction = "vertical" }
@@ -973,12 +987,13 @@ function product_panel.update_error_panel(g, error_panel)
                         b = line1.add { type = "choose-elem-button", elem_type = "fluid", fluid = signal.name }
                     end
 
+                    b.style.size = general_button_size
                     local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
                     local toplabel = b.add { type = "label", style = label_style_top, name = "toplabel", ignored_by_interaction = true }
                     set_output_value(g, product.name, qtlabel, toplabel)
 
                     tools.set_name_handler(b, np("error-unlock-product"), { product_name = product.name })
-                    b.style.size = 30
+                    b.style.size = general_button_size
                     b.locked = true
                 end
             end
@@ -1248,6 +1263,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
                 elem_type = "item-with-quality",
                 tooltip = { np("build-button-tooltip") } }
             b.elem_value             = sitem
+            b.style.size             = general_button_size
             tools.set_name_handler(b, np("summary_machine"), {
                 item = item,
                 count = count,
@@ -2023,6 +2039,7 @@ tools.on_gui_click(goto_button_name,
             if not e.shift then
                 if g.surface == player.surface then
                     local position = gutils.get_recipe_position(g, recipe)
+                    if not position then return end
                     drawing.draw_target(g, recipe)
                     if e.control then
                         player.teleport(position, g.surface, false)
@@ -2053,7 +2070,6 @@ tools.on_gui_click(goto_button_name,
 
 msettings_panel.create_product_line = create_product_line
 
-
 tools.on_configuration_changed(
 ---@param data ConfigurationChangedData
     function(data)
@@ -2063,7 +2079,5 @@ tools.on_configuration_changed(
             end
         end
     end)
-
-
 
 return product_panel

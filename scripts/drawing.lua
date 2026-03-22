@@ -1304,7 +1304,7 @@ local function open_query(player)
     local product_name
     if player.cursor_stack and player.cursor_stack.count > 0 then
         product_name = player.cursor_stack.name
-    elseif player.cursor_ghost and player.cursor_ghost.name  then
+    elseif player.cursor_ghost and player.cursor_ghost.name then
         product_name = player.cursor_ghost.name.name
     else
         local selected = player.selected
@@ -1331,9 +1331,9 @@ local function on_control_click4(e)
     if not g then return end
 
     local selected = player.selected
-    if selected == nil or not selected.valid then 
+    if selected == nil or not selected.valid then
         open_query(player)
-        return 
+        return
     end
 
     if player.surface ~= g.surface then
@@ -1346,7 +1346,8 @@ local function on_control_click4(e)
             if recipe then
                 gutils.refresh_machine_list(g, recipe.name)
                 gutils.show_machine(player, recipe.name, true)
-            end
+                tools.fire_user_event(commons.open_recipe_selection, { g = g, player = player, recipe = g.recipes[recipe.name], if_opened = true })
+           end
         end
     else
         local grecipe = gutils.get_selected_recipe_in_graph(player)

@@ -102,7 +102,9 @@ end
 
 ---@param g Graph
 ---@param recipe GRecipe
+---@return MapPosition?
 function gutils.get_recipe_position(g, recipe)
+    if not recipe.col then return nil end
     local x, y = gutils.get_position(g, recipe.col, recipe.line)
     return { x = x, y = y }
 end
@@ -144,6 +146,7 @@ function gutils.move_to_recipe(player, recipe_name, fast)
     if not grecipe or not grecipe.line then return end
 
     local position = gutils.get_recipe_position(g, grecipe)
+    if not position then return end
 
     if fast then
         player.teleport(position)
@@ -332,7 +335,6 @@ end
 ---@param g Graph
 ---@return table<KEY, GRecipe>
 function gutils.filter_lab_pack(recipes, g)
-
     local lab_packs = g.lab_packs
     if lab_packs == nil or #lab_packs == 0 then return recipes end
     local lab_filter = {}
@@ -525,16 +527,24 @@ end
 ---@param product_name string
 ---@param button_name string?
 ---@return LuaGuiElement
+---@return string
+---@return string
 function gutils.create_product_button(container, product_name, button_name)
     ---@cast button_name -nil
     local b
+    local type
+    local name
     if string.find(product_name, "^item/") then
-        b = container.add { type = "choose-elem-button", elem_type = "item", item = string.sub(product_name, 6), name = button_name }
+        name = string.sub(product_name, 6)
+        b = container.add { type = "choose-elem-button", elem_type = "item", item = name, name = button_name }
+        type = "item"
     else
-        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = string.sub(product_name, 7), name = button_name }
+        name = string.sub(product_name, 7)
+        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = name, name = button_name }
+        type = "fluid"
     end
     b.locked = true
-    return b
+    return b, type, name
 end
 
 -- Fire production change

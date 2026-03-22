@@ -28,6 +28,10 @@ machinedb = {
 
 }
 
+---@type {[string]:MachineInfo[]}
+local category_to_machines
+
+
 ---@param machine LuaEntityPrototype
 ---@return MachineInfo
 function machinedb.get_machine(machine)
@@ -57,6 +61,8 @@ function machinedb.initialize()
         return
     end
     machinedb.initialized = true
+    category_to_machines = machinedb.category_to_machines
+
     for category_name, _ in pairs(prototypes.recipe_category) do
         local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category_name } }
         local machine_infos = {}
@@ -118,7 +124,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     end
 
     machinedb.initialize()
-    local machines                 = machinedb.category_to_machines[recipe.category]
+    local machines                 = category_to_machines[recipe.category]
 
     local preferred_machines       = g.preferred_machines
     local preferred_modules        = g.preferred_modules
@@ -356,6 +362,33 @@ function machinedb.compute_recipes_productivities(g)
         end
     end
     return productivities
+end
+
+---@param recipe_name string
+---@return MachineInfo[]
+function machinedb.get_machines_for_recipe(recipe_name)
+
+    local recipe = prototypes.recipe[recipe_name]
+    local category = recipe.category
+
+    if not machinedb.initialized then
+        machinedb.initialize()
+    end
+
+    local machines = category_to_machines[category]
+    local additional_categories  = recipe.additional_categories 
+
+    if additional_categories and #recipe.additional_categories > 0 then
+        for _, acategory in pairs(recipe.additional_categories ) do
+            local amachines = machinedb.category_to_machines[acategory]
+            if amachines then
+                for _, amachine in pairs(amachines) do
+                    table.insert(machines, amachine)
+                end
+            end
+        end
+   end
+   return machines
 end
 
 return machinedb

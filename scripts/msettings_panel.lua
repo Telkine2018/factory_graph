@@ -149,7 +149,7 @@ end
 local function enable_config(field_table, is_default)
     local enabled = not is_default
     field_table.machine.enabled = enabled
-    for _, c in pairs(field_table.modules.children) do
+    for _, c in pairs(field_table.modules_scroll.modules_pane.children) do
         c.enabled = enabled
     end
     field_table.beacon.enabled = enabled
@@ -234,11 +234,10 @@ function msettings.create(player_index, grecipe)
     b.style.height = 40
     tools.set_name_handler(b, np("is_default"))
 
-    local recipe = prototypes.recipe[grecipe.name]
-    local category = recipe.category
     machinedb.initialize()
-    local machines = machinedb.category_to_machines[category]
+    local machines = machinedb.get_machines_for_recipe(grecipe.name)
     local machine_names = {}
+    
     if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
         local search_surface = tools.get_vars(player).extern_surface
@@ -263,7 +262,9 @@ function msettings.create(player_index, grecipe)
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
-    local module_flow = field_table.add { type = "table", column_count = 6, name = "modules" }
+    local module_scroll = field_table.add{type="scroll-pane", name="modules_scroll"}
+    module_scroll.style.maximal_height = 300
+    local module_flow = module_scroll.add { type = "table", column_count = 6, name = "modules_pane" }
     install_modules(module_flow, g, config, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
@@ -338,7 +339,7 @@ tools.on_named_event(np("is_default"), defines.events.on_gui_checked_state_chang
             end
 
             field_table.machine.elem_value = tools.id_to_signal(config.machine_name)
-            install_modules(field_table.modules, g, config, g.recipes[recipe_name])
+            install_modules(field_table.modules_scroll.modules_pane, g, config, g.recipes[recipe_name])
 
             field_table.beacon.elem_value = tools.id_to_signal(config.beacon_name)
             install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
@@ -370,7 +371,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         local config = vars.msettings_config
         config.machine_name = tools.signal_to_id(e.element.elem_value)
 
-        install_modules(field_table.modules, g, config, g.recipes[recipe_name])
+        install_modules(field_table.modules_scroll.modules_pane, g, config, g.recipes[recipe_name])
 
         msettings.save(player)
     end
@@ -430,7 +431,7 @@ local function read_config(player)
         return nil
     end
     config.machine_modules = {}
-    for _, fmod in pairs(field_table.modules.children) do
+    for _, fmod in pairs(field_table.modules_scroll.modules_pane.children) do
         local module_id = tools.signal_to_id(fmod.elem_value)
         if module_id then
             table.insert(config.machine_modules, module_id)
