@@ -804,6 +804,8 @@ local function create_product_line(container, machine, manual_mode, color_values
     frecipe.style.right_margin = 5
     frecipe.locked = true
     frecipe.style.size = general_button_size
+    frecipe.elem_tooltip = {type="recipe", name=machine.name}
+    frecipe.tooltip = {np("recipe_tooltip")}
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
     local slayer = nil
@@ -836,19 +838,22 @@ local function create_product_line(container, machine, manual_mode, color_values
     for _, ingredient in pairs(machine.recipe.ingredients) do
         local type = ingredient.type
         local style = ingredient_button_style
-        local ingredient_name = type .. "/" .. ingredient.name
+        local iname = ingredient.name
+        local ingredient_name = type .. "/" .. iname
         if color_values then
             local value = color_values[ingredient_name] or 0
             if value >= 0 then style = green_button else style = red_button end
         end
         b = recipe_row.add { type = "choose-elem-button",
             elem_type = type,
-            item = ingredient.name,
+            item = iname,
             fluid = ingredient.name,
             style = style
         }
         b.style.size = general_button_size
         b.locked = true
+        b.elem_tooltip = { type = type, name = iname }
+        b.tooltip = { np("ingredient_tooltip") }
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name })
 
         local amount = ingredient.amount * machine.limited_craft_s * count
@@ -873,15 +878,18 @@ local function create_product_line(container, machine, manual_mode, color_values
     for _, product in pairs(machine.recipe.products) do
         local type = product.type
         local style = product_button_style
-        local product_name = type .. "/" .. product.name
+        local pname = product.name
+        local product_name = type .. "/" .. pname
         if color_values then
             local value = color_values[product_name] or 0
             if value >= 0 then style = green_button else style = red_button end
         end
 
-        b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = product.name, fluid = product.name, style = style }
+        b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = pname, fluid = product.name, style = style }
         b.style.size = general_button_size
         b.locked = true
+        b.elem_tooltip = { type = type, name = pname }
+        b.tooltip = { np("production_tooltip") }
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name })
 
         local amount = get_product_amount(machine, product)
@@ -1579,9 +1587,6 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
             elseif e.shift then
                 local recipe_name = element.tags.recipe_name --[[@as string]]
                 player.begin_crafting { recipe = recipe_name, count = 1 }
-            elseif e.control then
-                local recipe_name = element.tags.recipe_name --[[@as string]]
-                player.begin_crafting { recipe = recipe_name, count = 10 }
             end
         elseif e.button == defines.mouse_button_type.right then
             local recipe_name = element.tags.recipe_name --[[@as string]]
@@ -1595,18 +1600,22 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
         if e.alt then return end
-        if not (e.button ~= defines.mouse_button_type.right or e.shift or e.control or e.alt) then
-            local element = e.element
-            local player = game.players[e.player_index]
-            if not element or not element.valid then return end
 
-            local recipe_name = element.tags.recipe_name --[[@as string]]
-            local product_name = element.tags.product_name --[[@as string]]
+        local element = e.element
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        if not g then return end
+        if not element or not element.valid then return end
+
+        local recipe_name = element.tags.recipe_name --[[@as string]]
+        local product_name = element.tags.product_name --[[@as string]]
+
+        if not (e.button ~= defines.mouse_button_type.left or e.shift or e.control) then
             if not recipe_name or not product_name then return end
-
-            local g = gutils.get_graph(player)
-            recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
-        elseif not (e.button ~= defines.mouse_button_type.left or e.shift or e.control or e.alt) then
+            recipe_selection.open(g, { product = g.products[product_name], action = commons.action_consumer })
+        elseif not (e.button ~= defines.mouse_button_type.right or e.shift or e.control) then
+            if not product_name then return end
+            recipe_selection.open(g, { product = g.products[product_name], action = commons.action_producer })
         end
     end)
 

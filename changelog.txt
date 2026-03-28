@@ -5,10 +5,12 @@ Date: 14. 03. 2026.
     - Fix module configuration on migration.
     - Fix invalid migration on product
   Features:
-    - In tooltip of a machine, show missing ingredient to hand craft the machine
+    - In tooltip of a machine, show missing ingredient to handcraft the machine
     - In machine highlight, show connection for any recipe and not only the machine of the current setup
     - Improve recipe panel, show technology to have recipe (click to show in tech tree)
     - In settings, add a list of science pack to restrict the recipe list. Only the recipes with all science pack are in the list are displayed. (to limit to recipe immediatly searchable in hude mods)
+    - Improve tooltips
+    - Improve buttons to navigate between recipe
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.22
 Date: 14. 03. 2026.

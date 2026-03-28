@@ -28,11 +28,11 @@ local cb_name = np("cb")
 
 local general_button_size = commons.general_button_size
 
-local action_used_in_recipe = 1
-local action_path_to_build = 2
-local action_consumer = 3
-local action_producer = 4
-local action_in_selection = 5
+local action_used_in_recipe = commons.action_used_in_recipe
+local action_path_to_build = commons.action_path_to_build
+local action_consumer = commons.action_consumer
+local action_producer = commons.action_producer
+local action_in_selection = commons.action_in_selection
 
 
 ---@param g Graph
@@ -455,13 +455,17 @@ end)
 tools.on_named_event(np("product_button"), defines.events.on_gui_click,
     function(e)
         local player = game.players[e.player_index]
-        local e = e.element
-        if e.valid then
-            local product_name = e.tags.product_name
-            local recipe_name = e.tags.recipe_name
+        local element = e.element
+        if element.valid then
+            local product_name = element.tags.product_name
+            local recipe_name = element.tags.recipe_name
             local g = gutils.get_graph(player)
             if g then
-                recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
+                if not (e.button ~= defines.mouse_button_type.left or e.shift or e.control or e.alt) then
+                    recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
+                else
+                    recipe_selection.open(g, { product = g.products[product_name], action = action_used_in_recipe })
+                end
             end
         end
     end)
@@ -547,7 +551,6 @@ function recipe_selection.close(player_index)
     end
 end
 
-
 ---@param g Graph
 ---@param remaining_pane LuaGuiElement
 function recipe_selection.display_remaining(g, remaining_pane)
@@ -558,7 +561,7 @@ function recipe_selection.display_remaining(g, remaining_pane)
             local b, type, name = gutils.create_product_button(remaining_pane, gproduct.name)
             b.style.size = general_button_size
             b.elem_tooltip = { type = type, name = name }
-            b.tooltip = {np("remaining_tooltip")}
+            b.tooltip = { np("remaining_tooltip") }
             tools.set_name_handler(b, np("remaining"), { product_name = gproduct.name })
         end
     end
@@ -752,6 +755,10 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 tags = { recipe_name = recipe_name }
             }
             cb.style.top_margin = 6
+            cb.style.minimal_width = 100
+            if #technologies == 0 then
+                cb.style.left_margin = general_button_size + 4
+            end
             recipe_col1.tooltip = tooltip
 
             local recipe_col2 = recipe_table.add { type = "flow", direction = "horizontal", tooltip = tooltip }

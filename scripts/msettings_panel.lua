@@ -602,7 +602,7 @@ function msettings.open_selection(player)
         msettings.create(player.index, grecipe)
     else
         local product = g.products[grecipe.name]
-        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, only_product = true })
+        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, action=commons.action_producer })
     end
 end
 

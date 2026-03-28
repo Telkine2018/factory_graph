@@ -99,6 +99,7 @@ function main.enter(player, recipe_name)
     vars.controller_surface_index = player.surface_index
 
     local surface = main.enter_surface(player, recipe_name)
+
     if not vars.graph then
         local g = graph.new(surface)
         g.player = player
