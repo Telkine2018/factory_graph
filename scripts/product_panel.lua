@@ -804,8 +804,8 @@ local function create_product_line(container, machine, manual_mode, color_values
     frecipe.style.right_margin = 5
     frecipe.locked = true
     frecipe.style.size = general_button_size
-    frecipe.elem_tooltip = {type="recipe", name=machine.name}
-    frecipe.tooltip = {np("recipe_tooltip")}
+    frecipe.elem_tooltip = { type = "recipe", name = machine.name }
+    frecipe.tooltip = { np("recipe_tooltip") }
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
     local slayer = nil
@@ -854,7 +854,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         b.locked = true
         b.elem_tooltip = { type = type, name = iname }
         b.tooltip = { np("ingredient_tooltip") }
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name })
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name, action = commons.action_producer })
 
         local amount = ingredient.amount * machine.limited_craft_s * count
         amount = fround(amount)
@@ -890,7 +890,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         b.locked = true
         b.elem_tooltip = { type = type, name = pname }
         b.tooltip = { np("production_tooltip") }
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name })
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
 
         local amount = get_product_amount(machine, product)
 
@@ -1562,7 +1562,7 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_hover,
         local parts = { "" }
         local proto = prototypes.entity[machine_name]
         if proto then
-            parts = product_panel.create_parts_tooltip(player, proto)
+            parts = gutils.create_machine_tooltip(player, proto)
             e.element.tooltip = { np("build-button-tooltip_hover"), parts }
         end
     end)
@@ -1609,65 +1609,16 @@ tools.on_named_event(np("open_product"), defines.events.on_gui_click,
 
         local recipe_name = element.tags.recipe_name --[[@as string]]
         local product_name = element.tags.product_name --[[@as string]]
+        local action = element.tags.action --[[@as integer]]
 
         if not (e.button ~= defines.mouse_button_type.left or e.shift or e.control) then
             if not recipe_name or not product_name then return end
-            recipe_selection.open(g, { product = g.products[product_name], action = commons.action_consumer })
+            recipe_selection.open(g, { product = g.products[product_name], action = action })
         elseif not (e.button ~= defines.mouse_button_type.right or e.shift or e.control) then
             if not product_name then return end
-            recipe_selection.open(g, { product = g.products[product_name], action = commons.action_producer })
+            recipe_selection.open(g, { product = g.products[product_name], action = commons.action_used_in_recipe })
         end
     end)
-
----@param player LuaPlayer
----@param machine_entity LuaEntityPrototype
----@return table
-function product_panel.create_parts_tooltip(player, machine_entity)
-    local parts = { "" }
-    if machine_entity and machine_entity.items_to_place_this then
-        local machine_item = machine_entity.items_to_place_this[1]
-        if machine_item then
-            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, 1)
-
-            if not used then
-                local machine_recipes =
-                    prototypes.get_recipe_filtered { {
-                        filter = "has-product-item",
-                        elem_filters = { { filter = "name", name = machine_item.name } } } }
-
-                local machine_recipe
-                for _, mp in pairs(machine_recipes) do
-                    machine_recipe = mp
-                    break
-                end
-                if machine_recipe then
-                    local ingredients = machine_recipe.ingredients
-                    for _, p in pairs(ingredients) do
-                        local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
-                        local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
-                        local ptext = {
-                            np("machine_product_tooltip"),
-                            amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
-                        table.insert(parts, ptext)
-                    end
-                end
-            else
-                table.insert(parts, { np("from_inventory") })
-                for name, count in pairs(missing) do
-                    local label = gutils.get_product_name(player, "item/" .. name)
-                    local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
-                end
-                for name, count in pairs(used) do
-                    local label = gutils.get_product_name(player, "item/" .. name)
-                    local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
-                end
-            end
-        end
-    end
-    return parts
-end
 
 tools.on_named_event(np("machine"), defines.events.on_gui_hover,
     ---@param e EventData.on_gui_hover
@@ -1686,7 +1637,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
 
         local parts = { "" }
         if machine and machine.machine then
-            parts = product_panel.create_parts_tooltip(player, machine.machine)
+            parts = gutils.create_machine_tooltip(player, machine.machine)
         end
 
         if machine and machine.machine then

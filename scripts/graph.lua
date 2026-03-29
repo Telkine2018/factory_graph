@@ -1184,6 +1184,11 @@ end
 function graph.load_saving(g, data)
     drawing.delete_content(g)
     local selection = {}
+
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.layer = nil
+    end
+
     for _, grecipe in pairs(data.selection) do
         local current = g.recipes[grecipe.name]
         if current then
@@ -1229,6 +1234,7 @@ end
 function graph.import_saving(g, data)
     drawing.delete_content(g)
     local selection = g.selection
+
     for _, grecipe in pairs(data.selection) do
         local current = g.recipes[grecipe.name]
         selection[grecipe.name] = current

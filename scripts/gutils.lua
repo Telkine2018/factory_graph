@@ -707,9 +707,14 @@ end
 ---@param player LuaPlayer
 ---@param recipe_name string
 function gutils.set_cursor_stack(player, recipe_name)
+    local g = gutils.get_graph(player)
+    local layer 
+    if g.visibility == commons.visibility_layers then
+        layer = g.current_layer
+    end
     player.cursor_stack.clear()
     player.cursor_stack.set_stack { name = commons.recipe_symbol_name, count = 1 }
-    player.cursor_stack.tags = { recipe_name = recipe_name }
+    player.cursor_stack.tags = { recipe_name = recipe_name, layer = layer }
 end
 
 ---@param player LuaPlayer
@@ -1117,6 +1122,56 @@ function gutils.find_missing_ingredients(player, item, count)
     local character = gutils.get_character(player)
     if not character then return nil, nil end
     return tools.find_missing_ingredients(character, item, count)
+end
+
+---@param player LuaPlayer
+---@param machine_entity LuaEntityPrototype
+---@return table
+function gutils.create_machine_tooltip(player, machine_entity)
+    local parts = { "" }
+    if machine_entity and machine_entity.items_to_place_this then
+        local machine_item = machine_entity.items_to_place_this[1]
+        if machine_item then
+            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, 1)
+
+            if not used then
+                local machine_recipes =
+                    prototypes.get_recipe_filtered { {
+                        filter = "has-product-item",
+                        elem_filters = { { filter = "name", name = machine_item.name } } } }
+
+                local machine_recipe
+                for _, mp in pairs(machine_recipes) do
+                    machine_recipe = mp
+                    break
+                end
+                if machine_recipe then
+                    local ingredients = machine_recipe.ingredients
+                    for _, p in pairs(ingredients) do
+                        local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
+                        local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
+                        local ptext = {
+                            np("machine_product_tooltip"),
+                            amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
+                        table.insert(parts, ptext)
+                    end
+                end
+            else
+                table.insert(parts, { np("from_inventory") })
+                for name, count in pairs(missing) do
+                    local label = gutils.get_product_name(player, "item/" .. name)
+                    local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
+                    table.insert(parts, ptext)
+                end
+                for name, count in pairs(used) do
+                    local label = gutils.get_product_name(player, "item/" .. name)
+                    local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
+                    table.insert(parts, ptext)
+                end
+            end
+        end
+    end
+    return parts
 end
 
 return gutils

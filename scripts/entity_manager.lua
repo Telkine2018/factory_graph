@@ -130,17 +130,20 @@ local function on_build(entity, e, revive)
     local recipe_name
     local tags
     local selected = true
+    local layer 
     if entity.name == "entity-ghost" then
         tags = entity.tags
         if tags then
             recipe_name = entity.tags.recipe_name --[[@as string]]
             selected = tags.selected --[[@as boolean]]
+            layer = tags.layer --[[@as string]]
         end
     elseif e.tags then
         tags = e.tags
         if tags then
             recipe_name = tags.recipe_name --[[@as string]]
             selected = tags.selected --[[@as boolean]]
+            layer = tags.layer --[[@as string]]
         end
     end
 
@@ -161,6 +164,7 @@ local function on_build(entity, e, revive)
     end
     graph.insert_recipe_at_position(g, grecipe, col, line)
     grecipe.visible = true
+    grecipe.layer = layer
     if selected ~= false then
         g.selection[recipe_name] = grecipe
     end

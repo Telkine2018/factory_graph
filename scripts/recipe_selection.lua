@@ -471,9 +471,10 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
     end)
 
 ---@param player LuaPlayer
+---@param selected_recipe_name string?
 ---@return {[string]:GRecipe}   @ all selected
 ---@return {[string]:GRecipe}   @ all invisible
-local function set_recipes_to_selection(player)
+local function set_recipes_to_selection(player, selected_recipe_name)
     local frame = player.gui.screen[recipe_selection_frame_name]
     if not frame then return {}, {} end
     local recipe_table = tools.get_child(frame, "recipe_table")
@@ -486,8 +487,11 @@ local function set_recipes_to_selection(player)
         local name = line.tags.recipe_name --[[@as string]]
         local cb = line[cb_name]
         if name and cb then
+            if selected_recipe_name and name == selected_recipe_name then
+                cb.state = true
+            end
+            local grecipe = g.recipes[name]
             if cb.state then
-                local grecipe = g.recipes[name]
                 if grecipe then
                     g.selection[name] = grecipe
                     recipes[name] = grecipe
@@ -500,6 +504,7 @@ local function set_recipes_to_selection(player)
                 end
             else
                 g.selection[name] = nil
+                grecipe.visible = nil
             end
         end
     end
@@ -508,10 +513,11 @@ end
 
 ---@param player LuaPlayer
 ---@param recipe_name  string?
-local function select_recipe(player, recipe_name)
+---@param do_add boolean?
+local function select_recipe(player, recipe_name, do_add)
     local g = gutils.get_graph(player)
 
-    local _, not_visible = set_recipes_to_selection(player)
+    local _, not_visible = set_recipes_to_selection(player, do_add and recipe_name or nil)
     for _, grecipe in pairs(not_visible) do
         grecipe.visible = true
         graph.insert_recipe(g, grecipe)
@@ -579,7 +585,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
         local recipe = prototypes.recipe[grecipe.name]
-        if (not recipe.hidden) or g.show_hidden then
+        if recipe and (not recipe.hidden) or g.show_hidden then
             if recipe then
                 table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
             else
@@ -740,7 +746,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 b_machine.style.size = general_button_size
                 b_machine.elem_value = machines[1].name
                 b_machine.elem_tooltip = { type = "entity", name = machines[1].name }
-                b_machine.tooltip = { np("machine_tooltip") }
+                -- b_machine.tooltip = { np("machine_tooltip") }
+                b_machine.raise_hover_events = true
 
                 tools.set_name_handler(b_machine, np("machine"), { recipe_name = recipe_name })
             end
@@ -832,6 +839,21 @@ tools.on_gui_click(np("close"),
         recipe_selection.close(e.player_index --[[@as integer]])
     end)
 
+---@param g Graph
+---@param grecipe GRecipe
+---@param control boolean?
+function recipe_selection.goto_recipe(g, grecipe, control)
+    local position = gutils.get_recipe_position(g, grecipe)
+    if not position then return end
+    drawing.draw_target(g, grecipe)
+    if control then
+        player.teleport(position, g.surface, false)
+    else
+        gutils.move_view(g.player, position)
+    end
+    gutils.refresh_machine_list(g, grecipe.name)
+end
+
 tools.on_gui_click(np("goto"),
     ---@param e EventData.on_gui_click
     function(e)
@@ -848,15 +870,7 @@ tools.on_gui_click(np("goto"),
 
         if not (e.shift or e.control or e.alt) then
             if player.surface == g.surface then
-                local position = gutils.get_recipe_position(g, grecipe)
-                if not position then return end
-                drawing.draw_target(g, grecipe)
-                if e.control then
-                    player.teleport(position, g.surface, false)
-                else
-                    gutils.move_view(player, position)
-                end
-                gutils.refresh_machine_list(g, recipe_name)
+                recipe_selection.goto_recipe(g, grecipe, e.control)
             else
                 gutils.show_machine(player, recipe_name, true)
                 gutils.refresh_machine_list(g, recipe_name)
@@ -1110,8 +1124,30 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
 
         local g = gutils.get_graph(player)
         if g and g.surface == player.surface then
-            gutils.set_cursor_stack(player, recipe_name)
-            recipe_selection.close(player.index)
+            if not (e.shift or e.control or e.alt) then
+                local grecipe = g.recipes[recipe_name]
+                if not grecipe.visible then
+                    if not g.layout_on_selection then
+                        gutils.set_cursor_stack(player, recipe_name)
+                        recipe_selection.close(player.index)
+                    elseif g.selection[recipe_name] then
+                        if g.visibility == commons.visibility_layers then
+                            if grecipe.layer ~= g.current_layer then
+                                grecipe.layer = g.current_layer
+                            else
+                                grecipe.layer = nil
+                            end
+                            graph.deferred_update(player, { do_layout = true })
+                        elseif grecipe.visible then
+                            recipe_selection.show_recipes(player, grecipe)
+                        end
+                    else
+                        select_recipe(player, recipe_name, true)
+                    end
+                else
+                    recipe_selection.show_recipes(player, { grecipe })
+                end
+            end
         end
     end)
 
@@ -1236,5 +1272,30 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
         end
     end)
 
+tools.on_named_event(np("machine"), defines.events.on_gui_hover,
+    ---@param e EventData.on_gui_hover
+    function(e)
+        local player = game.players[e.player_index]
+        local machine_name = e.element.elem_value
+
+        local machine
+        if machine_name then
+            machine = prototypes.entity[machine_name]
+        end
+        local parts = { "" }
+
+        e.element.tooltip = { np("machine-tooltip"), "" }
+        if machine then
+            parts = gutils.create_machine_tooltip(player, machine)
+            if #parts > 16 then
+                local newparts = {}
+                for i = 1, 16 do
+                    table.insert(newparts, parts[i])
+                end
+                parts = newparts
+            end
+            e.element.tooltip = { np("machine-tooltip"), { "", machine.localised_name }, parts }
+        end
+    end)
 
 return recipe_selection
