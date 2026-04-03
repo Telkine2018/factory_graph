@@ -1347,7 +1347,7 @@ local function on_control_click4(e)
                 gutils.refresh_machine_list(g, recipe.name)
                 gutils.show_machine(player, recipe.name, true)
                 tools.fire_user_event(commons.open_recipe_selection, { g = g, player = player, recipe = g.recipes[recipe.name], if_opened = true })
-           end
+            end
         end
     else
         local grecipe = gutils.get_selected_recipe_in_graph(player)
@@ -1570,6 +1570,7 @@ function drawing.redraw_selection(player)
         g.selected_recipe = nil
         g.selected_recipe_entity = nil
     end
+    -- player.force.rechart(g.surface)
 end
 
 ---@param g Graph
@@ -1579,7 +1580,7 @@ function drawing.delete_content(g, keep_location)
     destroy_graph_ids(g)
     g.layer_ids = gutils.destroy_drawing(g.layer_ids)
 
-    local entities = g.surface.find_entities_filtered {}
+    local entities = g.surface.find_entities_filtered { name = commons.radar_name, invert = true }
     for _, entity in pairs(entities) do
         entity.destroy { raise_destroy = false }
     end

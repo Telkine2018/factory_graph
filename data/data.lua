@@ -7,7 +7,8 @@ local empty_sprite = {
   filename = png('invisible'),
   width = 1,
   height = 1,
-  frame_count = 1
+  frame_count = 1,
+  direction_count = 1
 }
 
 local declarations = {}
@@ -389,5 +390,36 @@ add {
   alt_entity_type_filters = { "assembling-machine", "furnace" }
 }
 
+	local radar = data.raw["radar"]["radar"]
+  if radar then
+    radar = table.deepcopy(radar)
+    -- log(serpent.block(radar))
+    radar.name = commons.radar_name
+    radar.energy_per_nearby_scan = "1W"
+    radar.energy_per_sector = "1W"
+    radar.energy_source = { type="void"}
+    radar.max_distance_of_nearby_sector_revealed = 30
+    radar.max_distance_of_sector_revealed = 30
+    radar.circuit_connector = {}
+    radar.circuit_wire_max_distance = nil
+    radar.connects_to_other_radars = false
+    radar.draw_circuit_wires = false
+    radar.draw_copper_wires = false
+    radar.frozen_patch = nil
+    --radar.pictures = nil
+    radar.radius_minimap_visualisation_color = nil
+    radar.reset_orientation_when_frozen = false
+    radar.collision_mask = {layers={}}
+    
+    radar.hidden_in_factoriopedia = true
+    radar.minable = nil
+    radar.flags = { "not-on-map", "hide-alt-info", "not-blueprintable" }
+    radar.selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } }
+    radar.pictures={
+      layers = { empty_sprite }
+    }
+
+    table.insert(declarations, radar)
+  end
 
 data:extend(declarations)

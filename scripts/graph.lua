@@ -48,7 +48,6 @@ function graph.new(surface)
         layout_on_selection = true,
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
-        world_zoom_level = 2,
         line_gap = 0.2,
         show_products = true,
 

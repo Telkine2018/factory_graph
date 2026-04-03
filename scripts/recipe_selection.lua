@@ -847,7 +847,7 @@ function recipe_selection.goto_recipe(g, grecipe, control)
     if not position then return end
     drawing.draw_target(g, grecipe)
     if control then
-        player.teleport(position, g.surface, false)
+        gutils.teleport(player, position)
     else
         gutils.move_view(g.player, position)
     end

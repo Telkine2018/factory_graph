@@ -29,6 +29,7 @@ local tools = require("scripts.tools")
 ---@field selector_product_name_id LuaRenderObject?         @ selector text id
 ---@field recipe_order integer
 ---@field player_position MapPosition
+---@field highlight_recipe string?
 ---@field module_limitations {[string]:({[string]:true})}
 ---@field excluded_categories {[string]:boolean}?
 ---@field excluded_subgroups {[string]:boolean}?
@@ -49,7 +50,7 @@ local tools = require("scripts.tools")
 ---@field always_use_full_selection boolean?
 ---@field layout_on_selection boolean?
 ---@field graph_zoom_level number?
----@field world_zoom_level number?
+---@field graph_zoom_level_cmd number?
 ---@field autosave_on_graph_switching boolean?
 ---@field current_layer string?
 ---@field visible_layers {[string]:boolean}
@@ -215,4 +216,15 @@ local tools = require("scripts.tools")
 ---@field update_command  boolean?
 ---@field no_recipe_selection_update boolean?
 ---@field update_product_list boolean?
+
+---@class Extern
+---@field surface LuaSurface
+---@field position MapPosition
+---@field zoom number
+---@field character LuaEntity
+---@field force LuaForce
+---@field cheat_mode boolean
+---@field controller integer | defines.controllers
+---@field show_surface_list boolean
+---@field in_graph boolean
 

@@ -1012,13 +1012,7 @@ end
 ---@param player LuaPlayer
 ---@return LuaEntity?
 function product_panel.get_character(player)
-    ---@type LuaEntity
-    local character = player.character
-    local vars = tools.get_vars(player)
-    if not character and vars.saved_character and vars.saved_character.valid then
-        character = vars.saved_character
-    end
-    return character
+    return gutils.get_character(player)
 end
 
 ---@param player LuaPlayer
@@ -1038,7 +1032,7 @@ local function get_inventories(player)
         network = character.surface.find_logistic_network_by_position(character.position, player.force_index)
     end
     local craft_queue = {}
-    if player.crafting_queue_size > 0 then
+    if player.controller_type == defines.controllers.character and player.crafting_queue_size > 0 then
         for _, c in pairs(player.crafting_queue) do
             local recipe = prototypes.recipe[c.recipe]
             if recipe then
@@ -2002,7 +1996,7 @@ tools.on_gui_click(goto_button_name,
                     if not position then return end
                     drawing.draw_target(g, recipe)
                     if e.control then
-                        player.teleport(position, g.surface, false)
+                        gutils.teleport(player, position)
                     else
                         gutils.move_view(player, position)
                     end

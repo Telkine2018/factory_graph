@@ -149,7 +149,7 @@ function gutils.move_to_recipe(player, recipe_name, fast)
     if not position then return end
 
     if fast then
-        player.teleport(position)
+        player.set_controller { type = defines.controllers.remote, position = position, surface = g.surface }
     else
         gutils.move_view(player, position)
     end
@@ -167,8 +167,9 @@ local function move_tick_handler()
 
     local toremove = {}
     for player_index, move in pairs(moves) do
-        local count = move.count
         local player = game.players[player_index]
+        local g = gutils.get_graph(player)
+        local count = move.count
         count = count - 1
         if count <= 0 then
             toremove[player_index] = true
@@ -176,7 +177,7 @@ local function move_tick_handler()
             local pos = player.position
             local x = pos.x + move.dx
             local y = pos.y + move.dy
-            player.teleport({ x, y }, player.surface, false)
+            gutils.teleport(player, { x, y })
             move.count = count
         end
     end
@@ -506,7 +507,8 @@ function gutils.recenter(g)
     end
 
     local x, y = gutils.get_position(g, center_col, center_line)
-    g.player.teleport({ x, y })
+
+    gutils.teleport(g.player, { x, y })
 end
 
 ---@param recipes table<any, GRecipe>
@@ -708,7 +710,7 @@ end
 ---@param recipe_name string
 function gutils.set_cursor_stack(player, recipe_name)
     local g = gutils.get_graph(player)
-    local layer 
+    local layer
     if g.visibility == commons.visibility_layers then
         layer = g.current_layer
     end
@@ -1022,10 +1024,15 @@ function gutils.get_real_surface(player)
     if surface ~= g.surface then
         return surface, player.position
     else
-        if vars.extern_surface and vars.extern_surface.valid then
-            return vars.extern_surface, vars.extern_position or player.position
+        ---@type Extern
+        local extern = vars.extern
+        if extern.surface.valid then
+            return extern.surface, extern.position
         end
-        return game.surfaces("nauvis"), player.position
+        if player.physical_surface then
+            return player.physical_surface, player.physical_position
+        end
+        return game.surfaces("nauvis"), { 0, 0 }
     end
 end
 
@@ -1107,9 +1114,13 @@ function gutils.get_character(player)
     if character then return character end
 
     local vars = tools.get_vars(player)
-    if not character and vars.saved_character and vars.saved_character.valid then
-        character = vars.saved_character
+
+    ---@type Extern?
+    local extern = vars.extern
+    if extern and extern.character and extern.character.valid then
+        character = extern.character
     end
+
     return character
 end
 
@@ -1172,6 +1183,15 @@ function gutils.create_machine_tooltip(player, machine_entity)
         end
     end
     return parts
+end
+
+---@param player LuaPlayer
+---@param position MapPosition
+function gutils.teleport(player, position)
+    local surface = player.surface
+    local zoom = player.zoom
+    player.set_controller { type = defines.controllers.remote, position = position, surface = surface }
+    player.zoom = zoom
 end
 
 return gutils

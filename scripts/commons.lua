@@ -105,4 +105,6 @@ commons.action_consumer = 3
 commons.action_producer = 4
 commons.action_in_selection = 5
 
+commons.radar_name = prefix .. "-radar"
+
 return commons

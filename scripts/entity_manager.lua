@@ -171,10 +171,9 @@ local function on_build(entity, e, revive)
     if grecipe.entity and grecipe.entity.valid then
         drawing.clear_selection(g)
         local x, y = gutils.get_position(g, grecipe.col, grecipe.line)
-        grecipe.entity.teleport { x, y }
+        gutils.teleport(player, {x,y})
     else
         grecipe.entity = nil
-
         drawing.clear_selection(g)
         graph.create_recipe_object(g, grecipe)
     end

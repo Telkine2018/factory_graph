@@ -240,7 +240,7 @@ function msettings.create(player_index, grecipe)
     
     if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
-        local search_surface = tools.get_vars(player).extern_surface
+        local search_surface = gutils.get_real_surface(player)
         if search_surface and not search_surface.valid then
             search_surface = nil
         end
