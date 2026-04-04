@@ -152,8 +152,7 @@ function recipe_panel.create(player_index, grecipe)
     local label = flow.add { type = "label", caption = { np("speed"), tostring(recipe.energy) } }
     label.style.top_margin = 5
 
-    local category = recipe.category
-    local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category } }
+    local machines = machinedb.get_machines_for_recipe(recipe.name)
 
     local technologies = prototypes.get_technology_filtered { { filter = "unlocks-recipe", recipe = recipe.name } }
     if technologies and #technologies > 0 then

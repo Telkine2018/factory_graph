@@ -67,9 +67,11 @@ function machinedb.initialize()
         local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category_name } }
         local machine_infos = {}
         for _, machine in pairs(machines) do
-            local info = machinedb.get_machine(machine)
-            info.categories[category_name] = true
-            table.insert(machine_infos, info)
+            if not machine.hidden then
+                local info = machinedb.get_machine(machine)
+                info.categories[category_name] = true
+                table.insert(machine_infos, info)
+            end
         end
         machinedb.category_to_machines[category_name] = machine_infos
         table.sort(machine_infos, function(e1, e2) return e1.crafting_speed < e2.crafting_speed end)
@@ -94,6 +96,7 @@ end
 ---@return boolean
 function machinedb.is_machine_enabled(force, machine_name)
     local entity = prototypes.entity[machine_name]
+    if entity.hidden then return false end
     if entity.items_to_place_this then
         local item = entity.items_to_place_this[1]
         local machine_recipes = prototypes.get_recipe_filtered {
