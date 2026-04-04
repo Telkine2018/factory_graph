@@ -81,7 +81,8 @@ function recipe_panel.create(player_index, grecipe)
         create_inner_frame = true,
         container          = player.gui.left
     }
-    local _, flow = tools.create_standard_panel(player, params)
+    local frame, flow = tools.create_standard_panel(player, params)
+    frame.style.horizontally_stretchable = false
 
     ---@param title LocalisedString?
     local function add_line(title)

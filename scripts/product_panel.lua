@@ -1574,10 +1574,13 @@ tools.on_named_event(np("recipe_detail"), defines.events.on_gui_click,
             if not (e.shift or e.control or e.alt) then
                 local recipe_name = element.tags.recipe_name --[[@as string]]
                 if not recipe_name then return end
-                gutils.move_to_recipe(player, recipe_name, e.control)
-
-                local g = gutils.get_graph(player)
-                drawing.draw_target(g, g.recipes[recipe_name])
+                if not string.find(player.surface.name, commons.surface_prefix_filter) then
+                    gutils.enter(player, recipe_name)
+                else
+                    gutils.move_to_recipe(player, recipe_name, e.control)
+                    local g = gutils.get_graph(player)
+                    drawing.draw_target(g, g.recipes[recipe_name])
+                end
             elseif e.shift then
                 local recipe_name = element.tags.recipe_name --[[@as string]]
                 player.begin_crafting { recipe = recipe_name, count = 1 }
@@ -1848,7 +1851,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     gutils.exit(player)
                 end
                 local recipe_name = e.element.tags.recipe_name --[[@as string]]
-                gutils.show_machine(player, recipe_name)
+                gutils.show_machine(player, recipe_name, true)
             end
         end
     end)

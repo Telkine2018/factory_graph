@@ -56,6 +56,7 @@ local tools = require("scripts.tools")
 ---@field visible_layers {[string]:boolean}
 ---@field show_products boolean?
 ---@field lab_packs string[]
+---@field is_command_invisible boolean?
 
 ---@class GraphProduction
 ---@field use_connected_recipes boolean             @ true if connected reciped use

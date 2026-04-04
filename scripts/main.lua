@@ -324,7 +324,10 @@ function main.exit(player)
 
     _log("main.exit")
 
-    if g.surface.index ~= player.surface_index then return end
+    if g.surface.index ~= player.surface_index then 
+        player.game_view_settings.show_surface_list = true
+        return 
+    end
 
     if extern then
         if extern.controller == defines.controllers.god then
@@ -358,7 +361,8 @@ tools.on_event(defines.events.on_player_changed_surface,
             local saved_surface = extern.surface
             local saved_position = extern.position
             local saved_controller = extern.controller
-            local save_show_surface_list = extern.show_surface_list
+            local save_show_surface_list = true
+            local save_show_minimap = true
 
             player.force = extern.force
             player.cheat_mode = extern.cheat_mode
@@ -374,16 +378,19 @@ tools.on_event(defines.events.on_player_changed_surface,
                 if saved_zoom then
                     player.zoom = saved_zoom
                 end
-                player.game_view_settings.show_surface_list = save_show_surface_list
-                return
+            else
+                if (saved_controller == defines.controllers.god and player.controller_type == defines.controllers.character)
+                then
+                    player.set_controller { type = defines.controllers.remote, position = saved_position, surface = saved_surface }
+                end
             end
 
-            if (saved_controller == defines.controllers.god and player.controller_type == defines.controllers.character)
-            then
-                player.set_controller { type = defines.controllers.remote, position = saved_position, surface = saved_surface }
-            end
-            player.game_view_settings.show_surface_list = save_show_surface_list
-
+            local settings = player.game_view_settings
+            settings.show_surface_list = save_show_surface_list
+            settings.show_minimap = save_show_minimap
+            settings.show_entity_tooltip = true
+            settings.show_tool_bar = true
+            settings.show_quickbar = true
             return
         end
 
@@ -424,7 +431,12 @@ tools.on_event(defines.events.on_player_changed_surface,
             command.open(player)
             player.force = "player"
             player.cheat_mode = false
-            player.game_view_settings.show_surface_list = false
+            local settings = player.game_view_settings
+            settings.show_surface_list = false
+            settings.show_minimap = false
+            settings.show_entity_tooltip = false
+            settings.show_tool_bar = false
+            settings.show_quickbar = false
 
             player.zoom = g.graph_zoom_level
             g.graph_zoom_level_cmd = g.graph_zoom_level

@@ -2,7 +2,7 @@
 Version: 2.0.24
 Date: 31. 03. 2026.
   Features:
-    - Use remote view
+    - Big refactor to use remote views. Now use <Escape> to exit graph view.
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.23
 Date: 14. 03. 2026.

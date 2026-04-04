@@ -1083,6 +1083,8 @@ function tools.create_standard_panel(player, params)
         drag.style = "flib_titlebar_drag_handle"
         drag.drag_target = frame
         titleflow.drag_target = frame
+    else
+        drag.style.horizontally_stretchable = true
     end
 
     if params.title_menu_func then
@@ -1106,14 +1108,16 @@ function tools.create_standard_panel(player, params)
         inner_frame = frame.add {
             type = "frame",
             direction = "vertical",
-            style = "inside_shallow_frame_with_padding"
+            style = "inside_shallow_frame_with_padding",
+            name = "inner_frame"
         }
         inner_frame.style.vertically_stretchable = true
         inner_frame.style.horizontally_stretchable = true
     else
         inner_frame = frame.add {
             type = "frame",
-            direction = "vertical"
+            direction = "vertical",
+            name = "inner_frame"
         }
         inner_frame.style.vertically_stretchable = true
         inner_frame.style.horizontally_stretchable = true
