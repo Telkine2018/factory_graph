@@ -1137,13 +1137,15 @@ end
 
 ---@param player LuaPlayer
 ---@param machine_entity LuaEntityPrototype
+---@param machine_count integer?
 ---@return table
-function gutils.create_machine_tooltip(player, machine_entity)
+function gutils.create_machine_tooltip(player, machine_entity, machine_count)
     local parts = { "" }
+    if not machine_count then machine_count = 1 end
     if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
-            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, 1)
+            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, machine_count)
 
             if not used then
                 local machine_recipes =

@@ -1554,13 +1554,14 @@ tools.on_named_event(np("summary_machine"), defines.events.on_gui_hover,
 
         local tags = e.element.tags
         local machine_name = tags.machine_name --[[@as string]]
+        local count = tags.count --[[@as integer]]
 
         if not machine_name then return end
 
         local parts = { "" }
         local proto = prototypes.entity[machine_name]
         if proto then
-            parts = gutils.create_machine_tooltip(player, proto)
+            parts = gutils.create_machine_tooltip(player, proto, count)
             e.element.tooltip = { np("build-button-tooltip_hover"), parts }
         end
     end)
@@ -1638,7 +1639,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
 
         local parts = { "" }
         if machine and machine.machine then
-            parts = gutils.create_machine_tooltip(player, machine.machine)
+            local count = math.ceil(machine.count or 1)
+            parts = gutils.create_machine_tooltip(player, machine.machine, count)
         end
 
         if machine and machine.machine then
