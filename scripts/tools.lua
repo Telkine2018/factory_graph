@@ -1276,7 +1276,7 @@ end
 
 local recipe_logging = true
 local terminal_products = {
-    ["stone-brick"]=true
+    ["stone-brick"] = true
 }
 
 ---@class CraftStack
@@ -1284,11 +1284,10 @@ local terminal_products = {
 ---@field count int
 
 ---@param character LuaEntity
----@param  item string
----@param  count integer
+---@param  item_map {[string]:number}
 ---@return {[string]:integer}?
 ---@return {[string]:integer}?
-function tools.find_missing_ingredients(character, item, count)
+function tools.find_missing_ingredients(character, item_map)
     local inv = character.get_main_inventory()
     if not inv then return nil end
 
@@ -1304,161 +1303,153 @@ function tools.find_missing_ingredients(character, item, count)
             content_map[elem.name] = elem.count
         end
     end
-    content_map[item] = 0
 
     local missing = {}
-    ---@type CraftStack[]
-    local to_process = { { item = item, count = count } }
-
-    if recipe_logging then
-        log(">>> find_missing_ingredients: " .. item)
-    end
-
-    local to_process_index = 1
-
-    local filters = {}
-    local recipe_ref = { filter = "name", name = item }
-    table.insert(filters, { filter = "hidden", mode = "and", invert = true })
-    table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
-
     local used = {}
 
-    --- Link product => complete recipe
-    ---@type {[string]:string[]}
-    local completion = {}
+    for item, count in pairs(item_map) do
 
-    ---@type {[string]:boolean}
-    local stack = {}
+        ---@type CraftStack[]
+        local to_process = { { item = item, count = count } }
+        local to_process_index = 1
 
-    ---@param current_item string
-    function complete_items(current_item)
-        if completion[current_item] then
-            
-            --- complete items
-            local to_complete = { [current_item] = true }
-            while (true) do
+        local filters = {}
+        local recipe_ref = { filter = "name", name = item }
+        table.insert(filters, { filter = "hidden", mode = "and", invert = true })
+        table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
 
-                local complete_item, _ = next(to_complete)
-                if complete_item then
-                    local complete_list = completion[complete_item]
-                    if complete_list then
-                        completion[complete_item] = nil
-                        for _, end_item in pairs(complete_list) do
-                            stack[end_item] = nil
-                            to_complete[end_item] = true
-                        end
-                    end
-                    to_complete[complete_item] = nil
-                else
-                    break
-                end
-            end
-        end
-    end
+        --- Link product => complete recipe
+        ---@type {[string]:string[]}
+        local completion = {}
 
-    while to_process_index <= #to_process do
-        local to_process_current = to_process[to_process_index]
-        to_process_index = to_process_index + 1
+        ---@type {[string]:boolean}
+        local stack = {}
 
-        local current_item = to_process_current.item
-        local count = to_process_current.count
-
-        if recipe_logging then
-            log("process: " .. current_item .. " x " ..count)
-        end
-
-        local content_count = (content_map[current_item] or 0)
-        local remaining = content_count - count
-
-        if remaining >= 0 then
-            content_map[current_item] = remaining
-            used[current_item] = (used[current_item] or 0) + count
-            complete_items(current_item)
-
-            if recipe_logging then
-                log("found: " .. current_item .. " x " ..count)
-            end
-        else
-            if content_count > 0 then
-                used[current_item] = (used[current_item] or 0) + content_count
-            end
-            content_map[current_item] = nil
-            local done
-            local needed = -remaining
-
-            if not stack[current_item] and not terminal_products[current_item] then
-                recipe_ref.name = current_item
-                local recipes = prototypes.get_recipe_filtered(filters)
-
-                local iter = 1
-                for _, recipe in pairs(recipes) do
-                    if not character.force.recipes[recipe.name].enabled or recipe.hidden then
-                        goto skip
-                    end
-                    if item ~= current_item and not recipe.allow_as_intermediate then
-                        goto skip
-                    end
-                    if recipe.hidden_from_player_crafting then goto skip end
-                    if crafting_categories[recipe.category] then
-                        -- Get iteration count of recipe
-                        for _, product in pairs(recipe.products) do
-                            if product.name == current_item then
-                                if product.amount then
-                                    iter = math.ceil(needed / product.amount)
-                                else
-                                    iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
-                                end
-                                break
+        ---@param current_item string
+        function complete_items(current_item)
+            if completion[current_item] then
+                --- complete items
+                local to_complete = { [current_item] = true }
+                while (true) do
+                    local complete_item, _ = next(to_complete)
+                    if complete_item then
+                        local complete_list = completion[complete_item]
+                        if complete_list then
+                            completion[complete_item] = nil
+                            for _, end_item in pairs(complete_list) do
+                                stack[end_item] = nil
+                                to_complete[end_item] = true
                             end
                         end
-
-                        if recipe_logging then
-                            log("apply recipe: " .. recipe.name)
-                        end
-
-                        local last_item
-                        local insert_index = to_process_index
-                        for _, ingredient in pairs(recipe.ingredients) do
-                            if ingredient.name == current_item then
-                                goto skip
-                            end
-                            if ingredient.type == "item" then
-                                local amount = ingredient.amount * iter
-                                table.insert(to_process, insert_index,
-                                    {
-                                        item = ingredient.name,
-                                        count = amount
-                                    })
-                                insert_index = insert_index + 1
-                                last_item = ingredient.name
-                            else
-                                return nil, nil
-                            end
-                        end
-                        done = true
-                        if last_item then
-                            stack[current_item] = true
-                            local l = completion[last_item]
-                            if l then
-                                table.insert(l, current_item)
-                            else
-                                completion[last_item] = { current_item }
-                            end
-                        end
+                        to_complete[complete_item] = nil
+                    else
                         break
                     end
-                    ::skip::
                 end
             end
-            if not done then
-                if current_item == item then
-                    return nil, nil
-                end
-                missing[current_item] = (missing[current_item] or 0) + needed
+        end
+
+        while to_process_index <= #to_process do
+            local to_process_current = to_process[to_process_index]
+            to_process_index = to_process_index + 1
+
+            local current_item = to_process_current.item
+            local count = to_process_current.count
+
+            if recipe_logging then
+                log("process: " .. current_item .. " x " .. count)
+            end
+
+            local content_count = (content_map[current_item] or 0)
+            local remaining = content_count - count
+
+            if remaining >= 0 then
+                content_map[current_item] = remaining
+                used[current_item] = (used[current_item] or 0) + count
                 complete_items(current_item)
 
                 if recipe_logging then
-                    log("failed to find: " .. current_item .. " x " .. needed)
+                    log("found: " .. current_item .. " x " .. count)
+                end
+            else
+                if content_count > 0 then
+                    used[current_item] = (used[current_item] or 0) + content_count
+                end
+                content_map[current_item] = nil
+                local done
+                local needed = -remaining
+
+                if not stack[current_item] and not terminal_products[current_item] then
+                    recipe_ref.name = current_item
+                    local recipes = prototypes.get_recipe_filtered(filters)
+
+                    local iter = 1
+                    for _, recipe in pairs(recipes) do
+                        if not character.force.recipes[recipe.name].enabled or recipe.hidden then
+                            goto skip
+                        end
+                        if item ~= current_item and not recipe.allow_as_intermediate then
+                            goto skip
+                        end
+                        if recipe.hidden_from_player_crafting then goto skip end
+                        if crafting_categories[recipe.category] then
+                            -- Get iteration count of recipe
+                            for _, product in pairs(recipe.products) do
+                                if product.name == current_item then
+                                    if product.amount then
+                                        iter = math.ceil(needed / product.amount)
+                                    else
+                                        iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
+                                    end
+                                    break
+                                end
+                            end
+
+                            if recipe_logging then
+                                log("apply recipe: " .. recipe.name)
+                            end
+
+                            local last_item
+                            local insert_index = to_process_index
+                            for _, ingredient in pairs(recipe.ingredients) do
+                                if ingredient.name == current_item then
+                                    goto skip
+                                end
+                                if ingredient.type == "item" then
+                                    local amount = ingredient.amount * iter
+                                    table.insert(to_process, insert_index,
+                                        {
+                                            item = ingredient.name,
+                                            count = amount
+                                        })
+                                    insert_index = insert_index + 1
+                                    last_item = ingredient.name
+                                else
+                                    return nil, nil
+                                end
+                            end
+                            done = true
+                            if last_item then
+                                stack[current_item] = true
+                                local l = completion[last_item]
+                                if l then
+                                    table.insert(l, current_item)
+                                else
+                                    completion[last_item] = { current_item }
+                                end
+                            end
+                            break
+                        end
+                        ::skip::
+                    end
+                end
+                if not done then
+                    missing[current_item] = (missing[current_item] or 0) + needed
+                    complete_items(current_item)
+
+                    if recipe_logging then
+                        log("failed to find: " .. current_item .. " x " .. needed)
+                    end
                 end
             end
         end

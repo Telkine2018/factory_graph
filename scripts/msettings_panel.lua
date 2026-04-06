@@ -5,6 +5,7 @@ local tools      = require("scripts.tools")
 local gutils     = require("scripts.gutils")
 local machinedb  = require("scripts.machinedb")
 local production = require("scripts.production")
+local graph      = require("scripts.graph")
 
 local prefix     = commons.prefix
 
@@ -237,7 +238,7 @@ function msettings.create(player_index, grecipe)
     machinedb.initialize()
     local machines = machinedb.get_machines_for_recipe(grecipe.name)
     local machine_names = {}
-    
+
     if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
         local search_surface = gutils.get_real_surface(player)
@@ -262,7 +263,7 @@ function msettings.create(player_index, grecipe)
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
-    local module_scroll = field_table.add{type="scroll-pane", name="modules_scroll"}
+    local module_scroll = field_table.add { type = "scroll-pane", name = "modules_scroll" }
     module_scroll.style.maximal_height = 300
     local module_flow = module_scroll.add { type = "table", column_count = 6, name = "modules_pane" }
     install_modules(module_flow, g, config, grecipe)
@@ -601,8 +602,18 @@ function msettings.open_selection(player)
         gutils.refresh_machine_list(g, grecipe.name)
         msettings.create(player.index, grecipe)
     else
-        local product = g.products[grecipe.name]
-        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, action=commons.action_producer })
+        local gproduct = g.products[grecipe.name]
+        if g.visibility == commons.visibility_layers then
+            for gname, grecipe in pairs(gproduct.product_of) do
+                if not grecipe.is_product and g.selection[gname] then
+                    grecipe.layer = g.current_layer
+                    graph.deferred_update(player, { selection_changed = true, do_layout = true })
+                    tools.fire_user_event(commons.production_data_change_event, { g = g })
+                    return
+                end
+            end
+        end
+        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = gproduct, action = commons.action_producer })
     end
 end
 

@@ -1069,6 +1069,7 @@ tools.on_gui_click(np("select-all"),
             end
         end
         graph.deferred_update(player, { do_layout = true, center_on_graph = true, no_recipe_selection_update = true })
+        tools.fire_user_event(commons.production_data_change_event, { g = g })
     end)
 
 ---@param player LuaPlayer
@@ -1134,10 +1135,9 @@ tools.on_named_event(np("recipe"), defines.events.on_gui_click,
                         if g.visibility == commons.visibility_layers then
                             if grecipe.layer ~= g.current_layer then
                                 grecipe.layer = g.current_layer
-                            else
-                                grecipe.layer = nil
                             end
                             graph.deferred_update(player, { do_layout = true })
+                            tools.fire_user_event(commons.production_data_change_event, { g = g })
                         elseif grecipe.visible then
                             recipe_selection.show_recipes(player, grecipe)
                         end

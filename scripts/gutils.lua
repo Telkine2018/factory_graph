@@ -1132,7 +1132,7 @@ end
 function gutils.find_missing_ingredients(player, item, count)
     local character = gutils.get_character(player)
     if not character then return nil, nil end
-    return tools.find_missing_ingredients(character, item, count)
+    return tools.find_missing_ingredients(character, { [item] = count})
 end
 
 ---@param player LuaPlayer
