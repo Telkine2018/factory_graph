@@ -1129,10 +1129,11 @@ end
 ---@param  count integer
 ---@return {[string]:integer}?
 ---@return {[string]:integer}?
+---@return {[string]:integer}?
 function gutils.find_missing_ingredients(player, item, count)
     local character = gutils.get_character(player)
     if not character then return nil, nil end
-    return tools.find_missing_ingredients(character, { [item] = count})
+    return tools.find_missing_ingredients(character, { [item] = count })
 end
 
 ---@param player LuaPlayer
@@ -1145,7 +1146,7 @@ function gutils.create_machine_tooltip(player, machine_entity, machine_count)
     if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
-            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, machine_count)
+            local missing, used, inv = gutils.find_missing_ingredients(player, machine_item.name, machine_count)
 
             if not used then
                 local machine_recipes =
@@ -1170,7 +1171,10 @@ function gutils.create_machine_tooltip(player, machine_entity, machine_count)
                     end
                 end
             else
-                table.insert(parts, { np("from_inventory") })
+                inv = inv or {}
+                local mcount = "0"
+                if inv[machine_item.name] then mcount = tostring(inv[machine_item.name]) end
+                table.insert(parts, { np("from_inventory"), mcount })
                 for name, count in pairs(missing) do
                     local label = gutils.get_product_name(player, "item/" .. name)
                     local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
@@ -1194,6 +1198,52 @@ function gutils.teleport(player, position)
     local zoom = player.zoom
     player.set_controller { type = defines.controllers.remote, position = position, surface = surface }
     player.zoom = zoom
+end
+
+---@param player LuaPlayer
+---@param item string
+---@param count integer
+---@return integer?
+---@return string?
+function gutils.craft(player, item, count)
+    local recipes = prototypes.get_recipe_filtered { { filter = "has-product-item",
+        elem_filters = { { filter = "name", name = item } } } }
+
+    if not count then
+        count = 1
+    end
+    if not player.character then
+        return nil
+    end
+    local crafting_categories = player.character.prototype.crafting_categories
+    if #recipes > 0 and crafting_categories then
+        for recipe_name, recipe in pairs(recipes) do
+            if crafting_categories[recipe.category] then
+                local missing = gutils.find_missing_ingredients(player, item, count)
+                if missing and table_size(missing) > 0 then
+                    for name, count in pairs(missing) do
+                        local label = translations.get_item_name(player.index, name)
+                        player.create_local_flying_text {
+                            text = { np("missing_ingredient"), count, "[item=" .. name .. "]", label },
+                            color = { 1, 0, 0 },
+                            create_at_cursor = true,
+                            speed = 2
+                        }
+                    end
+                else
+                    local inv = player.character.get_main_inventory()
+                    local inv_count = 0
+                    if inv then
+                        inv_count = inv.get_item_count(item)
+                    end
+                    local craft_count = player.begin_crafting { recipe = recipe_name, count = count }
+                    player.print { np("craft"), count, "[item=" .. item .. "]", inv_count }
+                    return craft_count, recipe_name.name
+                end
+            end
+        end
+    end
+    return nil
 end
 
 return gutils

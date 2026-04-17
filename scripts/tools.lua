@@ -1287,6 +1287,7 @@ local terminal_products = {
 ---@param  item_map {[string]:number}
 ---@return {[string]:integer}?
 ---@return {[string]:integer}?
+---@return {[string]:integer}?
 function tools.find_missing_ingredients(character, item_map)
     local inv = character.get_main_inventory()
     if not inv then return nil end
@@ -1296,11 +1297,23 @@ function tools.find_missing_ingredients(character, item_map)
 
     local contents = inv.get_contents();
     local content_map = {}
+    local inv_content = {}
 
     -- Get normal content
     for _, elem in pairs(contents) do
         if elem.quality == "normal" or not elem.quality then
             content_map[elem.name] = elem.count
+            if item_map[elem.name] then
+                inv_content[elem.name] = elem.count
+            end
+        end
+    end
+
+    -- Force decomposition of requested entities
+    for name, count in pairs(item_map) do
+        if count == -1 then
+            content_map[name] = nil
+            item_map[name] = 1
         end
     end
 
@@ -1308,7 +1321,6 @@ function tools.find_missing_ingredients(character, item_map)
     local used = {}
 
     for item, count in pairs(item_map) do
-
         ---@type CraftStack[]
         local to_process = { { item = item, count = count } }
         local to_process_index = 1
@@ -1454,7 +1466,7 @@ function tools.find_missing_ingredients(character, item_map)
             end
         end
     end
-    return missing, used
+    return missing, used, inv_content
 end
 
 return tools

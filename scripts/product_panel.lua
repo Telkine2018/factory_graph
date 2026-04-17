@@ -154,7 +154,7 @@ function product_panel.create(player_index)
     machine_frame.style.minimal_width = 200
     machine_frame.style.minimal_height = 400
 
-    local tabbed_pane = machine_frame.add { type = "tabbed-pane", name=np("tabbed_pane") }
+    local tabbed_pane = machine_frame.add { type = "tabbed-pane", name = np("tabbed_pane") }
     tabbed_pane.style.vertically_stretchable = true
     tabbed_pane.style.horizontally_stretchable = true
 
@@ -178,7 +178,7 @@ function product_panel.create(player_index)
     error_panel.style.vertically_stretchable = true
     error_panel.style.maximal_height = 600
 
-    local requirements_panel = tabbed_pane.add { type = "flow", direction = "vertical" , name="requirements_panel"}
+    local requirements_panel = tabbed_pane.add { type = "flow", direction = "vertical", name = "requirements_panel" }
 
     tabbed_pane.add_tab(setup_tab, setup_flow)
     tabbed_pane.add_tab(summary_tab, summary_scroll)
@@ -1330,36 +1330,16 @@ tools.on_event(defines.events.on_player_crafted_item,
 ---@param item string
 ---@param count integer?
 function product_panel.craft_machine(player, item, count)
-    local recipes = prototypes.get_recipe_filtered { { filter = "has-product-item",
-        elem_filters = { { filter = "name", name = item } } } }
-
     if string.find(player.surface.name, commons.surface_prefix_filter) then
         gutils.exit(player)
     end
     if not count then
         count = 1
     end
-    if #recipes > 0 then
-        for name in pairs(recipes) do
-            local missing = gutils.find_missing_ingredients(player, item, count)
-            if missing and table_size(missing) > 0 then
-                for name, count in pairs(missing) do
-                    player.create_local_flying_text {
-                        text = { np("missing_ingredient"), count, "[item=" .. name .. "]" },
-                        color = { 1, 0, 0 },
-                        create_at_cursor = true,
-                        speed = 2
-                    }
-                end
-            else
-                local craft_count = player.begin_crafting { recipe = name, count = count }
-                local vars = tools.get_vars(player)
-                vars.current_craft_recipe = name
-                if craft_count > 0 then
-                    break
-                end
-            end
-        end
+    local craft_count, craft_recipe = gutils.craft(player, item, count)
+    if craft_count then
+        local vars = tools.get_vars(player)
+        vars.current_craft_recipe = craft_recipe
     end
 end
 
@@ -1639,7 +1619,8 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
 
         local parts = { "" }
         if machine and machine.machine then
-            local count = math.ceil(machine.count or 1)
+            -- local count = math.ceil(machine.count or 1)
+            local count = -1
             parts = gutils.create_machine_tooltip(player, machine.machine, count)
         end
 
@@ -2043,53 +2024,52 @@ tools.on_configuration_changed(
         end
     end)
 
-tools.on_event(defines.events.on_gui_selected_tab_changed, 
----@param e EventData.on_gui_selected_tab_changed
-function (e)
+tools.on_event(defines.events.on_gui_selected_tab_changed,
+    ---@param e EventData.on_gui_selected_tab_changed
+    function(e)
+        if e.element.name ~= np("tabbed_pane") then return end
 
-    if e.element.name ~= np("tabbed_pane") then return end
+        local requirements_panel = tools.get_child(e.element, "requirements_panel")
+        if not requirements_panel then return end
 
-    local requirements_panel = tools.get_child(e.element, "requirements_panel")
-    if not requirements_panel then return end
+        if e.element.selected_tab_index ~= 4 then return end
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
 
-    if e.element.selected_tab_index ~= 4 then return end
-    local player = game.players[e.player_index]
-    local g = gutils.get_graph(player)
-    
-    
-    requirements_panel.clear()
-    local machines = get_machines(g)
-    if not machines then return end
 
-    ---@type {[string]:number}
-    local machine_map = {}
-    for _, machine in pairs(machines) do
-        if machine.machine_quality == "normal" then
-            local m = machine.machine
-            local items = m.items_to_place_this
-            if items and #items > 0 then
-                local item = items[1].name
-                machine_map[item] = (machine_map[item] or 0) +  math.ceil(machine.count)
+        requirements_panel.clear()
+        local machines = get_machines(g)
+        if not machines then return end
+
+        ---@type {[string]:number}
+        local machine_map = {}
+        for _, machine in pairs(machines) do
+            if machine.machine_quality == "normal" then
+                local m = machine.machine
+                local items = m.items_to_place_this
+                if items and #items > 0 then
+                    local item = items[1].name
+                    machine_map[item] = (machine_map[item] or 0) + math.ceil(machine.count)
+                end
             end
         end
-    end
 
-    local character = gutils.get_character(player)
-    if not character then return end
+        local character = gutils.get_character(player)
+        if not character then return end
 
-    local missing, used = tools.find_missing_ingredients(character, machine_map);
-    if not missing then return end
+        local missing, used = tools.find_missing_ingredients(character, machine_map);
+        if not missing then return end
 
-    for name, count in pairs(missing) do
-        local label = gutils.get_product_name(player, "item/" .. name)
-        local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
-        requirements_panel.add{type="label", caption=ptext}
-    end
-    for name, count in pairs(used) do
-        local label = gutils.get_product_name(player, "item/" .. name)
-        local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
-        requirements_panel.add{type="label", caption=ptext}
-    end
-end)
+        for name, count in pairs(missing) do
+            local label = gutils.get_product_name(player, "item/" .. name)
+            local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
+            requirements_panel.add { type = "label", caption = ptext }
+        end
+        for name, count in pairs(used) do
+            local label = gutils.get_product_name(player, "item/" .. name)
+            local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
+            requirements_panel.add { type = "label", caption = ptext }
+        end
+    end)
 
 return product_panel

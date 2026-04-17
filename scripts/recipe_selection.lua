@@ -20,6 +20,7 @@ end
 local ingredient_button_style = commons.buttons.ingredient
 local product_button_style = commons.buttons.product
 local recipe_button_style = commons.buttons.recipe
+local label_style_name = prefix .. "_count_label_bottom"
 
 local recipe_selection_frame_name = np("recipe_selection_frame")
 local cb_name = np("cb")
@@ -463,8 +464,13 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
             if g then
                 if not (e.button ~= defines.mouse_button_type.left or e.shift or e.control or e.alt) then
                     recipe_selection.open(g, { product = g.products[product_name], recipe = g.recipes[recipe_name] })
-                else
+                elseif not (e.button ~= defines.mouse_button_type.right or e.shift or e.control or e.alt) then
                     recipe_selection.open(g, { product = g.products[product_name], action = action_used_in_recipe })
+                elseif not (e.button ~= defines.mouse_button_type.left or e.shift or not e.control or e.alt) then
+                    local signal = tools.id_to_signal(product_name)
+                    if signal and signal.type == "item" then
+                        gutils.craft(player, signal.name, 1) 
+                    end
                 end
             end
         end
@@ -666,8 +672,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 else
                     amount = i.amount
                 end
-                table.insert(tooltip_builder, "[img=" .. name .. "] " .. tools.fround(amount) .. " x " .. label)
-                table.insert(i_table, { name = name, tooltip = label })
+                table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
+                table.insert(i_table, { name = name, tooltip = label, amount = amount })
             end
             table.insert(tooltip_builder, "\n           [img=" .. prefix .. "_down]\n")
 
@@ -706,7 +712,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                     end
                 end
                 table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
-                table.insert(p_table, { name = name, tooltip = label })
+                table.insert(p_table, { name = name, tooltip = label, amount=amount })
             end
             table.insert(tooltip_builder, "[/color]")
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
@@ -778,6 +784,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 b.style.margin = 0
                 b.elem_tooltip = { type = type, name = name }
                 b.tooltip = { np("ingredient_tooltip") }
+                local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+                qtlabel.caption = tostring(def.amount)
                 tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
             end
             local arrow = recipe_col2.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
@@ -793,6 +801,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                     b.style.margin = 0
                     b.elem_tooltip = { type = type, name = name }
                     b.tooltip = { np("production_tooltip") }
+                    local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
+                    qtlabel.caption = tostring(def.amount)
                     tools.set_name_handler(b, np("product_button"), { product_name = def.name, recipe_name = recipe_name })
                 end
             end
@@ -880,7 +890,7 @@ tools.on_gui_click(np("goto"),
 
 
 tools.on_named_event(np("choose_recipe"), defines.events.on_gui_elem_changed,
-    ---@param e EventData.on_gui_click
+    ---@param e EventData.on_gui_elem_changed
     function(e)
         local player = game.players[e.player_index]
         if not e.element.valid then return end

@@ -5,6 +5,7 @@ Date: 05. 04. 2026.
     - Fix synchronization in UI
   Features:
     - Add total of items in required machines
+    - Add <CONTROL><LEFT-CLICK> on ingredient/product in recipe list to handcraft item if possible
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.24
 Date: 31. 03. 2026.
