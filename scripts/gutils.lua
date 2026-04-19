@@ -1236,6 +1236,7 @@ function gutils.craft(player, item, count)
                     if inv then
                         inv_count = inv.get_item_count(item)
                     end
+                    if count < 0 then count = -count end
                     local craft_count = player.begin_crafting { recipe = recipe_name, count = count }
                     player.print { np("craft"), count, "[item=" .. item .. "]", inv_count }
                     return craft_count, recipe_name.name
