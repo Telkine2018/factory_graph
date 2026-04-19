@@ -1334,7 +1334,7 @@ function product_panel.craft_machine(player, item, count)
         gutils.exit(player)
     end
     if not count then
-        count = 1
+        count = -1
     end
     local craft_count, craft_recipe = gutils.craft(player, item, count)
     if craft_count then
