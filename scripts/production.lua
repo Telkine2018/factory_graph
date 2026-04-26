@@ -107,7 +107,8 @@ function production.compute_machine(g, grecipe, config)
         if grecipe.is_product then goto skip end
 
         local recipe_name = grecipe.name
-        local recipe = prototypes.recipe[recipe_name]
+        local recipe = gutils.get_recipe_prototype(recipe_name)
+
 
         local smachine = tools.id_to_signal(config.machine_name)
         ---@cast smachine -nil
@@ -282,8 +283,9 @@ function production.compute_products(g, machines, manual_mode)
         if machine_count then
             if machine_count > 0 then
                 machine.count = machine_count
-                for _, ingredient in pairs(machine.recipe.ingredients) do
-                    local iname = ingredient.type .. "/" .. ingredient.name
+                local grecipe = machine.grecipe
+                for index, ingredient in pairs(machine.recipe.ingredients) do
+                    local iname = grecipe.ingredients[index].name
                     local coef = product_inputs[iname]
                     if not coef then
                         coef = 0
@@ -295,8 +297,9 @@ function production.compute_products(g, machines, manual_mode)
                         product_inputs[iname] = coef + total
                     end
                 end
-                for _, product in pairs(machine.recipe.products) do
-                    local pname = product.type .. "/" .. product.name
+
+                for index, product in pairs(machine.recipe.products) do
+                    local pname = grecipe.products[index].name
                     local coef = product_outputs[pname]
                     if not coef then
                         coef = 0
@@ -430,9 +433,11 @@ function production.compute_matrix(g)
     local product_to_recipes = {}
 
     for _, machine in pairs(machines) do
-        local recipe_name = machine.recipe.name
+        local grecipe = machine.grecipe
+        local recipe_name = grecipe.name
+        local index = 1
         for _, ingredient in pairs(machine.recipe.ingredients) do
-            local iname = ingredient.type .. "/" .. ingredient.name
+            local iname = grecipe.ingredients[index].name
             local eq = equations[iname]
             if not eq then
                 eq = {}
@@ -446,10 +451,12 @@ function production.compute_matrix(g)
             coef = coef - ingredient.amount * machine.limited_craft_s
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
+            index = index + 1
         end
 
+        index = 1
         for _, product in pairs(machine.recipe.products) do
-            local pname = product.type .. "/" .. product.name
+            local pname = grecipe.products[index].name
             local eq = equations[pname]
             if not eq then
                 eq = {}
@@ -473,6 +480,7 @@ function production.compute_matrix(g)
             else
                 table.insert(products, recipe_name)
             end
+            index = index + 1
         end
     end
 
@@ -942,8 +950,8 @@ local function recompute_manual_recipe(g, recipe_name, inputs)
     local selected_machine = grecipe.machine
     if not selected_machine then return end
 
-    local recipe = prototypes.recipe[recipe_name]
-    if #recipe.products > 0 then
+    local recipe = gutils.get_recipe_prototype(recipe_name)
+    if recipe and #recipe.products > 0 then
         local mcount
         for _, p in pairs(recipe.products) do
             local product_id = p.type .. "/" .. p.name

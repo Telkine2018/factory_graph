@@ -34,9 +34,11 @@ local function install_modules(container, g, config, grecipe)
         return
     end
 
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+    if not recipe then return end
+
     local allowed = {}
     local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
-    local recipe = prototypes.recipe[grecipe.name]
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
     local allowed_module_categories2 = assembly_machine.allowed_module_categories
@@ -105,11 +107,13 @@ local function install_beacon_modules(container, g, config, grecipe)
         local beacon = prototypes.entity[tools.extract_name(config.beacon_name)]
         if not beacon then return end
 
+        local recipe = gutils.get_recipe_prototype(grecipe.name)
+        if not recipe then return end
+
         local count = beacon.module_inventory_size
         local allowed = {}
         local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
 
-        local recipe = prototypes.recipe[grecipe.name]
         local allowed_effects = recipe.allowed_effects
         local allowed_module_categories = recipe.allowed_module_categories
         for _, module in pairs(modules) do
@@ -177,12 +181,13 @@ function msettings.create(player_index, grecipe)
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end
 
-    local recipe = prototypes.recipe[grecipe.name]
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+
 
     ---@type Params.create_standard_panel
     local params = {
         panel_name           = panel_name,
-        title                = { np("title"), recipe and "[recipe=" .. grecipe.name .. "]" or "", recipe and recipe.localised_name or "" },
+        title                = { np("title"), recipe and "[recipe=" .. recipe.name .. "]" or "", recipe and recipe.localised_name or "" },
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
@@ -216,7 +221,7 @@ function msettings.create(player_index, grecipe)
 
     config = tools.table_dup(config)
 
-    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = grecipe.name } })
+    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = gutils.get_recipe_base_name(grecipe.name) } })
     if #technologies > 0 then
         local label = field_table.add { type = "label", caption = { np("technologies") } }
         local tech_flow = field_table.add { type = "flow" }

@@ -95,7 +95,14 @@ end
 ---@param name string
 ---@return string?
 function translations.get_recipe_name(player_index, name)
-    return translations.get_translation(player_index, "recipe_name", name) or ""
+    local recipe_name = translations.get_translation(player_index, "recipe_name", name) or ""
+    if recipe_name == "" then
+        local name = string.gmatch(name, tools.fluid_recipe_pattern)()
+        if name then
+            recipe_name = translations.get_translation(player_index, "recipe_name", name) or ""
+        end
+    end
+    return recipe_name
 end
 
 ---@param player_index integer

@@ -574,8 +574,15 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
 
         local tags = e.element.tags
         local product_name = tags.product_name --[[@as string]]
+        local gproduct = g.products[product_name]
 
         if not g.product_inputs then
+            if gproduct.derived_from then
+                local type, name, temperature = string.gmatch(product_name, "([^/]+)/([^/]+)/([^/]+)")()
+                product_info = "[img=" .. type .. "/" .. name .. "] "
+                product_label = tags.label .. " " .. tostring(temperature) .. " °C"
+                e.element.tooltip = { np("product_button_tooltip2"), product_info, product_label }
+            end
             return
         end
 
@@ -620,7 +627,6 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
             end
         end
 
-        local gproduct = g.products[product_name]
         local pline = {}
         local set = {}
 
@@ -631,7 +637,7 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
                 if machine and machine.count and not set[grecipe.name] and machine.count ~= 0 then
                     set[grecipe.name] = true
                     table.insert(pline, "\n")
-                    table.insert(pline, "[recipe=" .. grecipe.name .. "] : ")
+                    table.insert(pline, "[recipe=" .. gutils.get_recipe_base_name(grecipe.name) .. "] : ")
 
                     if machine.count > 0 then
                         table.insert(pline, "[color=cyan]")
@@ -665,7 +671,14 @@ tools.on_named_event(np("product"), defines.events.on_gui_hover,
         scan_list(gproduct.product_of)
 
         local recipe_str = table.concat(pline)
-        e.element.tooltip = { np("product_button_tooltip"), "[img=" .. product_name .. "]", tags.label,
+        local product_info = "[img=" .. product_name .. "]"
+        local product_label = tags.label
+        if (gproduct.derived_from) then
+            local type, name, temperature = string.gmatch(product_name, "([^/]+)/([^/]+)/([^/]+)")()
+            product_info = "[img=" .. type .. "/" .. name .. "] "
+            product_label = tags.label .. " " .. tostring(temperature) .. " °C"
+        end
+        e.element.tooltip = { np("product_button_tooltip"), product_info, product_label,
             output_label, input_label, inventory_label, recipe_str }
     end)
 
@@ -759,7 +772,7 @@ end
 local function create_product_line(container, machine, manual_mode, color_values, active)
     local line1 = container.add { type = "flow", direction = "horizontal" }
     line1.style.minimal_height = 40
-    line1.tags = { recipe_name = machine.recipe.name }
+    line1.tags = { recipe_name = machine.grecipe.name }
 
     local count
     local grecipe = machine.grecipe
@@ -787,7 +800,7 @@ local function create_product_line(container, machine, manual_mode, color_values
     b.elem_tooltip = { type = "entity", name = machine_name }
     b.locked = true
     b.style.size = general_button_size
-    tools.set_name_handler(b, np("machine"), { recipe_name = machine.recipe.name })
+    tools.set_name_handler(b, np("machine"), { recipe_name = machine.grecipe.name })
     b.raise_hover_events = true
     local label = b.add { type = "label", style = default_button_label_style, caption = caption, ignored_by_interaction = true, name = "count" }
 
@@ -797,18 +810,23 @@ local function create_product_line(container, machine, manual_mode, color_values
         b = count_flow.add { type = "sprite-button", sprite = prefix .. "_plus", name = prefix .. "-plus",
             style = mini_style, tooltip = { np("inc_tooltip") } }
         b.style.size = mini_size
-        tools.set_name_handler(b, np("inc_mcount"), { recipe_name = machine.recipe.name })
+        tools.set_name_handler(b, np("inc_mcount"), { recipe_name = machine.grecipe.name })
         b = count_flow.add { type = "sprite-button", sprite = prefix .. "_minus", name = prefix .. "-minus",
             style = mini_style, tooltip = { np("dec_tooltip") } }
         b.style.size = mini_size
-        tools.set_name_handler(b, np("dec_mcount"), { recipe_name = machine.recipe.name })
+        tools.set_name_handler(b, np("dec_mcount"), { recipe_name = machine.grecipe.name })
     end
 
-    local frecipe = line1.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name, style = recipe_button_style }
+    local frecipe = line1.add {
+        type = "choose-elem-button",
+        elem_type = "recipe",
+        recipe = gutils.get_recipe_base_name(machine.name),
+        style = recipe_button_style
+    }
     frecipe.style.right_margin = 5
     frecipe.locked = true
     frecipe.style.size = general_button_size
-    frecipe.elem_tooltip = { type = "recipe", name = machine.name }
+    frecipe.elem_tooltip = { type = "recipe", name = gutils.get_recipe_base_name(machine.name) }
     frecipe.tooltip = { np("recipe_tooltip") }
     tools.set_name_handler(frecipe, np("recipe_detail"), { recipe_name = machine.name })
 
@@ -839,25 +857,33 @@ local function create_product_line(container, machine, manual_mode, color_values
 
     local recipe_row = line1.add { type = "table", column_count = 7, name = "recipe_row" }
 
-    for _, ingredient in pairs(machine.recipe.ingredients) do
+    for index, ingredient in pairs(machine.recipe.ingredients) do
         local type = ingredient.type
+        local gingredient = grecipe.ingredients[index]
         local style = ingredient_button_style
         local iname = ingredient.name
-        local ingredient_name = type .. "/" .. iname
+        local ingredient_name = gingredient.name
+
         if color_values then
             local value = color_values[ingredient_name] or 0
             if value >= 0 then style = green_button else style = red_button end
         end
+
         b = recipe_row.add { type = "choose-elem-button",
             elem_type = type,
             item = iname,
             fluid = ingredient.name,
             style = style
         }
+
         b.style.size = general_button_size
         b.locked = true
         b.elem_tooltip = { type = type, name = iname }
-        b.tooltip = { np("ingredient_tooltip") }
+        if gingredient.temperature then
+            b.tooltip = { np("ingredient_tooltip_temperature"), tostring(gingredient.temperature) }
+        else
+            b.tooltip = { np("ingredient_tooltip") }
+        end
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name, action = commons.action_producer })
 
         local amount = ingredient.amount * machine.limited_craft_s * count
@@ -879,11 +905,12 @@ local function create_product_line(container, machine, manual_mode, color_values
     b.style.size = 24
     b.style.margin = 5
 
-    for _, product in pairs(machine.recipe.products) do
+    for index, product in pairs(machine.recipe.products) do
         local type = product.type
         local style = product_button_style
         local pname = product.name
-        local product_name = type .. "/" .. pname
+        local gproduct = grecipe.products[index]
+        local product_name = gproduct.name
         if color_values then
             local value = color_values[product_name] or 0
             if value >= 0 then style = green_button else style = red_button end
@@ -893,7 +920,11 @@ local function create_product_line(container, machine, manual_mode, color_values
         b.style.size = general_button_size
         b.locked = true
         b.elem_tooltip = { type = type, name = pname }
-        b.tooltip = { np("production_tooltip") }
+        if gproduct.temperature then
+            b.tooltip = { np("production_tooltip_temperature"), tostring(gproduct.temperature) }
+        else
+            b.tooltip = { np("production_tooltip") }
+        end
         tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
 
         local amount = get_product_amount(machine, product)
@@ -930,7 +961,7 @@ function product_panel.update_error_panel(g, error_panel)
     for _, machine in pairs(failed_machines) do
         local line = error_panel.add { type = "flow", direction = "horizontal" }
 
-        local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.name }
+        local b = line.add { type = "choose-elem-button", elem_type = "recipe", recipe = machine.recipe.name }
         b.locked = true
         b.style.size = general_button_size
         tools.set_name_handler(b, np("recipe_detail"), { recipe_name = machine.name })
@@ -1770,7 +1801,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_click,
                     name = machine.machine.name,
                     quality = machine.machine_quality,
                     position = { 0.5, 0.5 },
-                    recipe = recipe_name,
+                    recipe = gutils.get_recipe_base_name(recipe_name),
                     recipe_quality = recipe_quality
                 }
 
@@ -2049,7 +2080,7 @@ tools.on_event(defines.events.on_gui_selected_tab_changed,
                 local items = m.items_to_place_this
                 if items and #items > 0 then
                     local item = items[1].name
-                    machine_map[item] = (machine_map[item] or 0) + math.ceil(machine.count)
+                    machine_map[item] = (machine_map[item] or 0) + math.ceil(machine.count or 0)
                 end
             end
         end

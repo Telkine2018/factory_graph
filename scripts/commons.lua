@@ -56,8 +56,9 @@ local commons = {
         cannot_find_machine = "cannot_find_machine",
         use_handcraft_recipe = "use_handcraft_recipe"
     },
-    generate_with_lab_tiles = true
+    generate_with_lab_tiles = true,
 
+    default_temperature = -1e6
 }
 
 commons.buttons = {

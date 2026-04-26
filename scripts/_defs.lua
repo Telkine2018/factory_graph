@@ -94,6 +94,10 @@ local tools = require("scripts.tools")
 ---@field root_recipe GRecipe?
 ---@field color Color
 ---@field ids LuaRenderObject[]?
+---@field temperatures {[number]:boolean}
+---@field derived boolean?
+---@field temperature number?
+---@field derived_from GProduct?
 
 ---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
@@ -111,6 +115,10 @@ local tools = require("scripts.tools")
 ---@field layer string?
 ---@field pos_locked boolean?
 ---@field mcount number                 @ manual count of machine
+---@field use_temperature boolean?
+---@field i_temperatures {[string]:number}?
+---@field p_temperatures {[string]:number}?
+---@field derived_from GRecipe
 
 ---@class GSortNode
 ---@field sort_level integer?

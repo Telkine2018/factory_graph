@@ -281,16 +281,24 @@ function main.enter_surface(player, recipe_name)
         player_position = g.player_position
     end
 
-    local grecipe
     if g then
         g.highlight_recipe = recipe_name
         if recipe_name then
-            grecipe = g.recipes[recipe_name]
-            if grecipe and grecipe.visible then
+            ---@type GRecipe?
+            local grecipe = g.recipes[recipe_name]
+            if not grecipe or not grecipe.visible then
+                grecipe = nil
+                for _, crecipe in pairs(g.selection) do
+                    if crecipe.derived_from and crecipe.derived_from.name == recipe_name and crecipe.visible then
+                        grecipe = crecipe
+                        break
+                    end
+                end
+            end
+            if grecipe then
                 player_position = gutils.get_recipe_position(g, grecipe)
                 g.player_position = player_position
-            else
-                grecipe = nil
+                g.highlight_recipe = grecipe.name
             end
         end
     end

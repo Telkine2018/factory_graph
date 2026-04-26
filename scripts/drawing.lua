@@ -363,7 +363,8 @@ local function draw_product_h(x, y, positive)
         x1 = x + marker_offset
         x = x - product_sprite_offset
     end
-    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+    local sprite_name = current_product.derived_from and current_product.derived_from.name or current_product.name
+    local id = rendering.draw_sprite { surface = current_surface, sprite = sprite_name, target = { x, y },
         x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
     table.insert(current_ids, id)
 
@@ -405,7 +406,8 @@ local function draw_product_v(x, y, positive)
         y1 = y + marker_offset
         y = y - product_sprite_offset
     end
-    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+    local sprite_name = current_product.derived_from and current_product.derived_from.name or current_product.name
+    local id = rendering.draw_sprite { surface = current_surface, sprite = sprite_name, target = { x, y },
         x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
     table.insert(current_ids, id)
 
@@ -1055,7 +1057,7 @@ end
 ---@param g Graph
 ---@param crecipe GRecipe
 function drawing.draw_target(g, crecipe)
-    if not crecipe then
+    if not crecipe or not crecipe.visible then
         return
     end
     local margin = 0.7

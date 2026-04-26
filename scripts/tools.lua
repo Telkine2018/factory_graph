@@ -1196,12 +1196,18 @@ function tools.signal_to_id(signal)
     end
 end
 
+local signal_pattern = "([^/]+)[/]([^/]+)"
+tools.signal_pattern = signal_pattern
+tools.fluid_recipe_pattern = "([^/]+)[/]([^/]+)"
+tools.fluid_pattern ="fluid[/]([^/]+)[/]([^/]+)"
+tools.product_pattern = "([^/]+)[/]([^/]+)"
+
 ---@param signalid string?
 ---@return SignalFilter?
 function tools.id_to_signal(signalid)
     if not signalid then return nil end
     if type(signalid) ~= "string" then return signalid end
-    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local split = gmatch(signalid, signal_pattern)
     local type, name = split()
     local comparator, quality = split()
     if name ~= nil then
@@ -1225,7 +1231,7 @@ end
 function tools.id_to_filter(signalid)
     if not signalid then return nil end
     if type(signalid) ~= "string" then return signalid end
-    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local split = gmatch(signalid, signal_pattern)
     local type, name = split()
     local comparator, quality = split()
     if not type or type == "item" then

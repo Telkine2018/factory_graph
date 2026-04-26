@@ -65,7 +65,7 @@ function recipe_panel.create(player_index, grecipe)
     local g = gutils.get_graph(player)
 
     ---@type LuaRecipePrototype
-    local recipe = prototypes.recipe[grecipe.name]
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
 
     ---@type LocalisedString
     local name = translations.get_recipe_name(player_index, grecipe.name)

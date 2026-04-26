@@ -35,6 +35,16 @@ local action_consumer = commons.action_consumer
 local action_producer = commons.action_producer
 local action_in_selection = commons.action_in_selection
 
+---@param options RecipeSelectionOptions
+local function load_base(options)
+    local product = options.product
+    if product and product.derived_from then product = product.derived_from end
+    options.product = product
+
+    local recipe = options.recipe
+    if recipe and recipe.derived_from then recipe = recipe.derived_from end
+    options.recipe = recipe
+end
 
 ---@param g Graph
 ---@param options RecipeSelectionOptions
@@ -42,8 +52,10 @@ local action_in_selection = commons.action_in_selection
 function load_initial_recipes(g, options)
     local recipes = {}
 
+    load_base(options)
     local product = options.product
     local recipe = options.recipe
+
     if product and options.related_to_product then
         for name, i_recipe in pairs(product.ingredient_of) do
             if i_recipe.visible and not i_recipe.is_product then
@@ -330,6 +342,7 @@ function recipe_selection.open(g, options)
     search_text.style.width = 100
 
     local action = options.action
+    load_base(options)
     if not action and options.recipe then
         if options.product then
             if options.product.product_of[options.recipe.name] then
@@ -469,7 +482,7 @@ tools.on_named_event(np("product_button"), defines.events.on_gui_click,
                 elseif not (e.button ~= defines.mouse_button_type.left or e.shift or not e.control or e.alt) then
                     local signal = tools.id_to_signal(product_name)
                     if signal and signal.type == "item" then
-                        gutils.craft(player, signal.name, 1) 
+                        gutils.craft(player, signal.name, 1)
                     end
                 end
             end
@@ -499,6 +512,12 @@ local function set_recipes_to_selection(player, selected_recipe_name)
             local grecipe = g.recipes[name]
             if cb.state then
                 if grecipe then
+                    if grecipe.use_temperature then
+                        recipes[name] = nil
+                        grecipe = gutils.get_derived_recipe(g, grecipe, grecipe.i_temperatures, grecipe.p_temperatures)
+                        name = grecipe.name
+                        cb.state = false
+                    end
                     g.selection[name] = grecipe
                     recipes[name] = grecipe
                     if not grecipe.visible then
@@ -590,7 +609,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
     ---@type {grecipe:GRecipe, recipe:LuaRecipePrototype?, localized:string}[]
     local sorted_list = {}
     for _, grecipe in pairs(recipes) do
-        local recipe = prototypes.recipe[grecipe.name]
+        local recipe = gutils.get_recipe_prototype(grecipe.name)
         if recipe and (not recipe.hidden) or g.show_hidden then
             if recipe then
                 table.insert(sorted_list, { grecipe = grecipe, recipe = recipe, localised = translations.get_recipe_name(player_index, grecipe.name) })
@@ -611,7 +630,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
         recipe_col1.tags = { recipe_name = recipe_name }
         local state = g.selection[recipe_name] ~= nil
 
-        local grecipe = recipe_element.recipe
+        local recipe = recipe_element.recipe
+        local grecipe = recipe_element.grecipe
 
         local b = recipe_col1.add {
             type = "sprite-button",
@@ -624,7 +644,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
         b.style.right_margin = 3
         b.style.top_margin = 6
 
-        if grecipe then
+        if recipe then
             local tooltip_builder = {}
             local start = true
             local i_table = {}
@@ -652,7 +672,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             end
 
 
-            for _, i in pairs(grecipe.ingredients) do
+            for _, i in pairs(recipe.ingredients) do
                 if start then
                     start = false
                 else
@@ -682,7 +702,7 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
             end
 
             start = true
-            for _, p in pairs(grecipe.products) do
+            for _, p in pairs(recipe.products) do
                 local name
                 local label
                 if p.type == "item" then
@@ -712,20 +732,23 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                     end
                 end
                 table.insert(tooltip_builder, "[img=" .. name .. "] " .. amount .. " x " .. label)
-                table.insert(p_table, { name = name, tooltip = label, amount=amount })
+                table.insert(p_table, { name = name, tooltip = label, amount = amount })
             end
             table.insert(tooltip_builder, "[/color]")
             table.insert(tooltip_builder, "\n[img=" .. prefix .. "_sep]")
 
-            local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(grecipe.energy), "s " }
+            local tooltip = { "", table.concat(tooltip_builder), "\n", { np("time") }, ":", tostring(recipe.energy), "s " }
 
-            local b_recipe = recipe_col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = recipe_name }
+            local b_recipe = recipe_col1.add { type = "choose-elem-button", elem_type = "recipe", recipe = gutils.get_recipe_base_name(recipe_name) }
             b_recipe.style = recipe_button_style
             b_recipe.locked = true
             b_recipe.style.size = general_button_size
             tools.set_name_handler(b_recipe, np("recipe"), { recipe_name = recipe_name })
 
-            local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = recipe_name } })
+            local technologies = prototypes.get_technology_filtered({ {
+                filter = "unlocks-recipe",
+                recipe = gutils.get_recipe_base_name(recipe_name)
+            } })
             if #technologies > 0 then
                 for _, tech in pairs(technologies) do
                     local b_tech = recipe_col1.add { type = "choose-elem-button", elem_type = "technology", technology = tech.name }
@@ -807,6 +830,83 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 end
             end
             recipe_col2.style.horizontally_stretchable = true
+
+            if grecipe.use_temperature then
+                local temperature_table = recipe_table.add { type = "table", column_count = 2 }
+
+                if not grecipe.i_temperatures then grecipe.i_temperatures = {} end
+                if not grecipe.p_temperatures then grecipe.p_temperatures = {} end
+
+                for name, i in pairs(recipe.ingredients) do
+                    if i.minimum_temperature and i.maximum_temperature then
+                        local gproduct = g.products[i.type .. "/" .. i.name]
+                        if gproduct and gproduct.temperatures then
+                            local labels = { { np("temperature_default") } }
+                            local values = { commons.default_temperature }
+                            local tcurrent = grecipe.i_temperatures[i.name]
+                            local index = 1
+                            local tdefault = i.minimum_temperature
+                            local icurrent
+                            if tcurrent == commons.default_temperature then
+                                icurrent = 1
+                            end
+                            for t, _ in pairs(gproduct.temperatures) do
+                                if t >= i.minimum_temperature and t <= i.maximum_temperature then
+                                    table.insert(values, t)
+                                    table.insert(labels, { np("temperature_value"), tostring(t) })
+                                    index = index + 1
+                                    if tcurrent and t == tcurrent then
+                                        icurrent = index
+                                    elseif not icurrent and t == tdefault then
+                                        icurrent = index
+                                    end
+                                end
+                            end
+                            icurrent = icurrent or 1
+                            grecipe.i_temperatures[i.name] = values[icurrent]
+                            temperature_table.add { type = "label", caption = { np("temperature_in"), "[img=" .. i.type .. "." .. i.name .. "]" } }
+                            local f = temperature_table.add { type = "drop-down", items = labels, selected_index = icurrent }
+                            tools.set_name_handler(f, np("temperature_in"), { recipe = grecipe.name, ingredient = i.name, values = values })
+                        end
+                    end
+                end
+
+                for name, p in pairs(recipe.products) do
+                    if p.temperature then
+                        local gproduct = g.products[p.type .. "/" .. p.name]
+                        if gproduct and gproduct.temperatures then
+                            local values = { commons.default_temperature }
+                            local labels = { { np("temperature_default") } }
+                            local tcurrent = grecipe.p_temperatures[p.name]
+                            local icurrent
+                            local index = 1
+                            local tdefault = p.temperature
+                            if tcurrent == commons.default_temperature then
+                                icurrent = 1
+                            end
+                            for t, _ in pairs(gproduct.temperatures) do
+                                if t <= tdefault then
+                                    table.insert(values, t)
+                                    table.insert(labels, { np("temperature_value"), tostring(t) })
+                                    index = index + 1
+                                    if tcurrent and tcurrent == t then
+                                        icurrent = index
+                                    elseif not icurrent and t == tdefault then
+                                        icurrent = index
+                                    end
+                                end
+                            end
+                            icurrent = icurrent or 1
+                            grecipe.p_temperatures[p.name] = values[icurrent]
+                            temperature_table.add { type = "label", caption = { np("temperature_out"), "[img=" .. p.type .. "." .. p.name .. "]" } }
+                            local f = temperature_table.add { type = "drop-down", items = labels, selected_index = icurrent }
+                            tools.set_name_handler(f, np("temperature_out"), { recipe = grecipe.name, product = p.name, values = values })
+                            f.style.bottom_margin = 10
+                        end
+                    end
+                end
+                recipe_table.add { type = "empty-widget" }
+            end
         else
             local b = gutils.create_product_button(recipe_col1, recipe_name)
             b.style.size = general_button_size
@@ -857,7 +957,7 @@ function recipe_selection.goto_recipe(g, grecipe, control)
     if not position then return end
     drawing.draw_target(g, grecipe)
     if control then
-        gutils.teleport(player, position)
+        gutils.teleport(g.player, position)
     else
         gutils.move_view(g.player, position)
     end
@@ -1307,5 +1407,48 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
             e.element.tooltip = { np("machine-tooltip"), { "", machine.localised_name }, parts }
         end
     end)
+
+tools.on_named_event(np("temperature_in"), defines.events.on_gui_selection_state_changed,
+    ---@param e EventData.on_gui_selection_state_changed
+    function(e)
+        local player = game.players[e.player_index]
+        local element = e.element
+        if not (element and element.valid) then return end
+
+        local tags = element.tags
+        local g = gutils.get_graph(player)
+        local recipe_name = tags.recipe
+        local grecipe = g.recipes[recipe_name]
+        if not grecipe then return end
+
+        local ingredient = tags.ingredient
+        local values = tags.values
+        if not grecipe.i_temperatures then
+            grecipe.i_temperatures = {}
+        end
+        grecipe.i_temperatures[ingredient] = values[element.selected_index]
+    end)
+
+tools.on_named_event(np("temperature_out"), defines.events.on_gui_selection_state_changed,
+    ---@param e EventData.on_gui_selection_state_changed
+    function(e)
+        local player = game.players[e.player_index]
+        local element = e.element
+        if not (element and element.valid) then return end
+
+        local tags = element.tags
+        local g = gutils.get_graph(player)
+        local recipe_name = tags.recipe
+        local grecipe = g.recipes[recipe_name]
+        if not grecipe then return end
+
+        local product = tags.product
+        local values = tags.values
+        if not grecipe.p_temperatures then
+            grecipe.p_temperatures = {}
+        end
+        grecipe.p_temperatures[product] = values[element.selected_index]
+    end)
+
 
 return recipe_selection

@@ -121,7 +121,7 @@ local is_machine_enabled = machinedb.is_machine_enabled
 ---@return ProductionConfig?
 function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local force = g.player.force --[[@as LuaForce]]
-    local recipe = prototypes.recipe[recipe_name]
+    local recipe = gutils.get_recipe_prototype(recipe_name)
     if not recipe then
         return nil
     end
@@ -371,9 +371,10 @@ end
 ---@return MachineInfo[]
 function machinedb.get_machines_for_recipe(recipe_name)
 
-    local recipe = prototypes.recipe[recipe_name]
-    local category = recipe.category
+    local recipe = gutils.get_recipe_prototype(recipe_name)
+    if not recipe then return {} end
 
+    local category = recipe.category
     if not machinedb.initialized then
         machinedb.initialize()
     end
