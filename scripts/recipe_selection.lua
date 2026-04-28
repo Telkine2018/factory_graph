@@ -105,7 +105,7 @@ function load_initial_recipes(g, options)
     elseif recipe then
         recipes = { recipe }
     end
-    recipes = gutils.filter_lab_pack(recipes, g)
+    recipes = gutils.filter_candidate_recipes(recipes, g)
     return recipes
 end
 
@@ -437,7 +437,7 @@ local function do_search_text(player)
         recipes = gutils.filter_non_product_recipe(recipes)
     end
 
-    recipes = gutils.filter_lab_pack(recipes, g)
+    recipes = gutils.filter_candidate_recipes(recipes, g)
     recipe_selection.show_recipes(player, recipes)
 end
 
@@ -516,7 +516,6 @@ local function set_recipes_to_selection(player, selected_recipe_name)
                         recipes[name] = nil
                         grecipe = gutils.get_derived_recipe(g, grecipe, grecipe.i_temperatures, grecipe.p_temperatures)
                         name = grecipe.name
-                        cb.state = false
                     end
                     g.selection[name] = grecipe
                     recipes[name] = grecipe
@@ -1107,7 +1106,7 @@ function recipe_selection.process_query(player, product_name, action)
     else
         recipes = gutils.filter_non_product_recipe(recipes)
     end
-    recipes = gutils.filter_lab_pack(recipes, g)
+    recipes = gutils.filter_candidate_recipes(recipes, g)
 
     recipe_selection.show_recipes(player, recipes)
 end

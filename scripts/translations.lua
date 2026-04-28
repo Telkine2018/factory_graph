@@ -158,7 +158,10 @@ end
 ---@param dic_name string
 ---@return table<string, string>
 function translations.get_all(player_index, dic_name)
-    return dictionary.get_all(player_index)[dic_name]
+    local all = dictionary.get_all(player_index)
+    if not all then return {} end
+    local dic = all[dic_name] or {}
+    return dic
 end
 
 script.on_event(dictionary.on_player_dictionaries_ready, function(e)

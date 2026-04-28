@@ -337,15 +337,24 @@ end
 ---@param recipes table<KEY, GRecipe>
 ---@param g Graph
 ---@return table<KEY, GRecipe>
-function gutils.filter_lab_pack(recipes, g)
+function gutils.filter_candidate_recipes(recipes, g)
+    
     local lab_packs = g.lab_packs
-    if lab_packs == nil or #lab_packs == 0 then return recipes end
+    if lab_packs == nil or #lab_packs == 0 then 
+        local new_recipes = {}
+        for _, recipe in pairs(recipes) do
+            if not recipe.derived_from then table.insert(new_recipes, recipe) end
+        end
+        return new_recipes 
+    end
+    
     local lab_filter = {}
     for _, lab in pairs(lab_packs) do
         lab_filter[lab] = true
     end
     local new_recipes = {}
-    for index, recipe in pairs(recipes) do
+    for _, recipe in pairs(recipes) do
+        if recipe.derived_from then goto skip end
         local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = recipe.name } })
         if #technologies > 0 then
             for _, tech in pairs(technologies) do
@@ -586,7 +595,7 @@ local saved_graph_fields = {
 
 local saved_reciped_fields = {
     "name",
-    "production_config", 
+    "production_config",
     "line",
     "col",
     "layer",
@@ -1276,6 +1285,29 @@ function gutils.get_derived_product(g, gproduct, temperature)
     return derived_product
 end
 
+---@param grecipe_name string
+---@param i_temperatures {[string]:number}?
+---@param p_temperatures {[string]:number}?
+---@return string, boolean?
+function gutils.get_derived_name(grecipe_name, i_temperatures, p_temperatures)
+    local args = ""
+    local has_temperature
+    if i_temperatures then
+        for name, temperature in pairs(i_temperatures) do
+            args = args .. "<" .. name .. "=" .. tostring(temperature)
+            has_temperature = true
+        end
+    end
+    if p_temperatures then
+        for name, temperature in pairs(p_temperatures) do
+            args = args .. ">" .. name .. "=" .. tostring(temperature)
+            has_temperature = true
+        end
+    end
+    local derived_name = grecipe_name .. "/" .. args
+    return derived_name, has_temperature
+end
+
 ---@param g Graph
 ---@param grecipe GRecipe
 ---@param i_temperatures {[string]:number}?
@@ -1285,24 +1317,9 @@ function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
     if grecipe.derived_from then
         return grecipe
     end
-    local args = ""
-    local has_temperature
-    if i_temperatures then
-        for name, temperature in pairs(i_temperatures) do
-            args = args .. "<" .. name .. "=" .. tostring(temperature)
-            has_temperature = true
-        end
-    end
-    if grecipe.p_temperatures then
-        for name, temperature in pairs(p_temperatures) do
-            args = args .. ">" .. name .. "=" .. tostring(temperature)
-            has_temperature = true
-        end
-    end
 
+    local derived_name, has_temperature = gutils.get_derived_name(grecipe.name, i_temperatures, p_temperatures)
     if not has_temperature then return grecipe end
-
-    local derived_name = grecipe.name .. "/" .. args
 
     ---@type GRecipe
     local derived = g.recipes[derived_name]
@@ -1321,7 +1338,7 @@ function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
         layer = grecipe.layer,
         derived_from = grecipe,
         i_temperatures = tools.table_dup(i_temperatures),
-        p_temperatures = tools.table_dup(p_temperatures)
+        p_temperatures = tools.table_dup(p_temperatures),
     }
     g.recipes[derived_name] = derived
 
