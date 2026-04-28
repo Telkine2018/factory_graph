@@ -510,8 +510,8 @@ local function set_recipes_to_selection(player, selected_recipe_name)
                 cb.state = true
             end
             local grecipe = g.recipes[name]
-            if cb.state then
-                if grecipe then
+            if grecipe then
+                if cb.state then
                     if grecipe.use_temperature then
                         recipes[name] = nil
                         grecipe = gutils.get_derived_recipe(g, grecipe, grecipe.i_temperatures, grecipe.p_temperatures)
@@ -525,10 +525,16 @@ local function set_recipes_to_selection(player, selected_recipe_name)
                     if g.visibility == commons.visibility_layers then
                         grecipe.layer = g.current_layer
                     end
+                else
+                    if grecipe.use_temperature then
+                        name = gutils.get_derived_name(grecipe.name, grecipe.i_temperatures, grecipe.p_temperatures)
+                        grecipe = g.recipes[name]
+                    end
+                    if grecipe then
+                        g.selection[name] = nil
+                        grecipe.visible = nil
+                    end
                 end
-            else
-                g.selection[name] = nil
-                grecipe.visible = nil
             end
         end
     end
@@ -903,6 +909,11 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                             f.style.bottom_margin = 10
                         end
                     end
+                end
+
+                local derived_name = gutils.get_derived_name(grecipe.name, grecipe.i_temperatures, grecipe.p_temperatures)
+                if g.recipes[derived_name] and g.recipes[derived_name].visible then
+                    cb.state = true
                 end
                 recipe_table.add { type = "empty-widget" }
             end
@@ -1407,6 +1418,33 @@ tools.on_named_event(np("machine"), defines.events.on_gui_hover,
         end
     end)
 
+---@param player LuaPlayer
+---@param g Graph
+---@param grecipe GRecipe
+local function update_cb(player, g, grecipe)
+    local derived_name = gutils.get_derived_name(grecipe.name, grecipe.i_temperatures, grecipe.p_temperatures)
+    local frame = player.gui.screen[recipe_selection_frame_name]
+    if not frame then return end
+
+    local recipe_table = tools.get_child(frame, "recipe_table")
+
+    ---@cast recipe_table -nil
+    for _, line in pairs(recipe_table.children) do
+        local recipe_name = line.tags.recipe_name --[[@as string]]
+        if recipe_name == grecipe.name then
+            local cb = line[cb_name]
+            if cb then
+                if g.recipes[derived_name] and g.recipes[derived_name].visible then
+                    cb.state = true
+                else
+                    cb.state = false
+                end
+            end
+            return
+        end
+    end
+end
+
 tools.on_named_event(np("temperature_in"), defines.events.on_gui_selection_state_changed,
     ---@param e EventData.on_gui_selection_state_changed
     function(e)
@@ -1426,6 +1464,8 @@ tools.on_named_event(np("temperature_in"), defines.events.on_gui_selection_state
             grecipe.i_temperatures = {}
         end
         grecipe.i_temperatures[ingredient] = values[element.selected_index]
+
+        update_cb(player, g, grecipe)
     end)
 
 tools.on_named_event(np("temperature_out"), defines.events.on_gui_selection_state_changed,
@@ -1447,6 +1487,8 @@ tools.on_named_event(np("temperature_out"), defines.events.on_gui_selection_stat
             grecipe.p_temperatures = {}
         end
         grecipe.p_temperatures[product] = values[element.selected_index]
+
+        update_cb(player, g, grecipe)
     end)
 
 
