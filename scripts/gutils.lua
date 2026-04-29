@@ -50,11 +50,15 @@ function gutils.get_recipe_name(player, grecipe)
     local localised_name
 
     if grecipe.is_product then
-        local type, name = string.gmatch(grecipe.name, "([^/]+)/([^/]+)")()
+        local type, name, arg = string.gmatch(grecipe.name, "([^/]+)/([^/]+)(.*)")()
         if type == "item" then
             localised_name = translations.get_item_name(player.index, name)
         else -- fluid
             localised_name = translations.get_fluid_name(player.index, name)
+            if (arg ~= "") then
+                local temperature = string.sub(arg, 2)
+                localised_name = { "", localised_name, { np("temperature"), temperature } }
+            end
         end
     else
         localised_name = translations.get_recipe_name(player.index, grecipe.name) or ""
@@ -338,16 +342,15 @@ end
 ---@param g Graph
 ---@return table<KEY, GRecipe>
 function gutils.filter_candidate_recipes(recipes, g)
-    
     local lab_packs = g.lab_packs
-    if lab_packs == nil or #lab_packs == 0 then 
+    if lab_packs == nil or #lab_packs == 0 then
         local new_recipes = {}
         for _, recipe in pairs(recipes) do
             if not recipe.derived_from then table.insert(new_recipes, recipe) end
         end
-        return new_recipes 
+        return new_recipes
     end
-    
+
     local lab_filter = {}
     for _, lab in pairs(lab_packs) do
         lab_filter[lab] = true
@@ -542,10 +545,11 @@ end
 ---@return LuaGuiElement
 ---@return string
 ---@return string
+---@return string?
 function gutils.create_product_button(container, product_name, button_name)
     ---@cast button_name -nil
     local b
-    local type, name = string.gmatch(product_name, "([^/]+)/([^/]+)")()
+    local type, name, temperature = string.gmatch(product_name, "([^/]+)/([^/]+)(.*)")()
     if type == "item" then
         b = container.add { type = "choose-elem-button", elem_type = type, item = name, name = button_name }
     else
@@ -553,7 +557,12 @@ function gutils.create_product_button(container, product_name, button_name)
     end
     b.locked = true
     b.elem_tooltip = { type = type, name = name }
-    return b, type, name
+    if temperature ~= "" then
+        temperature = string.sub(temperature, 2)
+    else
+        temperature = nil
+    end
+    return b, type, name, temperature
 end
 
 -- Fire production change
@@ -1293,14 +1302,14 @@ function gutils.get_derived_name(grecipe_name, i_temperatures, p_temperatures)
     local args = ""
     local has_temperature
     if i_temperatures then
-        for name, temperature in pairs(i_temperatures) do
-            args = args .. "<" .. name .. "=" .. tostring(temperature)
+        for ndx, temperature in pairs(i_temperatures) do
+            args = args .. "<" .. ndx .. "=" .. tostring(temperature)
             has_temperature = true
         end
     end
     if p_temperatures then
-        for name, temperature in pairs(p_temperatures) do
-            args = args .. ">" .. name .. "=" .. tostring(temperature)
+        for ndx, temperature in pairs(p_temperatures) do
+            args = args .. ">" .. ndx .. "=" .. tostring(temperature)
             has_temperature = true
         end
     end
@@ -1342,11 +1351,10 @@ function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
     }
     g.recipes[derived_name] = derived
 
-    for _, i in pairs(grecipe.ingredients) do
+    for index, i in pairs(grecipe.ingredients) do
         local ingredient = i
         if i.temperatures then
-            local _, name = gutils.split_name(i.name)
-            local temperature = grecipe.i_temperatures and grecipe.i_temperatures[name]
+            local temperature = grecipe.i_temperatures and grecipe.i_temperatures[tostring(index)]
             if temperature then
                 ingredient = gutils.get_derived_product(g, ingredient, temperature)
             end
@@ -1355,11 +1363,10 @@ function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
         ingredient.ingredient_of[derived_name] = derived
     end
 
-    for _, p in pairs(grecipe.products) do
+    for index, p in pairs(grecipe.products) do
         local product = p
         if p.temperatures then
-            local _, name = gutils.split_name(p.name)
-            local temperature = grecipe.p_temperatures and grecipe.p_temperatures[name]
+            local temperature = grecipe.p_temperatures and grecipe.p_temperatures[tostring(index)]
             if temperature then
                 product = gutils.get_derived_product(g, product, temperature)
             end
@@ -1369,6 +1376,19 @@ function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
     end
 
     return derived
+end
+
+---@param g Graph
+---@param recipe_name string
+---@return GRecipe?
+function gutils.get_instanced_recipe(g, recipe_name)
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe then return nil end
+    if not grecipe.use_temperature then return grecipe end
+
+    local name = gutils.get_derived_name(grecipe.name, grecipe.i_temperatures, grecipe.p_temperatures)
+    local grecipe = g.recipes[name]
+    return grecipe
 end
 
 local fluid_recipe_pattern = tools.fluid_recipe_pattern

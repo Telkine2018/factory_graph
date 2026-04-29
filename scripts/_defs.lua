@@ -116,7 +116,7 @@ local tools = require("scripts.tools")
 ---@field pos_locked boolean?
 ---@field mcount number                 @ manual count of machine
 ---@field use_temperature boolean?
----@field i_temperatures {[string]:number}?
+---@field i_temperatures {[string]:number}?         @ {ingredient name}@{ingredient index}
 ---@field p_temperatures {[string]:number}?
 ---@field derived_from GRecipe
 

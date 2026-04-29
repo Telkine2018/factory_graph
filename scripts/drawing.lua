@@ -1434,11 +1434,14 @@ function drawing.select_entity(g, entity)
             }
             local grecipe = g.selected_recipe
             if grecipe then
-                local product = drawing.get_product_from_selected(player, entity)
-                if product then
+                local gproduct = drawing.get_product_from_selected(player, entity)
+                if gproduct then
                     if entity.valid then
-                        g.selector_product_name = product.name
-                        local text = gutils.get_product_name(player, product.name)
+                        g.selector_product_name = gproduct.name
+                        local text = gutils.get_product_name(player, gproduct.name)
+                        if gproduct.temperature then
+                            text = text .. " (" .. gproduct.temperature .. " °C)"
+                        end
                         g.selector_product_name_id = rendering.draw_text {
                             color = { 1, 1, 1 },
                             surface = surface,
@@ -1448,10 +1451,10 @@ function drawing.select_entity(g, entity)
                             text = text,
                             scale = 0.4
                         }
-                        draw_connected_by_product(g, grecipe, product)
+                        draw_connected_by_product(g, grecipe, gproduct)
                         if not g.selection_lock then
                             dash_lines(g, grecipe, false)
-                            dash_line_for_product(product, true)
+                            dash_line_for_product(gproduct, true)
                             g.lock_selected_recipe = grecipe
                         end
                     end
@@ -1539,7 +1542,15 @@ local function on_gui_opened(e)
         elseif entity_name == commons.product_selector_name then
             local product = drawing.get_product_from_selected(player, entity)
             if product then
-                drawing.open_recipe_selection(g, { product = product, recipe = grecipe })
+                local action = nil
+                for _, ingredient in pairs(grecipe.ingredients) do
+                    if ingredient.name == product.name then
+                        action = commons.action_producer
+                        break
+                    end
+                end
+                if not action then action = commons.action_consumer end
+                drawing.open_recipe_selection(g, { product = product, action = action })
             end
             player.opened = nil
         end
@@ -1549,6 +1560,7 @@ tools.on_event(defines.events.on_gui_opened, on_gui_opened)
 
 ---@param player LuaPlayer
 ---@param entity LuaEntity
+---@return GProduct?
 function drawing.get_product_from_selected(player, entity)
     local g = gutils.get_graph(player)
     for product_name, selector in pairs(g.product_selectors) do

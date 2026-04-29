@@ -407,7 +407,7 @@ function product_panel.create_product_tables(player)
             local product_name = product.product.name
             local pline = product_table.add { type = "flow", direction = "horizontal" }
 
-            local b = gutils.create_product_button(pline, product_name, "product_button")
+            local b,_,_,temperature = gutils.create_product_button(pline, product_name, "product_button")
             b.raise_hover_events = true
             b.style.size = general_button_size
             tools.set_name_handler(b, np("product"), { product_name = product_name, label = product.label })
@@ -420,7 +420,13 @@ function product_panel.create_product_tables(player)
             b.style.size = general_button_size
 
             local vinput = pline.add { type = "flow", direction = "vertical", name = "vinput" }
-            local label = vinput.add { type = "label", caption = product.label }
+
+            ---@type any
+            local label_value = product.label
+            if temperature then
+                label_value = { "", label_value, { np("temperature"), temperature }}
+            end
+            local label = vinput.add { type = "label", caption = label_value }
 
             if g.iovalues[product_name] then
                 b.style = red_button

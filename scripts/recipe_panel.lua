@@ -75,13 +75,13 @@ function recipe_panel.create(player_index, grecipe)
     end
 
     ---@type Params.create_standard_panel
-    local params  = {
+    local params                         = {
         panel_name         = recipe_panel_name,
         title              = name,
         create_inner_frame = true,
         container          = player.gui.left
     }
-    local frame, flow = tools.create_standard_panel(player, params)
+    local frame, flow                    = tools.create_standard_panel(player, params)
     frame.style.horizontally_stretchable = false
 
     ---@param title LocalisedString?
@@ -104,16 +104,27 @@ function recipe_panel.create(player_index, grecipe)
         add_line({ np("ingredients") })
         for _, p in pairs(recipe.ingredients) do
             local caption
+
+            local temperature_label = ""
+            ---@type any
+            local minimum_temperature = p.minimum_temperature
+            ---@type any
+            local maximum_temperature = p.maximum_temperature
+            if minimum_temperature and maximum_temperature then
+                if minimum_temperature < -1e38 then temperature_label = " (<=" .. maximum_temperature .. " °C)" 
+                elseif maximum_temperature > 1e38 then temperature_label = " (>=" .. minimum_temperature .. " °C))" 
+                else temperature_label = " (" .. minimum_temperature .. " °C," .. maximum_temperature .. " °C)" end
+            end
             if machine and machine.count and machine.count > 0 then
                 local per_machine = production.get_ingredient_amount(machine, p)
                 caption = { np("ingredient"),
                     tools.fround(per_machine * machine.count),
                     "[" .. p.type .. "=" .. p.name .. "]",
                     gutils.get_product_name(player, p.type .. "/" .. p.name),
-                    "(" .. tools.fround(per_machine) .. "/m)"
+                    "(" .. tools.fround(per_machine) .. "/m) " .. temperature_label
                 }
             else
-                caption = get_product_label(player_index, p)
+                caption = { "", get_product_label(player_index, p), temperature_label }
                 if add_debug_info then
                     caption = { "", caption, " [", p.name, "]" }
                 end
@@ -128,6 +139,10 @@ function recipe_panel.create(player_index, grecipe)
         for _, p in pairs(recipe.products) do
             if p.type ~= "research-progress" then
                 local caption
+                local temperature_label = ""
+                if p.temperature then
+                    temperature_label = " (" .. p.temperature .. "°C)"
+                end
 
                 if machine and machine.count and machine.count > 0 then
                     local per_machine = production.get_product_amount(machine, p)
@@ -135,10 +150,11 @@ function recipe_panel.create(player_index, grecipe)
                         tools.fround(per_machine * machine.count),
                         "[" .. p.type .. "=" .. p.name .. "]",
                         gutils.get_product_name(player, p.type .. "/" .. p.name),
-                        "(" .. tools.fround(per_machine) .. "/m)"
+                        "(" .. tools.fround(per_machine) .. "/m)" ..
+                        temperature_label
                     }
                 else
-                    caption = get_product_label(player_index, p)
+                    caption = { "", get_product_label(player_index, p), temperature_label }
                     if add_debug_info then
                         caption = { "", caption, " [", p.name, "]" }
                     end

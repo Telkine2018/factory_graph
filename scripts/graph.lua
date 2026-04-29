@@ -129,6 +129,10 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                 grecipe.machine = nil
                 grecipe.hidden = recipe.hidden
                 grecipe.use_temperature = nil
+                if remove_derived then
+                    grecipe.i_temperatures = nil
+                    grecipe.p_temperatures = nil
+                end
                 local pconfig = grecipe.production_config
                 if pconfig then
                     ---@type boolean?
