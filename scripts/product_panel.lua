@@ -267,7 +267,7 @@ tools.register_user_event(commons.refresh_machine_list, function(data)
 
             if layer_button then
                 local layer_style = layer_button_style
-                if scanned_recipes[line_recipe_name] then
+                if scanned_recipes[gutils.get_recipe_base_name(line_recipe_name)] then
                     layer_style = active_layer_button_style
                 end
                 if layer_button.style.name ~= layer_style then
@@ -1195,7 +1195,7 @@ function product_panel.update_machine_panel(g, setup_flow, summary_flow)
 
     local scanned_recipes = product_panel.get_scanned_recipes(player)
     for _, machine in pairs(machines) do
-        local active = scanned_recipes[machine.grecipe.name]
+        local active = scanned_recipes[gutils.get_recipe_base_name(machine.grecipe.name)]
         create_product_line(machine_container, machine, manual_mode, color_values, active)
 
         local count = math.ceil(machine.count or 0)

@@ -6,7 +6,7 @@ Date: 05. 04. 2026.
   Features:
     - Add total of items in required machines
     - Add <CONTROL><LEFT-CLICK> on ingredient/product in recipe list to handcraft item if possible
-    - Manage fluid temperature in recipes
+    - Manage fluid temperature in recipes. For recipe with fluid using temperature, you can choose temperature and have the same recipe or product multiple time with different temperatures.
 ---------------------------------------------------------------------------------------------------
 Version: 2.0.24
 Date: 31. 03. 2026.
