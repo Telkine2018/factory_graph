@@ -407,7 +407,7 @@ function product_panel.create_product_tables(player)
             local product_name = product.product.name
             local pline = product_table.add { type = "flow", direction = "horizontal" }
 
-            local b,_,_,temperature = gutils.create_product_button(pline, product_name, "product_button")
+            local b, _, _, temperature = gutils.create_product_button(pline, product_name, "product_button")
             b.raise_hover_events = true
             b.style.size = general_button_size
             tools.set_name_handler(b, np("product"), { product_name = product_name, label = product.label })
@@ -424,7 +424,7 @@ function product_panel.create_product_tables(player)
             ---@type any
             local label_value = product.label
             if temperature then
-                label_value = { "", label_value, { np("temperature"), temperature }}
+                label_value = { "", label_value, { np("temperature"), temperature } }
             end
             local label = vinput.add { type = "label", caption = label_value }
 
@@ -882,20 +882,27 @@ local function create_product_line(container, machine, manual_mode, color_values
             style = style
         }
 
+        local amount = ingredient.amount * machine.limited_craft_s * count
+        amount = fround(amount)
+        local s_amount = luautil.format_number(amount)
+
         b.style.size = general_button_size
         b.locked = true
         b.elem_tooltip = { type = type, name = iname }
         if gingredient.temperature then
-            b.tooltip = { np("ingredient_tooltip_temperature"), tostring(gingredient.temperature) }
+            b.tooltip = { np("ingredient_tooltip_temperature"), tostring(gingredient.temperature), s_amount }
         else
-            b.tooltip = { np("ingredient_tooltip") }
+            b.tooltip = { np("ingredient_tooltip"), s_amount }
         end
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = ingredient_name, action = commons.action_producer })
 
-        local amount = ingredient.amount * machine.limited_craft_s * count
-        amount = fround(amount)
+        tools.set_name_handler(b, np("open_product"), {
+            recipe_name = machine.name,
+            product_name = ingredient_name,
+            action = commons.action_producer
+        })
+
         b.add { type = "label", style = default_button_label_style,
-            caption = tostring(amount), ignored_by_interaction = true }
+            caption = s_amount, ignored_by_interaction = true }
     end
 
     -- local col2 = container.add { type = "flow", direction = "horizontal" }
@@ -922,22 +929,23 @@ local function create_product_line(container, machine, manual_mode, color_values
             if value >= 0 then style = green_button else style = red_button end
         end
 
+        local amount = get_product_amount(machine, product)
+        amount = amount * count
+        amount = fround(amount)
+        local s_amount = luautil.format_number(amount)
+
         b = recipe_row.add { type = "choose-elem-button", elem_type = type, item = pname, fluid = product.name, style = style }
         b.style.size = general_button_size
         b.locked = true
         b.elem_tooltip = { type = type, name = pname }
         if gproduct.temperature then
-            b.tooltip = { np("production_tooltip_temperature"), tostring(gproduct.temperature) }
+            b.tooltip = { np("production_tooltip_temperature"), tostring(gproduct.temperature), s_amount }
         else
-            b.tooltip = { np("production_tooltip") }
+            b.tooltip = { np("production_tooltip"), s_amount }
         end
-        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
+        tools.set_name_handler(b, np("open_product"), {recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
 
-        local amount = get_product_amount(machine, product)
-
-        amount = amount * count
-        amount = fround(amount)
-        b.add { type = "label", style = default_button_label_style, caption = tostring(amount), ignored_by_interaction = true }
+        b.add { type = "label", style = default_button_label_style, caption = s_amount, ignored_by_interaction = true }
     end
 end
 product_panel.create_product_line = create_product_line
@@ -1886,6 +1894,16 @@ tools.register_user_event(commons.production_compute_event, function(data)
         update_machines(data.g)
     end
 end)
+
+tools.on_event(defines.events.on_player_main_inventory_changed,
+    ---@param e EventData.on_player_main_inventory_changed
+    function(e)
+        local player = game.players[e.player_index]
+        local g = gutils.get_graph(player)
+        if g then
+            update_machines(g)
+        end
+    end)
 
 tools.on_named_event(np("mini_maxi"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
