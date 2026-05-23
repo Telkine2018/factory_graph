@@ -368,7 +368,7 @@ function gutils.filter_candidate_recipes(recipes, g)
                 end
             end
         else
-            if not g.recipes[recipe.name].enabled then
+            if not g.player.force.recipes[recipe.name].enabled then
                 goto skip
             end
         end

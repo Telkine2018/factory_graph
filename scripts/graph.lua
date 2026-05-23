@@ -378,6 +378,12 @@ function graph.remove_unused(g)
         for _, grecipe in pairs(g.recipes) do
             if grecipe.derived_from and grecipe.derived_from.used then
                 grecipe.used = true
+                for _, i in pairs(grecipe.ingredients) do
+                    i.ingredient_of[grecipe.name] = grecipe
+                end
+                for _, p in pairs(grecipe.products) do
+                    p.product_of[grecipe.name] = grecipe
+                end
             elseif grecipe.is_product then
                 local base_name = string.gmatch(grecipe.name, "([^/]+/[^/]+)")()
                 if g.products[base_name].used then

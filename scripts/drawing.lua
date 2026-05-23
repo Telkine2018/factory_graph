@@ -563,17 +563,19 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
 
     topo_left_top, topo_right_top, topo_left_bottom, topo_right_bottom = 0, 0, 0, 0
     for _, recipe in pairs(connected_recipes) do
-        if recipe.col < routing_col then
-            if recipe.line < routing_line then
-                topo_left_top = topo_left_top + 1
+        if recipe.col then
+            if recipe.col < routing_col then
+                if recipe.line < routing_line then
+                    topo_left_top = topo_left_top + 1
+                else
+                    topo_left_bottom = topo_left_bottom + 1
+                end
             else
-                topo_left_bottom = topo_left_bottom + 1
-            end
-        else
-            if recipe.line < routing_line then
-                topo_right_top = topo_right_top + 1
-            else
-                topo_right_bottom = topo_right_bottom + 1
+                if recipe.line < routing_line then
+                    topo_right_top = topo_right_top + 1
+                else
+                    topo_right_bottom = topo_right_bottom + 1
+                end
             end
         end
     end
@@ -1008,13 +1010,15 @@ local function redraw_connections(g)
                 product_set[prod.name] = prod
             end
 
-            local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
-            id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
-                left_top = { p.x - margin, p.y - margin },
-                right_bottom = { p.x + margin, p.y + margin },
-                draw_on_ground = true
-            }
-            table.insert(ids, id)
+            if crecipe.col and crecipe.line then
+                local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
+                id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
+                    left_top = { p.x - margin, p.y - margin },
+                    right_bottom = { p.x + margin, p.y + margin },
+                    draw_on_ground = true
+                }
+                table.insert(ids, id)
+            end
         elseif crecipe.col and crecipe.line then
             local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0.4, 0.4, 0.4 },
