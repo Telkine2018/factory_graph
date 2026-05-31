@@ -1460,11 +1460,11 @@ function product_panel.request_items(player, item, total_count, quality)
             {
                 value = {
                     name = item,
-                    quality = has_quality and quality or nil,
-                    comparator = has_quality and "=" or nil
+                    type = "item",
+                    quality = has_quality and quality or "normal",
+                    comparator = "=" 
                 },
-                min = total_count,
-                max = total_count
+                min = total_count
             })
         return
     end
@@ -1485,8 +1485,9 @@ function product_panel.request_items(player, item, total_count, quality)
     section.set_slot(current.slot_index, {
         value = {
             name = item,
-            quality = has_quality and quality or nil,
-            comparator = has_quality and "=" or nil
+            type = "item",
+            quality = has_quality and quality or "normal",
+            comparator = "="
         },
         min = total_count,
         max = total_count
