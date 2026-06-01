@@ -1187,7 +1187,11 @@ function gutils.create_machine_tooltip(player, machine_entity, machine_count)
                         local ptext = {
                             np("machine_product_tooltip"),
                             amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
-                        table.insert(parts, ptext)
+                        if #parts < 15 then
+                            table.insert(parts, ptext)
+                        else
+                            break
+                        end
                     end
                 end
             else
@@ -1198,12 +1202,18 @@ function gutils.create_machine_tooltip(player, machine_entity, machine_count)
                 for name, count in pairs(missing) do
                     local label = gutils.get_product_name(player, "item/" .. name)
                     local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
+                    if #parts < 15 then
+                        table.insert(parts, ptext)
+                    end
                 end
                 for name, count in pairs(used) do
                     local label = gutils.get_product_name(player, "item/" .. name)
                     local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
+                    if #parts < 15 then
+                        table.insert(parts, ptext)
+                    else
+                        break
+                    end
                 end
             end
         end
