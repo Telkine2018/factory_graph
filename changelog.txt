@@ -1,4 +1,33 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.27
+Date: 31. 05. 2026.
+  Bugfixes:
+    - Fix logistic requests in summary
+    - Fix crash in on summary tooltip
+    - Add settings to view barrel / unbarrel recipes
+---------------------------------------------------------------------------------------------------
+Version: 2.0.26
+Date: 08. 05. 2026.
+  Bugfixes:
+    - Fix machine selection depending on fluid box
+    - Fix recipe selection for dynamic recipe change
+    - Fix drawing crash
+    - Fix invalid migration of recipe with temperature
+---------------------------------------------------------------------------------------------------
+Version: 2.0.25
+Date: 05. 04. 2026.
+  Bugfixes:
+    - Fix synchronization in UI
+  Features:
+    - Add total of items in required machines
+    - Add <CONTROL><LEFT-CLICK> on ingredient/product in recipe list to handcraft item if possible
+    - Manage fluid temperature in recipes. For recipe with fluid using temperature, you can choose temperature and have the same recipe or product multiple time with different temperatures. See description.
+---------------------------------------------------------------------------------------------------
+Version: 2.0.24
+Date: 31. 03. 2026.
+  Features:
+    - Big refactor to use remote views. Now use <Escape> to exit graph view.
+---------------------------------------------------------------------------------------------------
 Version: 2.0.23
 Date: 14. 03. 2026.
   Bugfixes:

@@ -5,6 +5,7 @@ local tools      = require("scripts.tools")
 local gutils     = require("scripts.gutils")
 local machinedb  = require("scripts.machinedb")
 local production = require("scripts.production")
+local graph      = require("scripts.graph")
 
 local prefix     = commons.prefix
 
@@ -33,9 +34,11 @@ local function install_modules(container, g, config, grecipe)
         return
     end
 
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+    if not recipe then return end
+
     local allowed = {}
     local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
-    local recipe = prototypes.recipe[grecipe.name]
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
     local allowed_module_categories2 = assembly_machine.allowed_module_categories
@@ -104,11 +107,13 @@ local function install_beacon_modules(container, g, config, grecipe)
         local beacon = prototypes.entity[tools.extract_name(config.beacon_name)]
         if not beacon then return end
 
+        local recipe = gutils.get_recipe_prototype(grecipe.name)
+        if not recipe then return end
+
         local count = beacon.module_inventory_size
         local allowed = {}
         local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
 
-        local recipe = prototypes.recipe[grecipe.name]
         local allowed_effects = recipe.allowed_effects
         local allowed_module_categories = recipe.allowed_module_categories
         for _, module in pairs(modules) do
@@ -176,12 +181,13 @@ function msettings.create(player_index, grecipe)
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end
 
-    local recipe = prototypes.recipe[grecipe.name]
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+
 
     ---@type Params.create_standard_panel
     local params = {
         panel_name           = panel_name,
-        title                = { np("title"), recipe and "[recipe=" .. grecipe.name .. "]" or "", recipe and recipe.localised_name or "" },
+        title                = { np("title"), recipe and "[recipe=" .. recipe.name .. "]" or "", recipe and recipe.localised_name or "" },
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
@@ -215,7 +221,7 @@ function msettings.create(player_index, grecipe)
 
     config = tools.table_dup(config)
 
-    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = grecipe.name } })
+    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = gutils.get_recipe_base_name(grecipe.name) } })
     if #technologies > 0 then
         local label = field_table.add { type = "label", caption = { np("technologies") } }
         local tech_flow = field_table.add { type = "flow" }
@@ -237,10 +243,10 @@ function msettings.create(player_index, grecipe)
     machinedb.initialize()
     local machines = machinedb.get_machines_for_recipe(grecipe.name)
     local machine_names = {}
-    
+
     if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
-        local search_surface = tools.get_vars(player).extern_surface
+        local search_surface = gutils.get_real_surface(player)
         if search_surface and not search_surface.valid then
             search_surface = nil
         end
@@ -262,7 +268,7 @@ function msettings.create(player_index, grecipe)
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
-    local module_scroll = field_table.add{type="scroll-pane", name="modules_scroll"}
+    local module_scroll = field_table.add { type = "scroll-pane", name = "modules_scroll" }
     module_scroll.style.maximal_height = 300
     local module_flow = module_scroll.add { type = "table", column_count = 6, name = "modules_pane" }
     install_modules(module_flow, g, config, grecipe)
@@ -601,8 +607,18 @@ function msettings.open_selection(player)
         gutils.refresh_machine_list(g, grecipe.name)
         msettings.create(player.index, grecipe)
     else
-        local product = g.products[grecipe.name]
-        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, action=commons.action_producer })
+        local gproduct = g.products[grecipe.name]
+        if g.visibility == commons.visibility_layers then
+            for gname, grecipe in pairs(gproduct.product_of) do
+                if not grecipe.is_product and g.selection[gname] then
+                    grecipe.layer = g.current_layer
+                    graph.deferred_update(player, { selection_changed = true, do_layout = true })
+                    tools.fire_user_event(commons.production_data_change_event, { g = g })
+                    return
+                end
+            end
+        end
+        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = gproduct, action = commons.action_producer })
     end
 end
 

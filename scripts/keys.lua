@@ -36,7 +36,7 @@ local function move_recipe(g, grecipe, col, line)
 
     gutils.set_colline(g, grecipe, col, line)
     local x, y = gutils.get_position(g, col, line)
-    grecipe.entity.teleport { x, y }
+    gutils.teleport(g.player, {x,y})
     drawing.redraw_selection(g.player)
     drawing.draw_layers(g)
 end

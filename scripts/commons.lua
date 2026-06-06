@@ -56,8 +56,9 @@ local commons = {
         cannot_find_machine = "cannot_find_machine",
         use_handcraft_recipe = "use_handcraft_recipe"
     },
-    generate_with_lab_tiles = true
+    generate_with_lab_tiles = true,
 
+    default_temperature = -1e6
 }
 
 commons.buttons = {
@@ -104,5 +105,7 @@ commons.action_path_to_build = 2
 commons.action_consumer = 3
 commons.action_producer = 4
 commons.action_in_selection = 5
+
+commons.radar_name = prefix .. "-radar"
 
 return commons

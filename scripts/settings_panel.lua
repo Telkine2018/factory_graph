@@ -173,9 +173,6 @@ function settings_panel.create(player_index)
     flow.add { type = "label", caption = { np("graph_zoom_level") } }
     flow.add { type = "textfield", name = "graph_zoom_level", text = g.graph_zoom_level and tostring(g.graph_zoom_level) or 1, numeric = true, allow_decimal = true }
 
-    flow.add { type = "label", caption = { np("world_zoom_level") } }
-    flow.add { type = "textfield", name = "world_zoom_level", text = g.world_zoom_level and tostring(g.world_zoom_level) or 1, numeric = true, allow_decimal = true }
-
     flow.add { type = "label", caption = { np("autosave_on_graph_switching") } }
     flow.add { type = "checkbox", name = "autosave_on_graph_switching", state = not not g.autosave_on_graph_switching,
         tooltip = { np("autosave_on_graph_switching_tooltip") } }
@@ -406,7 +403,6 @@ local function save(player, frame)
     g.autosave_on_graph_switching = field_table.autosave_on_graph_switching.state
     g.layout_on_selection = field_table["layout-on-selection"].state
     g.graph_zoom_level = tonumber(field_table.graph_zoom_level.text)
-    g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
     g.show_only_researched = field_table.show_only_researched.state
     g.show_hidden = field_table.show_hidden.state
     if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap then

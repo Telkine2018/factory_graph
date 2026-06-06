@@ -21,15 +21,15 @@ function gutils.destroy_drawing(ids)
     return nil
 end
 
----@param recipe GRecipe
+---@param grecipe GRecipe
 ---@return {[string]:GProduct}
-function gutils.product_set(recipe)
+function gutils.product_set(grecipe)
     local result = {}
-    for _, product in pairs(recipe.ingredients) do
-        result[product.name] = product
+    for _, gproduct in pairs(grecipe.ingredients) do
+        result[gproduct.name] = gproduct
     end
-    for _, product in pairs(recipe.products) do
-        result[product.name] = product
+    for _, gproduct in pairs(grecipe.products) do
+        result[gproduct.name] = gproduct
     end
     return result
 end
@@ -50,10 +50,15 @@ function gutils.get_recipe_name(player, grecipe)
     local localised_name
 
     if grecipe.is_product then
-        if match(grecipe.name, "^item/") then
-            localised_name = translations.get_item_name(player.index, string.sub(grecipe.name, 6))
+        local type, name, arg = string.gmatch(grecipe.name, "([^/]+)/([^/]+)(.*)")()
+        if type == "item" then
+            localised_name = translations.get_item_name(player.index, name)
         else -- fluid
-            localised_name = translations.get_fluid_name(player.index, string.sub(grecipe.name, 7))
+            localised_name = translations.get_fluid_name(player.index, name)
+            if (arg ~= "") then
+                local temperature = string.sub(arg, 2)
+                localised_name = { "", localised_name, { np("temperature"), temperature } }
+            end
         end
     else
         localised_name = translations.get_recipe_name(player.index, grecipe.name) or ""
@@ -68,10 +73,11 @@ function gutils.get_product_name(player, name)
     ---@type LocalisedString
     local localised_name
 
-    if match(name, "^item/") then
-        localised_name = translations.get_item_name(player.index, string.sub(name, 6))
+    local type, lname = string.gmatch(name, "([^/]+)/([^/]+)")()
+    if type == "item" then
+        localised_name = translations.get_item_name(player.index, lname)
     else -- fluid
-        localised_name = translations.get_fluid_name(player.index, string.sub(name, 7))
+        localised_name = translations.get_fluid_name(player.index, lname)
     end
     return localised_name
 end
@@ -149,7 +155,7 @@ function gutils.move_to_recipe(player, recipe_name, fast)
     if not position then return end
 
     if fast then
-        player.teleport(position)
+        player.set_controller { type = defines.controllers.remote, position = position, surface = g.surface }
     else
         gutils.move_view(player, position)
     end
@@ -167,8 +173,9 @@ local function move_tick_handler()
 
     local toremove = {}
     for player_index, move in pairs(moves) do
-        local count = move.count
         local player = game.players[player_index]
+        local g = gutils.get_graph(player)
+        local count = move.count
         count = count - 1
         if count <= 0 then
             toremove[player_index] = true
@@ -176,7 +183,7 @@ local function move_tick_handler()
             local pos = player.position
             local x = pos.x + move.dx
             local y = pos.y + move.dy
-            player.teleport({ x, y }, player.surface, false)
+            gutils.teleport(player, { x, y })
             move.count = count
         end
     end
@@ -334,15 +341,23 @@ end
 ---@param recipes table<KEY, GRecipe>
 ---@param g Graph
 ---@return table<KEY, GRecipe>
-function gutils.filter_lab_pack(recipes, g)
+function gutils.filter_candidate_recipes(recipes, g)
     local lab_packs = g.lab_packs
-    if lab_packs == nil or #lab_packs == 0 then return recipes end
+    if lab_packs == nil or #lab_packs == 0 then
+        local new_recipes = {}
+        for _, recipe in pairs(recipes) do
+            if not recipe.derived_from then table.insert(new_recipes, recipe) end
+        end
+        return new_recipes
+    end
+
     local lab_filter = {}
     for _, lab in pairs(lab_packs) do
         lab_filter[lab] = true
     end
     local new_recipes = {}
-    for index, recipe in pairs(recipes) do
+    for _, recipe in pairs(recipes) do
+        if recipe.derived_from then goto skip end
         local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = recipe.name } })
         if #technologies > 0 then
             for _, tech in pairs(technologies) do
@@ -353,7 +368,7 @@ function gutils.filter_lab_pack(recipes, g)
                 end
             end
         else
-            if not g.recipes[recipe.name].enabled then
+            if not g.player.force.recipes[recipe.name].enabled then
                 goto skip
             end
         end
@@ -506,7 +521,8 @@ function gutils.recenter(g)
     end
 
     local x, y = gutils.get_position(g, center_col, center_line)
-    g.player.teleport({ x, y })
+
+    gutils.teleport(g.player, { x, y })
 end
 
 ---@param recipes table<any, GRecipe>
@@ -529,22 +545,24 @@ end
 ---@return LuaGuiElement
 ---@return string
 ---@return string
+---@return string?
 function gutils.create_product_button(container, product_name, button_name)
     ---@cast button_name -nil
     local b
-    local type
-    local name
-    if string.find(product_name, "^item/") then
-        name = string.sub(product_name, 6)
-        b = container.add { type = "choose-elem-button", elem_type = "item", item = name, name = button_name }
-        type = "item"
+    local type, name, temperature = string.gmatch(product_name, "([^/]+)/([^/]+)(.*)")()
+    if type == "item" then
+        b = container.add { type = "choose-elem-button", elem_type = type, item = name, name = button_name }
     else
-        name = string.sub(product_name, 7)
-        b = container.add { type = "choose-elem-button", elem_type = "fluid", fluid = name, name = button_name }
-        type = "fluid"
+        b = container.add { type = "choose-elem-button", elem_type = type, fluid = name, name = button_name }
     end
     b.locked = true
-    return b, type, name
+    b.elem_tooltip = { type = type, name = name }
+    if temperature ~= "" then
+        temperature = string.sub(temperature, 2)
+    else
+        temperature = nil
+    end
+    return b, type, name, temperature
 end
 
 -- Fire production change
@@ -586,10 +604,13 @@ local saved_graph_fields = {
 
 local saved_reciped_fields = {
     "name",
-    "production_config", "line",
+    "production_config",
+    "line",
     "col",
     "layer",
-    "mcount"
+    "mcount",
+    "i_temperatures",
+    "p_temperatures"
 }
 
 gutils.saved_graph_fields = saved_graph_fields
@@ -708,7 +729,7 @@ end
 ---@param recipe_name string
 function gutils.set_cursor_stack(player, recipe_name)
     local g = gutils.get_graph(player)
-    local layer 
+    local layer
     if g.visibility == commons.visibility_layers then
         layer = g.current_layer
     end
@@ -780,6 +801,7 @@ local text_dist = 30
 ---@param recipe_name string?
 ---@param move_player boolean?
 function gutils.show_machine(player, recipe_name, move_player)
+    recipe_name = gutils.get_recipe_base_name(recipe_name)
     local g = gutils.get_graph(player)
     if not recipe_name then return end
     local grecipe = g.recipes[recipe_name]
@@ -1022,10 +1044,15 @@ function gutils.get_real_surface(player)
     if surface ~= g.surface then
         return surface, player.position
     else
-        if vars.extern_surface and vars.extern_surface.valid then
-            return vars.extern_surface, vars.extern_position or player.position
+        ---@type Extern
+        local extern = vars.extern
+        if extern.surface.valid then
+            return extern.surface, extern.position
         end
-        return game.surfaces("nauvis"), player.position
+        if player.physical_surface then
+            return player.physical_surface, player.physical_position
+        end
+        return game.surfaces("nauvis"), { 0, 0 }
     end
 end
 
@@ -1107,9 +1134,13 @@ function gutils.get_character(player)
     if character then return character end
 
     local vars = tools.get_vars(player)
-    if not character and vars.saved_character and vars.saved_character.valid then
-        character = vars.saved_character
+
+    ---@type Extern?
+    local extern = vars.extern
+    if extern and extern.character and extern.character.valid then
+        character = extern.character
     end
+
     return character
 end
 
@@ -1118,21 +1149,24 @@ end
 ---@param  count integer
 ---@return {[string]:integer}?
 ---@return {[string]:integer}?
+---@return {[string]:integer}?
 function gutils.find_missing_ingredients(player, item, count)
     local character = gutils.get_character(player)
     if not character then return nil, nil end
-    return tools.find_missing_ingredients(character, item, count)
+    return tools.find_missing_ingredients(character, { [item] = count })
 end
 
 ---@param player LuaPlayer
 ---@param machine_entity LuaEntityPrototype
+---@param machine_count integer?
 ---@return table
-function gutils.create_machine_tooltip(player, machine_entity)
+function gutils.create_machine_tooltip(player, machine_entity, machine_count)
     local parts = { "" }
+    if not machine_count then machine_count = 1 end
     if machine_entity and machine_entity.items_to_place_this then
         local machine_item = machine_entity.items_to_place_this[1]
         if machine_item then
-            local missing, used = gutils.find_missing_ingredients(player, machine_item.name, 1)
+            local missing, used, inv = gutils.find_missing_ingredients(player, machine_item.name, machine_count)
 
             if not used then
                 local machine_recipes =
@@ -1153,25 +1187,254 @@ function gutils.create_machine_tooltip(player, machine_entity)
                         local ptext = {
                             np("machine_product_tooltip"),
                             amount, label, "[" .. p.type .. "=" .. p.name .. "]" }
-                        table.insert(parts, ptext)
+                        if #parts < 15 then
+                            table.insert(parts, ptext)
+                        else
+                            break
+                        end
                     end
                 end
             else
-                table.insert(parts, { np("from_inventory") })
+                inv = inv or {}
+                local mcount = "0"
+                if inv[machine_item.name] then mcount = tostring(inv[machine_item.name]) end
+                table.insert(parts, { np("from_inventory"), mcount })
                 for name, count in pairs(missing) do
                     local label = gutils.get_product_name(player, "item/" .. name)
                     local ptext = { np("machine_product_missing_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
+                    if #parts < 15 then
+                        table.insert(parts, ptext)
+                    end
                 end
                 for name, count in pairs(used) do
                     local label = gutils.get_product_name(player, "item/" .. name)
                     local ptext = { np("machine_product_tooltip"), count, label, "[item=" .. name .. "]" }
-                    table.insert(parts, ptext)
+                    if #parts < 15 then
+                        table.insert(parts, ptext)
+                    else
+                        break
+                    end
                 end
             end
         end
     end
     return parts
+end
+
+---@param player LuaPlayer
+---@param position MapPosition
+function gutils.teleport(player, position)
+    local surface = player.surface
+    local zoom = player.zoom
+    player.set_controller { type = defines.controllers.remote, position = position, surface = surface }
+    player.zoom = zoom
+end
+
+---@param player LuaPlayer
+---@param item string
+---@param count integer
+---@return integer?
+---@return string?
+function gutils.craft(player, item, count)
+    local recipes = prototypes.get_recipe_filtered { { filter = "has-product-item",
+        elem_filters = { { filter = "name", name = item } } } }
+
+    if not count then
+        count = 1
+    end
+    if not player.character then
+        return nil
+    end
+    local crafting_categories = player.character.prototype.crafting_categories
+    if #recipes > 0 and crafting_categories then
+        for recipe_name, recipe in pairs(recipes) do
+            if crafting_categories[recipe.category] then
+                local missing = gutils.find_missing_ingredients(player, item, count)
+                if missing and table_size(missing) > 0 then
+                    for name, count in pairs(missing) do
+                        local label = translations.get_item_name(player.index, name)
+                        player.create_local_flying_text {
+                            text = { np("missing_ingredient"), count, "[item=" .. name .. "]", label },
+                            color = { 1, 0, 0 },
+                            create_at_cursor = true,
+                            speed = 2
+                        }
+                    end
+                else
+                    local inv = player.character.get_main_inventory()
+                    local inv_count = 0
+                    if inv then
+                        inv_count = inv.get_item_count(item)
+                    end
+                    if count < 0 then count = -count end
+                    local craft_count = player.begin_crafting { recipe = recipe_name, count = count }
+                    player.print { np("craft"), count, "[item=" .. item .. "]", inv_count }
+                    return craft_count, recipe_name.name
+                end
+            end
+        end
+    end
+    return nil
+end
+
+---@param g Graph
+---@param gproduct GProduct
+---@param temperature number
+---@return GProduct
+function gutils.get_derived_product(g, gproduct, temperature)
+    local gname = gproduct.name .. "/" .. tostring(temperature)
+    local derived = g.products[gname]
+    if derived then
+        return derived
+    end
+
+    if temperature == commons.default_temperature then
+        return gproduct
+    end
+
+    ---@type GProduct
+    local derived_product = {
+        name = gname,
+        ingredient_of = {},
+        product_of = {},
+        temperature = temperature,
+        derived_from = gproduct
+    }
+    g.products[gname] = derived_product
+    return derived_product
+end
+
+---@param grecipe_name string
+---@param i_temperatures {[string]:number}?
+---@param p_temperatures {[string]:number}?
+---@return string, boolean?
+function gutils.get_derived_name(grecipe_name, i_temperatures, p_temperatures)
+    local args = ""
+    local has_temperature
+    if i_temperatures then
+        for ndx, temperature in pairs(i_temperatures) do
+            args = args .. "<" .. ndx .. "=" .. tostring(temperature)
+            has_temperature = true
+        end
+    end
+    if p_temperatures then
+        for ndx, temperature in pairs(p_temperatures) do
+            args = args .. ">" .. ndx .. "=" .. tostring(temperature)
+            has_temperature = true
+        end
+    end
+    local derived_name = grecipe_name .. "/" .. args
+    return derived_name, has_temperature
+end
+
+---@param g Graph
+---@param grecipe GRecipe
+---@param i_temperatures {[string]:number}?
+---@param p_temperatures {[string]:number}?
+---@return table
+function gutils.get_derived_recipe(g, grecipe, i_temperatures, p_temperatures)
+    if grecipe.derived_from then
+        return grecipe
+    end
+
+    local derived_name, has_temperature = gutils.get_derived_name(grecipe.name, i_temperatures, p_temperatures)
+    if not has_temperature then return grecipe end
+
+    ---@type GRecipe
+    local derived = g.recipes[derived_name]
+    if derived then
+        return derived
+    end
+
+    derived = {
+        name = derived_name,
+        ingredients = {},
+        products = {},
+        visible = false,
+        order = 1,
+        hidden = grecipe.hidden,
+        enabled = grecipe.enabled,
+        layer = grecipe.layer,
+        derived_from = grecipe,
+        i_temperatures = tools.table_dup(i_temperatures),
+        p_temperatures = tools.table_dup(p_temperatures),
+    }
+    g.recipes[derived_name] = derived
+
+    for index, i in pairs(grecipe.ingredients) do
+        local ingredient = i
+        if i.temperatures then
+            local temperature = grecipe.i_temperatures and grecipe.i_temperatures[tostring(index)]
+            if temperature then
+                ingredient = gutils.get_derived_product(g, ingredient, temperature)
+            end
+        end
+        table.insert(derived.ingredients, ingredient)
+        ingredient.ingredient_of[derived_name] = derived
+    end
+
+    for index, p in pairs(grecipe.products) do
+        local product = p
+        if p.temperatures then
+            local temperature = grecipe.p_temperatures and grecipe.p_temperatures[tostring(index)]
+            if temperature then
+                product = gutils.get_derived_product(g, product, temperature)
+            end
+        end
+        table.insert(derived.products, product)
+        product.product_of[derived_name] = derived
+    end
+
+    return derived
+end
+
+---@param g Graph
+---@param recipe_name string
+---@return GRecipe?
+function gutils.get_instanced_recipe(g, recipe_name)
+    local grecipe = g.recipes[recipe_name]
+    if not grecipe then return nil end
+    if not grecipe.use_temperature then return grecipe end
+
+    local name = gutils.get_derived_name(grecipe.name, grecipe.i_temperatures, grecipe.p_temperatures)
+    local grecipe = g.recipes[name]
+    return grecipe
+end
+
+local fluid_recipe_pattern = tools.fluid_recipe_pattern
+
+---@param grecipe_name string
+---@return LuaRecipePrototype?
+function gutils.get_recipe_prototype(grecipe_name)
+    local recipe = prototypes.recipe[grecipe_name]
+    if recipe then return recipe end
+
+    local name = string.gmatch(grecipe_name, "([^/]+)")()
+    if name then return prototypes.recipe[name] end
+    return nil
+end
+
+---@param grecipe_name string
+---@return string
+function gutils.get_recipe_base_name(grecipe_name)
+    local name = string.gmatch(grecipe_name, "([^/]+)")()
+    return name
+end
+
+---@param product_name string?
+---@return string?
+function gutils.get_product_base_name(product_name)
+    if not product_name then return nil end
+    local base_name = string.gmatch(product_name, "([^/]+/[^/]+)")()
+    return base_name
+end
+
+---@param product_name string
+---@return string?
+---@return string?
+function gutils.split_name(product_name)
+    local type, name = string.gmatch(product_name, tools.product_pattern)()
+    return type, name
 end
 
 return gutils

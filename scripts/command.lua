@@ -58,12 +58,22 @@ function command.open(player)
         title              = { np("title") },
         is_draggable       = false,
         container          = player.gui.left,
-        create_inner_frame = true
+        create_inner_frame = true,
+        title_menu_func      = function(flow)
+            local b
+
+            b = flow.add {
+                type = "checkbox",
+                tooltip = { np("unselect_tooltip") },
+                name = np("command_visibility"),
+                state = not g.is_command_invisible
+            }
+        end
     }
     local frame, inner_frame = tools.create_standard_panel(player, params)
 
-    --frame.style.width = 600
-    --frame.style.minimal_height = 300
+    frame.style.horizontally_stretchable  = false
+    frame.style.minimal_width = 300
 
     local select_index = 1
     for i = 1, #select_modes do
@@ -118,6 +128,10 @@ function command.open(player)
     hflow.add { type = "button", caption = { np("unselect_all") }, name = np("unselect_all"), tooltip = { np("unselect_tooltip") } }
     hflow.add { type = "button", caption = { np("recompute-colors") }, name = np("recompute-colors") }
     hflow.style.bottom_margin = 5
+
+    if g.is_command_invisible then
+        inner_frame.visible = false
+    end
 end
 
 tools.on_named_event(np("recompute-colors"), defines.events.on_gui_click,
@@ -252,6 +266,21 @@ tools.on_named_event(np("show_products"), defines.events.on_gui_checked_state_ch
         graph.refresh(player, false, true)
     end
 )
+
+tools.on_named_event(np("command_visibility"), defines.events.on_gui_checked_state_changed,
+    ---@param e EventData.on_gui_click
+    function(e)
+        if not e.element or not e.element.valid then return end
+
+        local player = game.players[e.player_index]
+        local frame = player.gui.left[command_frame_name]
+        local g = gutils.get_graph(player)
+
+        g.is_command_invisible = not e.element.state
+        frame.inner_frame.visible = not g.is_command_invisible
+
+    end)
+
 
 graph.update_command_display = command.update_display
 

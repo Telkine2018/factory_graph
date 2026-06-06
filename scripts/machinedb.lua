@@ -9,6 +9,10 @@ local gutils = require("scripts.gutils")
 ---@field allowed_effects {[string]:boolean}
 ---@field module_inventory_size integer
 ---@field crafting_speed number
+---@field ingredient_count  number
+---@field max_item_product_count number
+---@field fluid_input number
+---@field fluid_output number
 
 ---@class ModuleInfo
 ---@field name string
@@ -35,17 +39,37 @@ local category_to_machines
 ---@param machine LuaEntityPrototype
 ---@return MachineInfo
 function machinedb.get_machine(machine)
+
+    ---@type MachineInfo
     local existing = machinedb.machines[machine.name]
     if existing then
         return existing
     end
 
+    local fluid_input = 0
+    local fluid_output = 0
+    if machine.fluidbox_prototypes then
+        for _, fb in pairs(machine.fluidbox_prototypes) do
+            if fb.production_type == "input" then
+                fluid_input = fluid_input + 1
+            elseif fb.production_type == "output" then
+                fluid_output = fluid_output +1
+            elseif fb.production_type == "input-output" then
+                fluid_input = fluid_input + 1
+                fluid_output = fluid_output + 1
+            end
+        end
+    end
     existing = {
         name = machine.name,
         categories = {},
         allowed_effects = machine.allowed_effects,
         module_inventory_size = machine.module_inventory_size,
-        crafting_speed = machine.get_crafting_speed("normal")
+        crafting_speed = machine.get_crafting_speed("normal"),
+        ingredient_count = machine.ingredient_count or 1000,
+        max_item_product_count = machine.max_item_product_count or 1000,
+        fluid_input = fluid_input,
+        fluid_output = fluid_output
     }
     machinedb.machines[machine.name] = existing
     return existing
@@ -67,9 +91,11 @@ function machinedb.initialize()
         local machines = prototypes.get_entity_filtered { { filter = "crafting-category", crafting_category = category_name } }
         local machine_infos = {}
         for _, machine in pairs(machines) do
-            local info = machinedb.get_machine(machine)
-            info.categories[category_name] = true
-            table.insert(machine_infos, info)
+            if not machine.hidden then
+                local info = machinedb.get_machine(machine)
+                info.categories[category_name] = true
+                table.insert(machine_infos, info)
+            end
         end
         machinedb.category_to_machines[category_name] = machine_infos
         table.sort(machine_infos, function(e1, e2) return e1.crafting_speed < e2.crafting_speed end)
@@ -94,6 +120,7 @@ end
 ---@return boolean
 function machinedb.is_machine_enabled(force, machine_name)
     local entity = prototypes.entity[machine_name]
+    if entity.hidden then return false end
     if entity.items_to_place_this then
         local item = entity.items_to_place_this[1]
         local machine_recipes = prototypes.get_recipe_filtered {
@@ -118,7 +145,7 @@ local is_machine_enabled = machinedb.is_machine_enabled
 ---@return ProductionConfig?
 function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local force = g.player.force --[[@as LuaForce]]
-    local recipe = prototypes.recipe[recipe_name]
+    local recipe = gutils.get_recipe_prototype(recipe_name)
     if not recipe then
         return nil
     end
@@ -368,26 +395,64 @@ end
 ---@return MachineInfo[]
 function machinedb.get_machines_for_recipe(recipe_name)
 
-    local recipe = prototypes.recipe[recipe_name]
-    local category = recipe.category
+    local recipe = gutils.get_recipe_prototype(recipe_name)
+    if not recipe then return {} end
 
+    local category = recipe.category
     if not machinedb.initialized then
         machinedb.initialize()
     end
 
-    local machines = category_to_machines[category]
+    local ingredient_count = #recipe.ingredients
+    local product_count = 0
+
+    local fluid_input = 0
+    for _, i in pairs(recipe.ingredients) do
+        if i.type == "fluid" then
+            fluid_input = fluid_input + 1
+        end
+    end
+
+    local fluid_output = 0
+    for _, p in pairs(recipe.products) do
+        if p.type == "item" then
+            product_count = product_count + 1
+        else
+            fluid_output = fluid_output + 1
+        end
+    end
+    
+    ---@type MachineInfo[]
+    local machines = {}
+
+    ---@param m MachineInfo
+    local function add_machine(m) 
+        if ingredient_count <= m.ingredient_count 
+                and product_count <= m.max_item_product_count 
+                and fluid_input <= m.fluid_input
+                and fluid_output <= m.fluid_output
+                then
+            table.insert(machines, m);
+        end
+    end
+
+    local base_machines = category_to_machines[category]
     local additional_categories  = recipe.additional_categories 
+    for _, machine in pairs(base_machines) do
+        add_machine(machine)
+    end
 
     if additional_categories and #recipe.additional_categories > 0 then
         for _, acategory in pairs(recipe.additional_categories ) do
             local amachines = machinedb.category_to_machines[acategory]
             if amachines then
                 for _, amachine in pairs(amachines) do
-                    table.insert(machines, amachine)
+                    add_machine(amachine)
                 end
             end
         end
    end
+
    return machines
 end
 

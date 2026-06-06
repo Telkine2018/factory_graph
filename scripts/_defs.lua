@@ -29,6 +29,7 @@ local tools = require("scripts.tools")
 ---@field selector_product_name_id LuaRenderObject?         @ selector text id
 ---@field recipe_order integer
 ---@field player_position MapPosition
+---@field highlight_recipe string?
 ---@field module_limitations {[string]:({[string]:true})}
 ---@field excluded_categories {[string]:boolean}?
 ---@field excluded_subgroups {[string]:boolean}?
@@ -49,12 +50,13 @@ local tools = require("scripts.tools")
 ---@field always_use_full_selection boolean?
 ---@field layout_on_selection boolean?
 ---@field graph_zoom_level number?
----@field world_zoom_level number?
+---@field graph_zoom_level_cmd number?
 ---@field autosave_on_graph_switching boolean?
 ---@field current_layer string?
 ---@field visible_layers {[string]:boolean}
 ---@field show_products boolean?
 ---@field lab_packs string[]
+---@field is_command_invisible boolean?
 
 ---@class GraphProduction
 ---@field use_connected_recipes boolean             @ true if connected reciped use
@@ -92,6 +94,10 @@ local tools = require("scripts.tools")
 ---@field root_recipe GRecipe?
 ---@field color Color
 ---@field ids LuaRenderObject[]?
+---@field temperatures {[number]:boolean}
+---@field derived boolean?
+---@field temperature number?
+---@field derived_from GProduct?
 
 ---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
@@ -109,6 +115,10 @@ local tools = require("scripts.tools")
 ---@field layer string?
 ---@field pos_locked boolean?
 ---@field mcount number                 @ manual count of machine
+---@field use_temperature boolean?
+---@field i_temperatures {[string]:number}?         @ {ingredient name}@{ingredient index}
+---@field p_temperatures {[string]:number}?
+---@field derived_from GRecipe
 
 ---@class GSortNode
 ---@field sort_level integer?
@@ -215,4 +225,15 @@ local tools = require("scripts.tools")
 ---@field update_command  boolean?
 ---@field no_recipe_selection_update boolean?
 ---@field update_product_list boolean?
+
+---@class Extern
+---@field surface LuaSurface
+---@field position MapPosition
+---@field zoom number
+---@field character LuaEntity
+---@field force LuaForce
+---@field cheat_mode boolean
+---@field controller integer | defines.controllers
+---@field show_surface_list boolean
+---@field in_graph boolean
 
