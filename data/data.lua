@@ -7,7 +7,8 @@ local empty_sprite = {
   filename = png('invisible'),
   width = 1,
   height = 1,
-  frame_count = 1
+  frame_count = 1,
+  direction_count = 1
 }
 
 local declarations = {}
@@ -33,6 +34,20 @@ add({
   key_sequence = "SHIFT + mouse-button-1",
   name = prefix .. "-control-click2"
 })
+
+add({
+  type = "custom-input",
+  key_sequence = "CONTROL + SHIFT + mouse-button-2",
+  name = prefix .. "-control-click4"
+})
+
+add({
+  type = "custom-input",
+  key_sequence = "mouse-button-3",
+  name = prefix .. "-control-click5"
+})
+
+
 
 if mods["space-exploration"] then
   add({
@@ -155,6 +170,16 @@ add(sprite)
 
 sprite = {
   type = "sprite",
+  name = prefix .. "_arrow-green",
+  filename = png("arrow-green"),
+  width = 16,
+  height = 16
+}
+add(sprite)
+
+
+sprite = {
+  type = "sprite",
   name = prefix .. "_refresh_black",
   filename = png("refresh_black"),
   width = 32,
@@ -246,6 +271,24 @@ add {
   filename = png("forward-white"),
   width = 32,
   height = 32
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_minus",
+  filename = png("minus"),
+  width = 32,
+  height = 32,
+  flags = { "icon" }
+}
+
+add {
+  type = "sprite",
+  name = prefix .. "_plus",
+  filename = png("plus"),
+  width = 32,
+  height = 32,
+  flags = { "icon" }
 }
 
 add {
@@ -346,5 +389,37 @@ add {
   entity_type_filters = { "assembling-machine", "furnace" },
   alt_entity_type_filters = { "assembling-machine", "furnace" }
 }
+
+	local radar = data.raw["radar"]["radar"]
+  if radar then
+    radar = table.deepcopy(radar)
+    -- log(serpent.block(radar))
+    radar.name = commons.radar_name
+    radar.energy_per_nearby_scan = "1W"
+    radar.energy_per_sector = "1W"
+    radar.energy_source = { type="void"}
+    radar.max_distance_of_nearby_sector_revealed = 30
+    radar.max_distance_of_sector_revealed = 30
+    radar.circuit_connector = {}
+    radar.circuit_wire_max_distance = nil
+    radar.connects_to_other_radars = false
+    radar.draw_circuit_wires = false
+    radar.draw_copper_wires = false
+    radar.frozen_patch = nil
+    --radar.pictures = nil
+    radar.radius_minimap_visualisation_color = nil
+    radar.reset_orientation_when_frozen = false
+    radar.collision_mask = {layers={}}
+    
+    radar.hidden_in_factoriopedia = true
+    radar.minable = nil
+    radar.flags = { "not-on-map", "hide-alt-info", "not-blueprintable" }
+    radar.selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } }
+    radar.pictures={
+      layers = { empty_sprite }
+    }
+
+    table.insert(declarations, radar)
+  end
 
 data:extend(declarations)

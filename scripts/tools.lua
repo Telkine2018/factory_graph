@@ -56,8 +56,8 @@ end
 function tools.is_tracing() return tracing end
 
 ---@param o any
-function tools.strip(o) 
-    local s = string.gsub(serpent.block(o), "%s", "") 
+function tools.strip(o)
+    local s = string.gsub(serpent.block(o), "%s", "")
     return s
 end
 
@@ -684,6 +684,40 @@ function tools.signal_to_sprite(signal)
     end
 end
 
+---@param signal (SignalID | SignalFilter) ?
+---@return string?
+function tools.signal_to_sprite2(signal)
+    if not signal then return nil end
+    local type = signal.type
+    if type == "virtual" then
+        return "virtual-signal." .. signal.name
+    elseif type == nil then
+        return "item." .. signal.name
+    else
+        return type .. "." .. signal.name
+    end
+end
+
+---@param s (SignalID | SignalFilter)
+---@return string
+function tools.text_sprite(s)
+    local type = s.type
+    if type == nil then
+        type = "item"
+    elseif type == "virtual" then
+        type = "virtual-signal"
+    end
+
+    local quality = s.quality
+    local text
+    if type == "item" and quality then
+        text = "[item=" .. s.name .. ",quality=" .. quality .. "] "
+    else
+        text = "[" .. type .. "=" .. s.name .. "] "
+    end
+    return text
+end
+
 local gmatch = string.gmatch
 
 ---@param sprite string?
@@ -727,6 +761,7 @@ local function check_signal(type, name)
     end
     return true
 end
+tools.check_signal = check_signal
 
 ---@param sprite string?
 ---@param default string?
@@ -1048,6 +1083,8 @@ function tools.create_standard_panel(player, params)
         drag.style = "flib_titlebar_drag_handle"
         drag.drag_target = frame
         titleflow.drag_target = frame
+    else
+        drag.style.horizontally_stretchable = true
     end
 
     if params.title_menu_func then
@@ -1071,14 +1108,16 @@ function tools.create_standard_panel(player, params)
         inner_frame = frame.add {
             type = "frame",
             direction = "vertical",
-            style = "inside_shallow_frame_with_padding"
+            style = "inside_shallow_frame_with_padding",
+            name = "inner_frame"
         }
         inner_frame.style.vertically_stretchable = true
         inner_frame.style.horizontally_stretchable = true
     else
         inner_frame = frame.add {
             type = "frame",
-            direction = "vertical"
+            direction = "vertical",
+            name = "inner_frame"
         }
         inner_frame.style.vertically_stretchable = true
         inner_frame.style.horizontally_stretchable = true
@@ -1093,6 +1132,7 @@ local round_digit = 2
 ---@param value number
 ---@return number
 local function fround(value)
+    if not value then return 0 end
     if abs(value) <= math_precision then
         return 0
     end
@@ -1145,7 +1185,7 @@ end
 
 -------------------------------------
 
----@param signal SignalFilter 
+---@param signal SignalFilter
 ---@return string?
 function tools.signal_to_id(signal)
     if not signal then return nil end
@@ -1156,21 +1196,26 @@ function tools.signal_to_id(signal)
     end
 end
 
+local signal_pattern = "([^/]+)[/]([^/]+)"
+tools.signal_pattern = signal_pattern
+tools.fluid_recipe_pattern = "([^/]+)[/]([^/]+)"
+tools.fluid_pattern ="fluid[/]([^/]+)[/]([^/]+)"
+tools.product_pattern = "([^/]+)[/]([^/]+)"
+
 ---@param signalid string?
 ---@return SignalFilter?
 function tools.id_to_signal(signalid)
     if not signalid then return nil end
     if type(signalid) ~= "string" then return signalid end
-    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local split = gmatch(signalid, signal_pattern)
     local type, name = split()
-    local comparator, quality = split() 
+    local comparator, quality = split()
     if name ~= nil then
         return { type = type, name = name, comparator = comparator, quality = quality }
     else
         return { type = "item", name = signalid }
     end
 end
-
 
 ---@param signalid string?
 ---@return string?
@@ -1186,22 +1231,248 @@ end
 function tools.id_to_filter(signalid)
     if not signalid then return nil end
     if type(signalid) ~= "string" then return signalid end
-    local split = gmatch(signalid, "([^/]+)[/]([^/]+)")
+    local split = gmatch(signalid, signal_pattern)
     local type, name = split()
-    local comparator, quality = split() 
+    local comparator, quality = split()
     if not type or type == "item" then
         if not quality or quality == "normal" then
             return name
         end
         return { type = "item", name = name, comparator = comparator or "=", quality = quality }
     end
-    return { type = type, name = name, comparator="=", quality="normal" }
+    return { type = type, name = name, comparator = "=", quality = "normal" }
 end
 
 ---@param name string
 ---@return SignalFilter
 function tools.build_virtual_signal(name)
-    return { type = "virtual", name = name, comparator="=", quality="normal" }
+    return { type = "virtual", name = name, comparator = "=", quality = "normal" }
+end
+
+---@class BackgroundCommand
+---@field event_name string
+---@field player LuaPlayer?
+
+---@param command BackgroundCommand
+function tools.background_exec(command)
+    if not storage.background_queue then
+        storage.background_queue = { data }
+    else
+        local queue = storage.background_queue --[[@as BackgroundCommand[] ]]
+        for _, cmd in pairs(queue) do
+            if cmd.player == command.player and cmd.event_name == command.event_name then
+                return
+            end
+        end
+        table.insert(queue, command)
+    end
+end
+
+if script then
+    tools.on_nth_tick(10, function(data)
+        local queue = storage.background_queue
+        if not queue or table_size(queue) == 0 then
+            return
+        end
+        local command = table.remove(queue, 1)
+        local event_name = command.event_name
+        tools.fire_user_event(event_name, command)
+    end)
+end
+
+local recipe_logging = true
+local terminal_products = {
+    ["stone-brick"] = true
+}
+
+---@class CraftStack
+---@field item string
+---@field count int
+
+---@param character LuaEntity
+---@param  item_map {[string]:number}
+---@return {[string]:integer}?
+---@return {[string]:integer}?
+---@return {[string]:integer}?
+function tools.find_missing_ingredients(character, item_map)
+    local inv = character.get_main_inventory()
+    if not inv then return nil end
+
+    local crafting_categories = character.prototype.crafting_categories
+    if not crafting_categories then return nil end
+
+    local contents = inv.get_contents();
+    local content_map = {}
+    local inv_content = {}
+
+    -- Get normal content
+    for _, elem in pairs(contents) do
+        if elem.quality == "normal" or not elem.quality then
+            content_map[elem.name] = elem.count
+            if item_map[elem.name] then
+                inv_content[elem.name] = elem.count
+            end
+        end
+    end
+
+    -- Force decomposition of requested entities
+    for name, count in pairs(item_map) do
+        if count == -1 then
+            content_map[name] = nil
+            item_map[name] = 1
+        end
+    end
+
+    local missing = {}
+    local used = {}
+
+    for item, count in pairs(item_map) do
+        ---@type CraftStack[]
+        local to_process = { { item = item, count = count } }
+        local to_process_index = 1
+
+        local filters = {}
+        local recipe_ref = { filter = "name", name = item }
+        table.insert(filters, { filter = "hidden", mode = "and", invert = true })
+        table.insert(filters, { filter = "has-product-item", mode = "and", elem_filters = { recipe_ref } })
+
+        --- Link product => complete recipe
+        ---@type {[string]:string[]}
+        local completion = {}
+
+        ---@type {[string]:boolean}
+        local stack = {}
+
+        ---@param current_item string
+        function complete_items(current_item)
+            if completion[current_item] then
+                --- complete items
+                local to_complete = { [current_item] = true }
+                while (true) do
+                    local complete_item, _ = next(to_complete)
+                    if complete_item then
+                        local complete_list = completion[complete_item]
+                        if complete_list then
+                            completion[complete_item] = nil
+                            for _, end_item in pairs(complete_list) do
+                                stack[end_item] = nil
+                                to_complete[end_item] = true
+                            end
+                        end
+                        to_complete[complete_item] = nil
+                    else
+                        break
+                    end
+                end
+            end
+        end
+
+        while to_process_index <= #to_process do
+            local to_process_current = to_process[to_process_index]
+            to_process_index = to_process_index + 1
+
+            local current_item = to_process_current.item
+            local count = to_process_current.count
+
+            if recipe_logging then
+                log("process: " .. current_item .. " x " .. count)
+            end
+
+            local content_count = (content_map[current_item] or 0)
+            local remaining = content_count - count
+
+            if remaining >= 0 then
+                content_map[current_item] = remaining
+                used[current_item] = (used[current_item] or 0) + count
+                complete_items(current_item)
+
+                if recipe_logging then
+                    log("found: " .. current_item .. " x " .. count)
+                end
+            else
+                if content_count > 0 then
+                    used[current_item] = (used[current_item] or 0) + content_count
+                end
+                content_map[current_item] = nil
+                local done
+                local needed = -remaining
+
+                if not stack[current_item] and not terminal_products[current_item] then
+                    recipe_ref.name = current_item
+                    local recipes = prototypes.get_recipe_filtered(filters)
+
+                    local iter = 1
+                    for _, recipe in pairs(recipes) do
+                        if not character.force.recipes[recipe.name].enabled or recipe.hidden then
+                            goto skip
+                        end
+                        if item ~= current_item and not recipe.allow_as_intermediate then
+                            goto skip
+                        end
+                        if recipe.hidden_from_player_crafting then goto skip end
+                        if crafting_categories[recipe.category] then
+                            -- Get iteration count of recipe
+                            for _, product in pairs(recipe.products) do
+                                if product.name == current_item then
+                                    if product.amount then
+                                        iter = math.ceil(needed / product.amount)
+                                    else
+                                        iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
+                                    end
+                                    break
+                                end
+                            end
+
+                            if recipe_logging then
+                                log("apply recipe: " .. recipe.name)
+                            end
+
+                            local last_item
+                            local insert_index = to_process_index
+                            for _, ingredient in pairs(recipe.ingredients) do
+                                if ingredient.name == current_item then
+                                    goto skip
+                                end
+                                if ingredient.type == "item" then
+                                    local amount = ingredient.amount * iter
+                                    table.insert(to_process, insert_index,
+                                        {
+                                            item = ingredient.name,
+                                            count = amount
+                                        })
+                                    insert_index = insert_index + 1
+                                    last_item = ingredient.name
+                                else
+                                    return nil, nil
+                                end
+                            end
+                            done = true
+                            if last_item then
+                                stack[current_item] = true
+                                local l = completion[last_item]
+                                if l then
+                                    table.insert(l, current_item)
+                                else
+                                    completion[last_item] = { current_item }
+                                end
+                            end
+                            break
+                        end
+                        ::skip::
+                    end
+                end
+                if not done then
+                    missing[current_item] = (missing[current_item] or 0) + needed
+                    complete_items(current_item)
+
+                    if recipe_logging then
+                        log("failed to find: " .. current_item .. " x " .. needed)
+                    end
+                end
+            end
+        end
+    end
+    return missing, used, inv_content
 end
 
 return tools

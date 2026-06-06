@@ -31,12 +31,18 @@ local commons = {
     visibility_layers = 3,
     add_debug_info = false,
 
+    -- Commands
     selection_change_event = "selection_change",
     production_compute_event = "production_compute",
     production_data_change_event = "production_data_change",
     graph_selection_change_event = "graph_selection_change",
     open_recipe_selection = "open_recipe_selection",
     open_current_selection = "open_current_selection",
+    refresh_machine_list = "refresh_machine_list",
+    clear_scanned_recipes = "clear_scanned_recipes",
+    show_implemented = "show_implemented",
+    query_product = "query_product",
+
 
     math_precision = 0.000001,
     production_failures = {
@@ -50,8 +56,9 @@ local commons = {
         cannot_find_machine = "cannot_find_machine",
         use_handcraft_recipe = "use_handcraft_recipe"
     },
-    generate_with_lab_tiles = true
+    generate_with_lab_tiles = true,
 
+    default_temperature = -1e6
 }
 
 commons.buttons = {
@@ -67,6 +74,10 @@ commons.buttons = {
 commons.buttons.ingredient = commons.buttons.cyan
 commons.buttons.product = commons.buttons.orange
 commons.buttons.recipe = commons.buttons.blue
+commons.buttons.tag = commons.buttons.default
+
+commons.buttons.positive = commons.buttons.green
+commons.buttons.negative = commons.buttons.red
 
 commons.default_selection = commons.ingredient_and_product_selection
 commons.surface_prefix_filter = "^" .. commons.surface_prefix
@@ -74,5 +85,27 @@ commons.surface_prefix_filter = "^" .. commons.surface_prefix
 ---@param name string
 ---@return string
 function commons.png(name) return (commons.graphic_path):format(name) end
+
+commons.colors = {}
+local colors = commons.colors
+colors.ingredient = { 1, 0, 0 }
+colors.production = { 255, 106, 0 }
+colors.main = { 1, 1, 0 }
+
+commons.recipe_entity_names = {
+    [commons.recipe_symbol_name] = true,
+    [commons.product_symbol_name] = true,
+    [commons.unresearched_symbol_name] = true,
+}
+
+commons.general_button_size = 36
+
+commons.action_used_in_recipe = 1
+commons.action_path_to_build = 2
+commons.action_consumer = 3
+commons.action_producer = 4
+commons.action_in_selection = 5
+
+commons.radar_name = prefix .. "-radar"
 
 return commons

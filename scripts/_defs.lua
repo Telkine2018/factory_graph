@@ -18,6 +18,7 @@ local tools = require("scripts.tools")
 ---@field graph_select_ids LuaRenderObject[]?
 ---@field highlighted_recipes_ids LuaRenderObject[]?
 ---@field selected_recipe GRecipe?
+---@field lock_selected_recipe GRecipe?
 ---@field selected_recipe_entity LuaEntity?         @ entity for selected recipe
 ---@field selector_product_name string?             @ selected product
 ---@field product_selectors {[string]:LuaEntity}    @ product name => entity
@@ -28,6 +29,7 @@ local tools = require("scripts.tools")
 ---@field selector_product_name_id LuaRenderObject?         @ selector text id
 ---@field recipe_order integer
 ---@field player_position MapPosition
+---@field highlight_recipe string?
 ---@field module_limitations {[string]:({[string]:true})}
 ---@field excluded_categories {[string]:boolean}?
 ---@field excluded_subgroups {[string]:boolean}?
@@ -35,6 +37,9 @@ local tools = require("scripts.tools")
 ---@field move_recipe GRecipe?
 ---@field layer_ids LuaRenderObject[]?
 ---@field recipes_productivities {[string]:number}?
+---@field manual_mode boolean                           # manual mode asked by user
+---@field real_manual_mode boolean                      # manual mode computed
+---@field selection_lock boolean?                       # selection display is locked
 
 ---@class GraphSettings
 ---@field select_mode "none" | "ingredient" | "product" | "ingredient_and_product"
@@ -45,11 +50,13 @@ local tools = require("scripts.tools")
 ---@field always_use_full_selection boolean?
 ---@field layout_on_selection boolean?
 ---@field graph_zoom_level number?
----@field world_zoom_level number?
+---@field graph_zoom_level_cmd number?
 ---@field autosave_on_graph_switching boolean?
 ---@field current_layer string?
 ---@field visible_layers {[string]:boolean}
 ---@field show_products boolean?
+---@field lab_packs string[]
+---@field is_command_invisible boolean?
 
 ---@class GraphProduction
 ---@field use_connected_recipes boolean             @ true if connected reciped use
@@ -71,6 +78,7 @@ local tools = require("scripts.tools")
 ---@field iovalues {[string]:number|boolean}
 ---@field color_index integer
 ---@field use_machine_in_inventory boolean?
+---@field default_recipe_quality string?
 
 ---@class Graph : GraphRuntime, GraphConfig, GraphProduction, GraphSettings
 
@@ -86,6 +94,10 @@ local tools = require("scripts.tools")
 ---@field root_recipe GRecipe?
 ---@field color Color
 ---@field ids LuaRenderObject[]?
+---@field temperatures {[number]:boolean}
+---@field derived boolean?
+---@field temperature number?
+---@field derived_from GProduct?
 
 ---@class GRecipe : GElement, GRecipeConfig, GSortNode
 ---@field ingredients  GProduct[]
@@ -102,6 +114,11 @@ local tools = require("scripts.tools")
 ---@field is_recursive boolean?
 ---@field layer string?
 ---@field pos_locked boolean?
+---@field mcount number                 @ manual count of machine
+---@field use_temperature boolean?
+---@field i_temperatures {[string]:number}?         @ {ingredient name}@{ingredient index}
+---@field p_temperatures {[string]:number}?
+---@field derived_from GRecipe
 
 ---@class GSortNode
 ---@field sort_level integer?
@@ -111,6 +128,7 @@ local tools = require("scripts.tools")
 
 ---@class GRecipeConfig
 ---@field production_config ProductionConfig?
+---@field computed_config ProductionConfig?
 ---@field line integer?
 ---@field col integer?
 
@@ -154,11 +172,13 @@ local tools = require("scripts.tools")
 ---@field beacon_name string?
 ---@field beacon_modules string[]?
 ---@field beacon_count integer?
+---@field recipe_quality string?
 
 ---@class ProductionMachine
 ---@field name string
 ---@field machine_quality string
 ---@field grecipe GRecipe
+---@field recipe_quality string?
 ---@field config ProductionConfig
 ---@field recipe LuaRecipePrototype
 ---@field machine LuaEntityPrototype
@@ -205,3 +225,15 @@ local tools = require("scripts.tools")
 ---@field update_command  boolean?
 ---@field no_recipe_selection_update boolean?
 ---@field update_product_list boolean?
+
+---@class Extern
+---@field surface LuaSurface
+---@field position MapPosition
+---@field zoom number
+---@field character LuaEntity
+---@field force LuaForce
+---@field cheat_mode boolean
+---@field controller integer | defines.controllers
+---@field show_surface_list boolean
+---@field in_graph boolean
+

@@ -9,13 +9,15 @@ local prefix = commons.prefix
 local graph = {}
 local recipe_sprite_scale = 0.5
 
+local remove_derived = false
+local log_enabled = false
+
 local e_recipe_name = commons.recipe_symbol_name
 local e_product_name = commons.product_symbol_name
 local e_unresearched_name = commons.unresearched_symbol_name
 
 local initial_col = 2
 
-local log_enabled = false
 
 local floor = math.floor
 local ceil = math.ceil
@@ -44,18 +46,22 @@ function graph.new(surface)
         show_hidden = false,
         show_only_researched = false,
         always_use_full_selection = true,
-        visibility = commons.visibility_all,
+        visibility = commons.visibility_selection,
         layout_on_selection = true,
         autosave_on_graph_switching = true,
         graph_zoom_level = 0.5,
-        world_zoom_level = 2,
         line_gap = 0.2,
-        show_products = true
+        show_products = true,
+
+        product_line = 1,
+        recipe_order = 1,
+        current_col = 1,
     }
 end
 
 ---@param g Graph
 ---@param name string
+---@return GProduct
 local function get_product(g, name)
     ---@type GProduct
     local product = g.products[name]
@@ -69,6 +75,10 @@ local function get_product(g, name)
         g.products[name] = product
     end
     product.used = true
+    local product_recipe = g.recipes[name]
+    if product_recipe then
+        product_recipe.used = true
+    end
     return product
 end
 
@@ -89,9 +99,15 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     g.excluded_subgroups = excluded_subgroups
 
     for _, gproduct in pairs(g.products) do
-        gproduct.ingredient_of = {}
-        gproduct.product_of = {}
+        if not gproduct.derived_from then
+            gproduct.ingredient_of = {}
+            gproduct.product_of = {}
+            gproduct.temperatures = nil
+        end
     end
+
+    ---@type {[string]:GProduct}
+    local fluids_with_temperature = {}
 
     for name, recipe in pairs(recipes) do
         if not excluded_categories[recipe.category]
@@ -112,6 +128,11 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
             else
                 grecipe.machine = nil
                 grecipe.hidden = recipe.hidden
+                grecipe.use_temperature = nil
+                if remove_derived then
+                    grecipe.i_temperatures = nil
+                    grecipe.p_temperatures = nil
+                end
                 local pconfig = grecipe.production_config
                 if pconfig then
                     ---@type boolean?
@@ -119,12 +140,14 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                     failed = failed or (pconfig.beacon_name and not prototypes.entity[tools.extract_name(pconfig.beacon_name)])
                     if pconfig.machine_modules then
                         for _, module in pairs(pconfig.machine_modules) do
-                            failed = failed or (module and not prototypes.item[module])
+                            local module_name = tools.extract_name(module)
+                            failed = failed or (module and not prototypes.item[module_name])
                         end
                     end
                     if pconfig.beacon_modules then
                         for _, module in pairs(pconfig.beacon_modules) do
-                            failed = failed or (module and not prototypes.item[module])
+                            local module_name = tools.extract_name(module)
+                            failed = failed or (module and not prototypes.item[module_name])
                         end
                     end
                     if failed then
@@ -156,6 +179,17 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                         local iname = production.type .. "/" .. production.name
                         local gproduct = get_product(g, iname)
 
+                        if production.type == "fluid" and production.temperature then
+                            if gproduct.temperatures then
+                                if not gproduct.temperatures[production.temperature] then
+                                    gproduct.temperatures[production.temperature] = true
+                                end
+                            else
+                                gproduct.temperatures = { [production.temperature] = true }
+                            end
+                            fluids_with_temperature[gproduct.name] = gproduct
+                        end
+
                         table.insert(grecipe.products, gproduct)
                         gproduct.product_of[recipe.name] = grecipe
                         gproduct.is_root = nil
@@ -177,6 +211,40 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                     local pname = p.type .. "/" .. p.name
                     local product = get_product(g, pname)
                     product.is_root = true
+                end
+            end
+        end
+    end
+
+    local debug_temperature = false
+
+    for gname, gproduct in pairs(fluids_with_temperature) do
+        local _, name = string.gmatch(gname, tools.signal_pattern)()
+
+        if debug_temperature then
+            log("Process temperature for " .. gname)
+        end
+        for recipe_name, grecipe in pairs(gproduct.ingredient_of) do
+            local recipe = prototypes.recipe[recipe_name]
+            for _, ingredient in pairs(recipe.ingredients) do
+                if ingredient.name == name then
+                    if ingredient.minimum_temperature and ingredient.maximum_temperature then
+                        grecipe.use_temperature = true
+                        if debug_temperature then
+                            log("Recipe ingredient with temperature =>" .. recipe_name .. "(" .. gname .. "[" .. ingredient.minimum_temperature .. "," .. ingredient.maximum_temperature .. "])")
+                        end
+                    end
+                end
+            end
+        end
+        for recipe_name, grecipe in pairs(gproduct.product_of) do
+            local recipe = prototypes.recipe[recipe_name]
+            for _, product in pairs(recipe.products) do
+                if product.temperature and product.name == name then
+                    grecipe.use_temperature = true
+                    if debug_temperature then
+                        log("Recipe product with temperature =>" .. recipe_name .. "(" .. gname .. "[" .. product.temperature .. "]" .. ")")
+                    end
                 end
             end
         end
@@ -283,6 +351,15 @@ function graph.get_product_recipe(g, product_name)
 end
 
 ---@param g Graph
+function graph.list_derived(g)
+    for _, product in pairs(g.products) do
+        if product.derived_from and product.derived_from.used then
+            log("")
+        end
+    end
+end
+
+---@param g Graph
 ---@return boolean
 function graph.remove_unused(g)
     local changed
@@ -295,6 +372,30 @@ function graph.remove_unused(g)
     end
     if g.selected_recipe and not g.selected_recipe.used then
         g.selected_recipe = nil
+    end
+
+    if not remove_derived then
+        for _, grecipe in pairs(g.recipes) do
+            if grecipe.derived_from and grecipe.derived_from.used then
+                grecipe.used = true
+                for _, i in pairs(grecipe.ingredients) do
+                    i.ingredient_of[grecipe.name] = grecipe
+                end
+                for _, p in pairs(grecipe.products) do
+                    p.product_of[grecipe.name] = grecipe
+                end
+            elseif grecipe.is_product then
+                local base_name = string.gmatch(grecipe.name, "([^/]+/[^/]+)")()
+                if g.products[base_name].used then
+                    grecipe.used = true
+                end
+            end
+        end
+        for _, product in pairs(g.products) do
+            if product.derived_from and product.derived_from.used then
+                product.used = true
+            end
+        end
     end
 
     ---@type table<string, GRecipe>
@@ -312,6 +413,12 @@ function graph.remove_unused(g)
         end
         g.recipes[name] = nil
         g.selection[name] = nil
+        for _, product in pairs(grecipe.ingredients) do
+            product.ingredient_of[name] = nil
+        end
+        for _, product in pairs(grecipe.products) do
+            product.product_of[name] = nil
+        end
         changed = true
     end
 
@@ -437,6 +544,7 @@ function graph.layout_recipe(g, grecipe)
     local gcols = g.gcols
 
     local gname = grecipe.name
+    if not g.current_col then g.current_col = 1 end
     if g.current_col ~= initial_col then
         for _, ingredient in pairs(grecipe.ingredients) do
             for _, irecipe in pairs(ingredient.product_of) do
@@ -1024,13 +1132,22 @@ local function create_recipe_object(g, grecipe)
     local entity_name
     if grecipe.is_product then
         sprite_name = grecipe.name
+        local derived_from = grecipe.products[1].derived_from
+        if derived_from then
+            sprite_name = derived_from.name
+        end
         entity_name = e_product_name
-    elseif grecipe.enabled then
-        sprite_name = "recipe/" .. grecipe.name
-        entity_name = e_recipe_name
     else
-        sprite_name = "recipe/" .. grecipe.name
-        entity_name = e_unresearched_name
+        local recipe_name = grecipe.name
+        if grecipe.derived_from then
+            recipe_name = grecipe.derived_from.name
+        end
+        sprite_name = "recipe/" .. recipe_name
+        if grecipe.enabled then
+            entity_name = e_recipe_name
+        else
+            entity_name = e_unresearched_name
+        end
     end
     local surface = g.surface
     local x = grecipe.col * g.grid_size + 0.5
@@ -1167,11 +1284,26 @@ end
 function graph.load_saving(g, data)
     drawing.delete_content(g)
     local selection = {}
+
+    for _, grecipe in pairs(g.recipes) do
+        grecipe.layer = nil
+    end
+
     for _, grecipe in pairs(data.selection) do
-        local current = g.recipes[grecipe.name]
+        local recipe_name = grecipe.name
+        local current = g.recipes[recipe_name]
+        if not current then
+            recipe_name = gutils.get_recipe_base_name(recipe_name)
+            local base = g.recipes[recipe_name]
+            if base then
+                current = gutils.get_derived_recipe(g, base, grecipe.i_temperatures, grecipe.p_temperatures)
+            end
+        end
         if current then
             selection[grecipe.name] = current
             current.layer = tools.check_sprite(grecipe.layer)
+            current.mcount = grecipe.mcount
+            current.production_config = grecipe.production_config
             if grecipe.col then
                 set_recipe_location(g, current, grecipe.col, grecipe.line)
             end
@@ -1210,6 +1342,7 @@ end
 function graph.import_saving(g, data)
     drawing.delete_content(g)
     local selection = g.selection
+
     for _, grecipe in pairs(data.selection) do
         local current = g.recipes[grecipe.name]
         selection[grecipe.name] = current

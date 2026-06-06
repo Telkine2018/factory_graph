@@ -11,6 +11,7 @@ local production = {}
 local abs = math.abs
 local math_precision = commons.math_precision
 
+--- Get product amount for one machine
 ---@param machine ProductionMachine
 ---@param product Product
 ---@return number
@@ -33,6 +34,7 @@ local function get_product_amount(machine, product)
     return amount
 end
 
+--- Get ingredient amount for one machine
 ---@param machine ProductionMachine
 ---@param ingredient Ingredient
 ---@return number
@@ -53,9 +55,45 @@ local function get_energy(machine)
     return energy
 end
 
+---@param module LuaItemPrototype
+---@param module_quality string
+---@param effectivity number
+---@return ModuleEffects
+function production.get_module_effect(module, module_quality, effectivity)
+    local effects = module.module_effects
+    local qproto = prototypes.quality[module_quality or "normal"]
+    local qmodifier = 1 + qproto.level * 0.3
+
+    local result = {
+        speed = 0,
+        productivity = 0,
+        consumption = 0,
+        pollution = 0,
+        quality = 0
+    }
+    if not effects then return result end
+    if effects.speed then
+        result.speed = effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed)
+    end
+    if effects.productivity then
+        result.productivity = effectivity * qmodifier * effects.productivity
+    end
+    if effects.consumption then
+        result.consumption = effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption)
+    end
+    if effects.pollution then
+        result.pollution = effectivity * (effects.pollution < 0 and qmodifier * effects.pollution or effects.pollution)
+    end
+    if effects.quality then
+        result.quality = effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality)
+    end
+    return result
+end
+
 production.get_product_amount = get_product_amount
 production.get_ingredient_amount = get_ingredient_amount
 production.get_energy = get_energy
+
 
 ---@param g Graph
 ---@param grecipe GRecipe
@@ -69,7 +107,8 @@ function production.compute_machine(g, grecipe, config)
         if grecipe.is_product then goto skip end
 
         local recipe_name = grecipe.name
-        local recipe = prototypes.recipe[recipe_name]
+        local recipe = gutils.get_recipe_prototype(recipe_name)
+
 
         local smachine = tools.id_to_signal(config.machine_name)
         ---@cast smachine -nil
@@ -81,7 +120,8 @@ function production.compute_machine(g, grecipe, config)
             grecipe = grecipe,
             recipe = recipe,
             machine = prototypes.entity[smachine.name],
-            config = config
+            config = config,
+            recipe_quality = config.recipe_quality
         }
 
         machine.modules = {}
@@ -90,7 +130,7 @@ function production.compute_machine(g, grecipe, config)
             for _, module_id in pairs(config.machine_modules) do
                 local smodule = tools.id_to_signal(module_id)
                 ---@cast smodule -nil
-                table.insert(machine.modules,prototypes.item[smodule.name])
+                table.insert(machine.modules, prototypes.item[smodule.name])
                 table.insert(machine.module_qualities, smodule.quality)
             end
         end
@@ -124,26 +164,26 @@ function production.compute_machine(g, grecipe, config)
         ---@param effectivity integer
         local function apply_effect(effects, qmodifier, effectivity)
             if effects then
-                if effects.speed then 
-                    speed = speed + effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed) 
+                if effects.speed then
+                    speed = speed + effectivity * (effects.speed > 0 and qmodifier * effects.speed or effects.speed)
                 end
-                if effects.productivity then 
-                    productivity = productivity + effectivity * qmodifier * effects.productivity 
+                if effects.productivity then
+                    productivity = productivity + effectivity * qmodifier * effects.productivity
                 end
-                if effects.consumption then 
-                    consumption = consumption + effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption) 
+                if effects.consumption then
+                    consumption = consumption + effectivity * (effects.consumption < 0 and qmodifier * effects.consumption or effects.consumption)
                 end
-                if effects.pollution then 
+                if effects.pollution then
                     pollution = pollution + effectivity * (effects.pollution < 0 and qmodifier * effects.pollution or effects.pollution)
                 end
-                if effects.quality then 
-                    quality = quality + effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality) 
+                if effects.quality then
+                    quality = quality + effectivity * (effects.quality > 0 and qmodifier * effects.quality or effects.quality)
                 end
             end
         end
 
         if machine.modules then
-            for index = 1, #machine.modules  do
+            for index = 1, #machine.modules do
                 local module = machine.modules[index]
                 local module_quality = machine.module_qualities[index]
                 local effects = module.module_effects
@@ -172,7 +212,7 @@ function production.compute_machine(g, grecipe, config)
                 end
                 effectivity = profile[index] * effectivity
             end
-            
+
             for _, module_id in pairs(config.beacon_modules) do
                 local smodule = tools.id_to_signal(module_id)
                 ---@cast smodule -nil
@@ -216,8 +256,9 @@ end
 local compute_machine = production.compute_machine
 
 ---@param g Graph
----@param machines {[string]:ProductionMachine}
-function production.compute_products(g, machines)
+---@param machines {[string]:ProductionMachine}?
+---@param manual_mode boolean?
+function production.compute_products(g, machines, manual_mode)
     ---@type table<string, number>
     local product_inputs = {}
     ---@type table<string, number>
@@ -227,14 +268,24 @@ function production.compute_products(g, machines)
     g.product_outputs = product_outputs
     g.total_energy = 0
 
-    --- compute products
+    if not machines then
+        machines = production.get_machines(g)
+    end
+
+    --- compute machines
     for _, machine in pairs(machines) do
-        local machine_count = machine.count
+        local machine_count
+        if manual_mode then
+            machine_count = machine.grecipe.mcount
+        else
+            machine_count = machine.count
+        end
         if machine_count then
             if machine_count > 0 then
                 machine.count = machine_count
-                for _, ingredient in pairs(machine.recipe.ingredients) do
-                    local iname = ingredient.type .. "/" .. ingredient.name
+                local grecipe = machine.grecipe
+                for index, ingredient in pairs(machine.recipe.ingredients) do
+                    local iname = grecipe.ingredients[index].name
                     local coef = product_inputs[iname]
                     if not coef then
                         coef = 0
@@ -246,8 +297,9 @@ function production.compute_products(g, machines)
                         product_inputs[iname] = coef + total
                     end
                 end
-                for _, product in pairs(machine.recipe.products) do
-                    local pname = product.type .. "/" .. product.name
+
+                for index, product in pairs(machine.recipe.products) do
+                    local pname = grecipe.products[index].name
                     local coef = product_outputs[pname]
                     if not coef then
                         coef = 0
@@ -271,18 +323,12 @@ function production.compute_products(g, machines)
 end
 
 ---@param g Graph
-function production.compute_matrix(g)
+---@return {[string]:GRecipe}?
+function production.compute_recipes(g)
     machinedb.initialize()
-
-    local failed = nil
-
-    ---@type {[string]:ProductionMachine}
-    local machines = {}
-
-    local enabled_cache = {}
-
     for _, grecipe in pairs(g.recipes) do
         grecipe.machine = nil
+        grecipe.computed_config = nil
     end
 
     local has_neg_value
@@ -293,7 +339,7 @@ function production.compute_matrix(g)
             end
         end
     else
-        return
+        return nil
     end
 
     ---@type {[string]:GRecipe}
@@ -310,7 +356,24 @@ function production.compute_matrix(g)
     for _, grecipe in pairs(g.selection) do
         grecipe.machine = nil
     end
+    return connected_recipes
+end
 
+---@param g Graph
+function production.compute_matrix(g)
+    local connected_recipes = production.compute_recipes(g)
+    if not connected_recipes then
+        return
+    end
+
+    g.real_manual_mode = g.manual_mode
+    gutils.clean_iovalues(g)
+
+    local failed = nil
+
+    ---@type {[string]:ProductionMachine}
+    local machines = {}
+    local enabled_cache = {}
     for recipe_name, grecipe in pairs(connected_recipes) do
         ---@cast grecipe GRecipe
 
@@ -335,7 +398,7 @@ function production.compute_matrix(g)
             else
                 failed = commons.production_failures.use_handcraft_recipe
                 g.production_failed = failed
-                g.production_recipes_failed = {[recipe_name]=true}
+                g.production_recipes_failed = { [recipe_name] = true }
                 return
             end
         end
@@ -370,9 +433,11 @@ function production.compute_matrix(g)
     local product_to_recipes = {}
 
     for _, machine in pairs(machines) do
-        local recipe_name = machine.recipe.name
+        local grecipe = machine.grecipe
+        local recipe_name = grecipe.name
+        local index = 1
         for _, ingredient in pairs(machine.recipe.ingredients) do
-            local iname = ingredient.type .. "/" .. ingredient.name
+            local iname = grecipe.ingredients[index].name
             local eq = equations[iname]
             if not eq then
                 eq = {}
@@ -386,10 +451,12 @@ function production.compute_matrix(g)
             coef = coef - ingredient.amount * machine.limited_craft_s
             eq[recipe_name] = coef
             all_recipes[recipe_name] = true
+            index = index + 1
         end
 
+        index = 1
         for _, product in pairs(machine.recipe.products) do
-            local pname = product.type .. "/" .. product.name
+            local pname = grecipe.products[index].name
             local eq = equations[pname]
             if not eq then
                 eq = {}
@@ -413,6 +480,7 @@ function production.compute_matrix(g)
             else
                 table.insert(products, recipe_name)
             end
+            index = index + 1
         end
     end
 
@@ -713,15 +781,54 @@ function production.compute_matrix(g)
         end
     end
 
+    local adjust_module = false
     for name, count in pairs(machine_counts) do
         local machine = machines[name]
         if machine then
+            if adjust_module and not machine.grecipe.production_config then
+                if machine.speed > 1 and machine.quality <= 0 then
+                    local module_count = #machine.modules
+                    if machine.modules and module_count > 0 then
+                        local module = machine.modules[1]
+                        local effects = production.get_module_effect(module, machine.module_qualities[1], 1)
+                        if effects.speed > 0 and effects.productivity == 0 and effects.quality <= 0 then
+                            local excess_module_count = (math.ceil(count) - count) * (1 + machine.speed) / effects.speed
+                            if excess_module_count >= 1 then
+                                if excess_module_count >= module_count then
+                                    excess_module_count = module_count
+                                end
+                                local computed_config = machinedb.get_default_config(g, machine.grecipe.name, {})
+                                if computed_config then
+                                    machine.grecipe.computed_config = computed_config
+                                    for _ = 1, excess_module_count do
+                                        table.remove(computed_config.machine_modules, 1)
+                                        table.remove(machine.modules, 1)
+                                        table.remove(machine.module_qualities, 1)
+                                    end
+                                    local new_speed = 1 + machine.speed - excess_module_count * effects.speed
+                                    count = count * (machine.speed + 1) / new_speed
+                                    machine.speed = new_speed
+                                end
+                            end
+                        end
+                    end
+                end
+            end
             machine.count = count
         end
     end
 
-    --- compute products
-    production.compute_products(g, machines)
+    local manual_mode = g.manual_mode or failed or not (g.iovalues) or table_size(g.iovalues) == 0
+    g.real_manual_mode = manual_mode
+
+    if not g.real_manual_mode then
+        --- compute products
+        production.compute_products(g, machines, manual_mode)
+    else
+        if table_size(g.iovalues) ~= 0 then
+            production.recompute_manual_all(g)
+        end
+    end
 
     g.production_failed = failed
     g.production_recipes_failed = failed_recipes
@@ -814,6 +921,125 @@ function production.clear(g)
     g.production_failed = nil
     gutils.fire_production_data_change(g)
 end
+
+---@param g Graph
+---@return ProductionMachine[]
+function production.get_machines(g)
+    ---@type ProductionMachine[]
+    local machines = {}
+    local manual_mode = g.real_manual_mode
+    for _, grecipe in pairs(g.selection) do
+        local machine = grecipe.machine
+        if manual_mode then
+            table.insert(machines, machine)
+        else
+            if machine and machine.count and machine.count > math_precision then
+                table.insert(machines, machine)
+            end
+        end
+    end
+    table.sort(machines, function(m1, m2) return m1.grecipe.sort_level < m2.grecipe.sort_level end)
+    return machines
+end
+
+---@param g Graph
+---@param recipe_name string
+---@param inputs table<string, number>
+local function recompute_manual_recipe(g, recipe_name, inputs)
+    local grecipe = g.recipes[recipe_name]
+    local selected_machine = grecipe.machine
+    if not selected_machine then return end
+
+    local recipe = gutils.get_recipe_prototype(recipe_name)
+    if recipe and #recipe.products > 0 then
+        local mcount
+        for _, p in pairs(recipe.products) do
+            local product_id = p.type .. "/" .. p.name
+            local input_amount = inputs[product_id] or 0
+
+            if recipe.ingredients then
+                for _, i in pairs(recipe.ingredients) do
+                    local ingredient_id = i.type .. "/" .. i.name
+                    if ingredient_id == product_id then
+                        goto next_product
+                    end
+                end
+            end
+
+            if g.iovalues[product_id] == true then
+                goto next_product
+            end
+            local is_target
+            if type(g.iovalues[product_id]) == "number" then
+                input_amount = input_amount + g.iovalues[product_id]
+                is_target = true
+            end
+            if input_amount and input_amount > 0 then
+                local amount_per_machine = production.get_product_amount(selected_machine, p)
+                local n = input_amount / amount_per_machine
+                if is_target then
+                    mcount = n
+                    break
+                end
+                if not mcount or mcount < n then
+                    mcount = n
+                end
+            end
+            ::next_product::
+        end
+        if mcount then
+            selected_machine.grecipe.mcount = mcount
+            return true
+        else
+            selected_machine.grecipe.mcount = 0
+            return true
+        end
+    end
+end
+
+---@param g Graph
+---@param recipe_name? string @if nil recompute all recipes
+local function recompute_manual_all(g, recipe_name)
+    local machines = production.get_machines(g)
+    local found
+    local inputs
+    if recipe_name then
+        for index = 1, #machines do
+            local machine = machines[index]
+            if machine.grecipe.name == recipe_name then
+                found = index
+                break
+            end
+        end
+
+        local tail = {}
+        for index = found + 1, #machines do
+            table.insert(tail, machines[index])
+        end
+        production.compute_products(g, tail, true)
+        inputs = g.product_inputs
+    else
+        found = #machines
+        inputs = {}
+    end
+
+    for index = found, 1, -1 do
+        local machine = machines[index]
+        local recipe_name = machine.grecipe.name
+        if recompute_manual_recipe(g, recipe_name, inputs) then
+            production.compute_products(g, { machine }, true)
+            for name, count in pairs(g.product_inputs) do
+                inputs[name] = (inputs[name] or 0) + count
+            end
+            for name, count in pairs(g.product_outputs) do
+                inputs[name] = (inputs[name] or 0) - count
+            end
+        end
+    end
+    production.compute_products(g, machines, true)
+end
+
+production.recompute_manual_all = recompute_manual_all
 
 tools.on_nth_tick(30, function()
     local production_queue = storage.production_queue

@@ -1,12 +1,13 @@
-local luautil = require("__core__/lualib/util")
+local luautil    = require("__core__/lualib/util")
 
-local commons = require("scripts.commons")
-local tools = require("scripts.tools")
-local gutils = require("scripts.gutils")
-local machinedb = require("scripts.machinedb")
+local commons    = require("scripts.commons")
+local tools      = require("scripts.tools")
+local gutils     = require("scripts.gutils")
+local machinedb  = require("scripts.machinedb")
 local production = require("scripts.production")
+local graph      = require("scripts.graph")
 
-local prefix = commons.prefix
+local prefix     = commons.prefix
 
 local function np(name)
     return prefix .. "-msettings." .. name
@@ -33,20 +34,28 @@ local function install_modules(container, g, config, grecipe)
         return
     end
 
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+    if not recipe then return end
+
     local allowed = {}
-    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
-    local recipe = prototypes.recipe[grecipe.name]
+    local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
     local allowed_effects = recipe.allowed_effects
     local allowed_module_categories = recipe.allowed_module_categories
+    local allowed_module_categories2 = assembly_machine.allowed_module_categories
     for _, module in pairs(modules) do
-        for effect, _ in pairs(module.module_effects) do
+        for effect, value in pairs(module.module_effects) do
             if not assembly_machine.allowed_effects[effect] then
                 goto skip
             end
             if allowed_effects and not allowed_effects[effect] then
-                goto skip
+                if effect ~= "quality" or value > 0 then
+                    goto skip
+                end
             end
             if allowed_module_categories and not allowed_module_categories[module.category] then
+                goto skip
+            end
+            if allowed_module_categories2 and not allowed_module_categories2[module.category] then
                 goto skip
             end
         end
@@ -67,9 +76,11 @@ local function install_modules(container, g, config, grecipe)
 
                 local module = prototypes.item[smodule.name]
                 if module then
-                    for effect in pairs(module.module_effects) do
-                        if not assembly_machine.allowed_effects[effect] then
-                            goto skip
+                    for effect, value in pairs(module.module_effects) do
+                        if effect ~= "quality" or value > 0 then
+                            if not assembly_machine.allowed_effects[effect] then
+                                goto skip
+                            end
                         end
                     end
                 end
@@ -78,7 +89,7 @@ local function install_modules(container, g, config, grecipe)
             end
         end
 
-        local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
+        local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality",
             elem_filters = { { filter = "name", name = allowed } } }
         b.elem_value = smodule
         tools.set_name_handler(b, np("module_button"), { count = count })
@@ -96,11 +107,13 @@ local function install_beacon_modules(container, g, config, grecipe)
         local beacon = prototypes.entity[tools.extract_name(config.beacon_name)]
         if not beacon then return end
 
+        local recipe = gutils.get_recipe_prototype(grecipe.name)
+        if not recipe then return end
+
         local count = beacon.module_inventory_size
         local allowed = {}
-        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" } }
+        local modules = prototypes.get_item_filtered { { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } }
 
-        local recipe = prototypes.recipe[grecipe.name]
         local allowed_effects = recipe.allowed_effects
         local allowed_module_categories = recipe.allowed_module_categories
         for _, module in pairs(modules) do
@@ -128,7 +141,7 @@ local function install_beacon_modules(container, g, config, grecipe)
             if config.beacon_modules and config.beacon_modules[i] then
                 smodule = tools.id_to_signal(config.beacon_modules[i])
             end
-            local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", 
+            local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality",
                 elem_filters = { { filter = "name", name = allowed } } }
             b.elem_value = smodule
             tools.set_name_handler(b, np("module_button"), { count = count })
@@ -141,7 +154,7 @@ end
 local function enable_config(field_table, is_default)
     local enabled = not is_default
     field_table.machine.enabled = enabled
-    for _, c in pairs(field_table.modules.children) do
+    for _, c in pairs(field_table.modules_scroll.modules_pane.children) do
         c.enabled = enabled
     end
     field_table.beacon.enabled = enabled
@@ -163,17 +176,18 @@ function msettings.create(player_index, grecipe)
         msettings.close(player)
     end
 
-    local config = grecipe.production_config
+    local config = grecipe.production_config or grecipe.computed_config
     if not config then
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end
 
-    local recipe = prototypes.recipe[grecipe.name]
+    local recipe = gutils.get_recipe_prototype(grecipe.name)
+
 
     ---@type Params.create_standard_panel
     local params = {
         panel_name           = panel_name,
-        title                = { np("title"), recipe and "[recipe=" .. grecipe.name .. "]" or "", recipe and recipe.localised_name or "" },
+        title                = { np("title"), recipe and "[recipe=" .. recipe.name .. "]" or "", recipe and recipe.localised_name or "" },
         is_draggable         = true,
         close_button_name    = np("close"),
         close_button_tooltip = np("close_button_tooltip"),
@@ -207,6 +221,18 @@ function msettings.create(player_index, grecipe)
 
     config = tools.table_dup(config)
 
+    local technologies = prototypes.get_technology_filtered({ { filter = "unlocks-recipe", recipe = gutils.get_recipe_base_name(grecipe.name) } })
+    if #technologies > 0 then
+        local label = field_table.add { type = "label", caption = { np("technologies") } }
+        local tech_flow = field_table.add { type = "flow" }
+        for techname, _ in pairs(technologies) do
+            local b_tech = tech_flow.add { type = "choose-elem-button", elem_type = "technology", technology = techname }
+            b_tech.locked = true
+            b_tech.style.size = 32
+            tools.set_name_handler(b_tech, np("technology"), { technology = techname })
+        end
+    end
+
     local is_default = grecipe.production_config == nil
     local label = field_table.add { type = "label", caption = { np("default_config") } }
     label.style.right_margin = 5
@@ -214,22 +240,21 @@ function msettings.create(player_index, grecipe)
     b.style.height = 40
     tools.set_name_handler(b, np("is_default"))
 
-    local recipe = prototypes.recipe[grecipe.name]
-    local category = recipe.category
     machinedb.initialize()
-    local machines = machinedb.category_to_machines[category]
+    local machines = machinedb.get_machines_for_recipe(grecipe.name)
     local machine_names = {}
+
     if machines and #machines ~= 0 then
         local force = player.force --[[@as LuaForce]]
-        local search_surface = tools.get_vars(player).extern_surface
+        local search_surface = gutils.get_real_surface(player)
         if search_surface and not search_surface.valid then
             search_surface = nil
         end
         for _, m in pairs(machines) do
-            if not g.show_only_researched or 
-                    machinedb.is_machine_enabled(force, m.name)  or
-                    (search_surface and search_surface.count_entities_filtered{name=m.name} > 0)
-                     then
+            if not g.show_only_researched or
+                machinedb.is_machine_enabled(force, m.name) or
+                (search_surface and search_surface.count_entities_filtered { name = m.name } > 0)
+            then
                 table.insert(machine_names, m.name)
             end
         end
@@ -243,12 +268,14 @@ function msettings.create(player_index, grecipe)
     tools.set_name_handler(b, np("machine"), { recipe_name = grecipe.name })
 
     field_table.add { type = "label", caption = { np("modules") } }
-    local module_flow = field_table.add { type = "table", column_count = 6, name = "modules" }
+    local module_scroll = field_table.add { type = "scroll-pane", name = "modules_scroll" }
+    module_scroll.style.maximal_height = 300
+    local module_flow = module_scroll.add { type = "table", column_count = 6, name = "modules_pane" }
     install_modules(module_flow, g, config, grecipe)
 
     field_table.add { type = "label", caption = { np("beacon") } }
     b = field_table.add { type = "choose-elem-button", elem_type = "entity-with-quality", name = "beacon",
-        elem_filters = { { filter = "type", type = "beacon" } } }
+        elem_filters = { { filter = "type", type = "beacon" }, { filter = "hidden", mode = "and", invert = true } } }
     signal = tools.id_to_signal(config.beacon_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("beacon"), { recipe_name = grecipe.name })
@@ -318,7 +345,7 @@ tools.on_named_event(np("is_default"), defines.events.on_gui_checked_state_chang
             end
 
             field_table.machine.elem_value = tools.id_to_signal(config.machine_name)
-            install_modules(field_table.modules, g, config, g.recipes[recipe_name])
+            install_modules(field_table.modules_scroll.modules_pane, g, config, g.recipes[recipe_name])
 
             field_table.beacon.elem_value = tools.id_to_signal(config.beacon_name)
             install_beacon_modules(field_table.beacon_modules, g, config, g.recipes[recipe_name])
@@ -350,7 +377,7 @@ tools.on_named_event(np("machine"), defines.events.on_gui_elem_changed,
         local config = vars.msettings_config
         config.machine_name = tools.signal_to_id(e.element.elem_value)
 
-        install_modules(field_table.modules, g, config, g.recipes[recipe_name])
+        install_modules(field_table.modules_scroll.modules_pane, g, config, g.recipes[recipe_name])
 
         msettings.save(player)
     end
@@ -399,6 +426,7 @@ local function read_config(player)
 
     if field_table.is_default.state then
         grecipe.production_config = nil
+        grecipe.computed_config = nil
         gutils.fire_production_data_change(g)
         return nil
     end
@@ -409,7 +437,7 @@ local function read_config(player)
         return nil
     end
     config.machine_modules = {}
-    for _, fmod in pairs(field_table.modules.children) do
+    for _, fmod in pairs(field_table.modules_scroll.modules_pane.children) do
         local module_id = tools.signal_to_id(fmod.elem_value)
         if module_id then
             table.insert(config.machine_modules, module_id)
@@ -448,6 +476,7 @@ function msettings.save(player)
     local config = read_config(player)
     if field_table.is_default.state then
         grecipe.production_config = nil
+        grecipe.computed_config = nil
     else
         grecipe.production_config = config
     end
@@ -490,6 +519,16 @@ tools.on_named_event(np("close"), defines.events.on_gui_click,
         msettings.close(game.players[e.player_index])
     end)
 
+tools.on_named_event(np("technology"), defines.events.on_gui_click,
+    ---@param e EventData.on_gui_click
+    function(e)
+        local player = game.players[e.player_index]
+        local technology = e.element.tags.technology
+        if not (e.shift or e.control or e.alt) then
+            player.open_technology_gui(technology)
+        end
+    end)
+
 function msettings.report(player)
     local frame = player.gui.screen[panel_name]
     if not frame then return end
@@ -510,7 +549,7 @@ function msettings.report(player)
     if grecipe then
         machine = grecipe.machine
     end
-    if machine and machine.count < 0 then
+    if machine and (not machine.count or machine.count < 0) then
         machine = nil
     end
     if not machine then
@@ -551,7 +590,6 @@ function msettings.report(player)
     label = report_table.add { type = "label", caption = "[color=cyan]" .. luautil.format_number(energy, true) .. "W[/color]" }
     label.style.width = 100
     label.style.horizontal_align = "right"
-
 end
 
 ---@param player LuaPlayer
@@ -566,10 +604,21 @@ function msettings.open_selection(player)
     if not grecipe then return end
 
     if not grecipe.is_product then
+        gutils.refresh_machine_list(g, grecipe.name)
         msettings.create(player.index, grecipe)
     else
-        local product = g.products[grecipe.name]
-        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = product, only_product = true })
+        local gproduct = g.products[grecipe.name]
+        if g.visibility == commons.visibility_layers then
+            for gname, grecipe in pairs(gproduct.product_of) do
+                if not grecipe.is_product and g.selection[gname] then
+                    grecipe.layer = g.current_layer
+                    graph.deferred_update(player, { selection_changed = true, do_layout = true })
+                    tools.fire_user_event(commons.production_data_change_event, { g = g })
+                    return
+                end
+            end
+        end
+        tools.fire_user_event(commons.open_recipe_selection, { g = g, product = gproduct, action = commons.action_producer })
     end
 end
 
@@ -579,14 +628,6 @@ tools.register_user_event(commons.open_current_selection,
         msettings.open_selection(player);
     end)
 
----@param e EventData.on_lua_shortcut
-local function on_control_click(e)
-
-    local player = game.players[e.player_index]
-    msettings.open_selection(player)
-end
-script.on_event(prefix .. "-control-click", on_control_click)
-
 ---@param container LuaGuiElement
 ---@param machine ProductionMachine
 function msettings.create_product_line(container, machine)
@@ -594,6 +635,7 @@ end
 
 -- React to production computation
 tools.register_user_event(commons.production_compute_event, function(data)
+    ---@type Graph
     local g = data.g
     local player = g.player
     local frame = player.gui.screen[panel_name]
@@ -608,7 +650,7 @@ tools.register_user_event(commons.production_compute_event, function(data)
     local grecipe = g.recipes[recipe_name]
     if not grecipe then return end
 
-    local config = grecipe.production_config
+    local config = grecipe.production_config or grecipe.computed_config
     if not config then
         config = machinedb.get_default_config(g, grecipe.name, {}) or {}
     end

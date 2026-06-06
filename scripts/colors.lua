@@ -5,6 +5,10 @@ local gutils = require("scripts.gutils")
 
 local colors = {}
 
+colors.ingredient = commons.colors.ingredient
+colors.production = commons.colors.production
+colors.main = commons.colors.main
+
 local color_func = {
     [0] = function(c, x, m) return { c, x, 0 } end,
     [1] = function(c, x, m) return { x, c, 0 } end,

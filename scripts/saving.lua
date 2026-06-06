@@ -281,52 +281,127 @@ tools.on_named_event(np("save"), defines.events.on_gui_click,
         local new_flow = tools.get_child(frame, "new_flow")
         if not new_flow then return end
 
-        ---@type Saving
-        local save = {}
-        save.icon1 = tools.signal_to_sprite(new_flow.icon1.elem_value --[[@as SignalID]])
-        save.icon2 = tools.signal_to_sprite(new_flow.icon2.elem_value --[[@as SignalID]])
-        save.label = tools.trim(new_flow.label.text)
+        if not (e.control or e.alt) then
+            ---@type Saving
+            local save = {}
+            save.icon1 = tools.signal_to_sprite(new_flow.icon1.elem_value --[[@as SignalID]])
+            save.icon2 = tools.signal_to_sprite(new_flow.icon2.elem_value --[[@as SignalID]])
+            save.label = tools.trim(new_flow.label.text)
 
-        if not save.icon1 then
-            player.print { np("missing_icon") }
-            return
-        end
-        if save.label == "" then
-            player.print { np("missing_label") }
-            return
-        end
+            if not save.icon1 or e.shift then
+                local first, second
+                save.icon1 = nil
+                save.icon2 = nil
+                save.label = nil
+                for name, value in pairs(g.iovalues) do
+                    if type(value) == "number" then
+                        if not first then
+                            first = name
+                        else
+                            second = name
+                            break
+                        end
+                    end
+                end
+                if not first then
+                    local machines = production.get_machines(g)
+                    if machines and #machines > 0 then
+                        local last = machines[#machines]
+                        local products = last.grecipe.products
+                        if #products > 0 then
+                            first = products[1].name
+                            if #products > 1 then
+                                second = products[1].name
+                            end
+                        end
+                    end
+                end
 
-        update_save(g, save)
+                if not second then second = first end
+                if first then
+                    local sfirst = tools.id_to_signal(first)
+                    new_flow.icon1.elem_value = sfirst
+                    save.icon1 = tools.signal_to_sprite(sfirst)
+                    save.label = gutils.get_product_name(player, first)
+                    new_flow.label.text = save.label
+                end
+                if second then
+                    local ssecond = tools.id_to_signal(second)
+                    new_flow.icon2.elem_value = ssecond
+                    save.icon2 = tools.signal_to_sprite(ssecond)
+                end
+            end
 
-        ---@type Saving[]
-        local saves = vars.saves
-        if not saves then
-            saves = {}
-            vars.saves = saves
-        end
-        for index, existing in pairs(saves) do
-            if existing.icon1 == save.icon1 and
-                existing.icon2 == save.icon2 and
-                existing.label == save.label then
-                existing.json = save.json
-                save = existing
-                goto done
+            if not save.icon1 then
+                player.print { np("missing_icon") }
+                return
+            end
+            if save.label == "" then
+                player.print { np("missing_label") }
+                return
+            end
+
+            update_save(g, save)
+
+            ---@type Saving[]
+            local saves = vars.saves
+            if not saves then
+                saves = {}
+                vars.saves = saves
+            end
+            if not e.shift then
+                for _, existing in pairs(saves) do
+                    if existing.icon1 == save.icon1 and
+                        existing.icon2 == save.icon2 and
+                        existing.label == save.label then
+                        existing.json = save.json
+                        save = existing
+                        goto done
+                    end
+                end
+            else
+                local existing_saves = {}
+                for _, existing in pairs(saves) do
+                    local key = existing.icon1 .. ":" .. existing.icon2
+                    existing_saves[key] = true
+                end
+                local current_key = save.icon1 .. ":" .. save.icon2
+                if existing_saves[current_key] then
+                    local found_icon2
+                    for i = 1, 9 do
+                        local icon2 = "virtual-signal/signal-" .. i
+                        local test_key = save.icon1 .. ":" .. icon2
+                        if not existing_saves[test_key] then
+                            found_icon2 = icon2
+                            break
+                        end
+                    end
+                    if found_icon2 then
+                        save.icon2 = found_icon2
+                    else
+                        player.print({np("existing")})
+                        local container = tools.get_child(frame, "save_list")
+                        saving.update(player, container)
+                        return
+                    end
+                end
+            end
+            table.insert(saves, save)
+            ::done::
+            save.pinned = true
+            saving.sort(player)
+
+            vars.saving_current = save
+            load_current_header(new_flow, save)
+
+            local container = tools.get_child(frame, "save_list")
+            if not container then return end
+            saving.update(player, container)
+
+            if not game.is_multiplayer() and player.mod_settings["factory_graph-saving-auto"].value then
+                game.auto_save("factory-graph")
             end
         end
-        table.insert(saves, save)
-        ::done::
-        save.pinned = true
-        saving.sort(player)
-
-        vars.saving_current = save
-        local container = tools.get_child(frame, "save_list")
-        if not container then return end
-        saving.update(player, container)
-
-        if not game.is_multiplayer() and player.mod_settings["factory_graph-saving-auto"].value then
-            game.auto_save("factory-graph")
-        end
-
         --saving.close(player)
     end)
 
@@ -403,6 +478,7 @@ tools.on_named_event(np("load"), defines.events.on_gui_click,
             local data = helpers.json_to_table(json) --[[@as SavingData]]
             graph.import_saving(g, data)
         end
+        gutils.reset_scanned_recipes(player, true)
     end)
 
 tools.on_named_event(np("icon1"), defines.events.on_gui_elem_changed,
@@ -449,6 +525,28 @@ tools.on_named_event(np("pin"), defines.events.on_gui_checked_state_changed,
         local container = tools.get_child(frame, "save_list")
         if not container then return end
         saving.update(player, container)
+    end)
+
+tools.on_configuration_changed(
+---@param data ConfigurationChangedData
+    function(data)
+        for _, player in pairs(game.players) do
+            local vars  = tools.get_vars(player)
+            ---@type Saving[]
+            local saves = vars.saves
+            if not saves then goto next_player end
+
+            local new_saves = {}
+            for _, save in pairs(saves) do
+                if not tools.check_sprite(save.icon1) then goto next_save end
+                if not tools.check_sprite(save.icon2) then goto next_save end
+
+                table.insert(new_saves, save)
+                ::next_save::
+            end
+            vars.saves = new_saves
+            ::next_player::
+        end
     end)
 
 return saving

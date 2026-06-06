@@ -25,8 +25,12 @@ tools.add_panel_name(settings_panel_name)
 ---@param machine_name string?
 ---@return LuaGuiElement
 local function add_machine_button(container, machine_name)
-    local filters = { { filter = "type", type = "assembling-machine" }, { filter = "type", type = "furnace" } }
-    local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality",  elem_filters =  filters }
+    local filters = {
+        { filter = "type",   type = "assembling-machine" },
+        { filter = "type",   type = "furnace" },
+        { filter = "hidden", mode = "and",               invert = true }
+    }
+    local b = container.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(machine_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("preferred_machines"))
@@ -37,8 +41,11 @@ end
 ---@param module_name string?
 ---@return LuaGuiElement
 local function add_module_button(container, module_name)
-    local filters ={ { filter = "type", type = "module" } }
-    local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters =  filters }
+    local filters = {
+        { filter = "type",   type = "module" },
+        { filter = "hidden", mode = "and",   invert = true }
+    }
+    local b = container.add { type = "choose-elem-button", elem_type = "item-with-quality", elem_filters = filters }
     local signal = tools.id_to_signal(module_name)
     b.elem_value = signal
     tools.set_name_handler(b, np("preferred_modules"))
@@ -66,6 +73,58 @@ local function set_module_buttons(g, pmodule_flow, modules)
         end
     end
     add_module_button(pmodule_flow)
+end
+
+---@param player LuaPlayer
+---@return string[]
+local function create_list_pack(player)
+    local labs = prototypes.get_entity_filtered{{filter="type", type="lab"}}
+    local packeds = {}
+
+    for _, lab in pairs(labs) do
+        local inputs = lab.lab_inputs
+        for _, item in pairs(inputs) do
+            packeds[item] = true
+        end
+    end
+
+    local pack_list = {}
+    for pack, _ in pairs(packeds) do
+        table.insert(pack_list, pack)
+    end
+    return pack_list
+end
+
+---@param container LuaGuiElement
+---@param all_packs string[]
+---@param pack_name string?
+---@return LuaGuiElement
+local function add_pack_button(container, all_packs, pack_name)
+    
+    if not all_packs then
+        local player = game.players[container.player_index]
+        all_packs = create_list_pack(player)
+    end
+
+    local filters = {
+        { filter="name", name=all_packs}
+    }
+    local b = container.add { type = "choose-elem-button", elem_type = "item", elem_filters = filters }
+    b.elem_value = pack_name
+    tools.set_name_handler(b, np("lab_pack"))
+    return b
+end
+
+---@param g Graph
+---@param pack_flow LuaGuiElement
+local function set_lab_packs(g, pack_flow)
+    local all_packs = create_list_pack(g.player)
+    if g.lab_packs then
+        for _, pack in pairs(g.lab_packs) do
+            add_pack_button(pack_flow, all_packs, pack)
+        end
+    end
+    add_pack_button(pack_flow, all_packs)
 end
 
 ---@param player_index integer
@@ -114,9 +173,6 @@ function settings_panel.create(player_index)
     flow.add { type = "label", caption = { np("graph_zoom_level") } }
     flow.add { type = "textfield", name = "graph_zoom_level", text = g.graph_zoom_level and tostring(g.graph_zoom_level) or 1, numeric = true, allow_decimal = true }
 
-    flow.add { type = "label", caption = { np("world_zoom_level") } }
-    flow.add { type = "textfield", name = "world_zoom_level", text = g.world_zoom_level and tostring(g.world_zoom_level) or 1, numeric = true, allow_decimal = true }
-
     flow.add { type = "label", caption = { np("autosave_on_graph_switching") } }
     flow.add { type = "checkbox", name = "autosave_on_graph_switching", state = not not g.autosave_on_graph_switching,
         tooltip = { np("autosave_on_graph_switching_tooltip") } }
@@ -156,6 +212,9 @@ function settings_panel.create(player_index)
     flow.add { type = "line" }
     flow.add { type = "line" }
 
+    flow.add { type = "label", caption = { np("manual_mode") } }
+    flow.add { type = "checkbox", state = not not g.manual_mode, name = "manual_mode" }
+
     flow.add { type = "label", caption = { np("use_machine_in_inventory") } }
     flow.add { type = "checkbox", state = not not g.use_machine_in_inventory, name = "use_machine_in_inventory" }
 
@@ -168,7 +227,10 @@ function settings_panel.create(player_index)
     set_module_buttons(g, pmodule_flow, g.preferred_modules)
 
     flow.add { type = "label", caption = { np("preferred_beacon") } }
-    b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality", elem_filters = { { filter = "type", type = "beacon" } },
+    b = flow.add { type = "choose-elem-button", elem_type = "entity-with-quality",
+        elem_filters = {
+            { filter = "type",   type = "beacon" },
+            { filter = "hidden", mode = "and",   invert = true } },
         name = "preferred_beacon" }
     b.elem_value = tools.id_to_signal(g.preferred_beacon)
 
@@ -179,6 +241,28 @@ function settings_panel.create(player_index)
     flow.add { type = "label", caption = { np("preferred_beacon_modules") } }
     local pbeacon_module_flow = flow.add { type = "flow", direction = "horizontal", name = "preferred_beacon_modules" }
     set_module_buttons(g, pbeacon_module_flow, g.preferred_beacon_modules)
+
+    if script.active_mods["quality"] then
+        flow.add { type = "label", caption = { np("recipe_quality") } }
+
+        local qualities = {}
+        local current_quality = 1
+        local index = 1
+        for _, q in pairs(prototypes.quality) do
+            if not q.hidden then
+                table.insert(qualities, q.localised_name)
+                if q.name == g.default_recipe_quality then
+                    current_quality = index
+                end
+                index = index + 1
+            end
+        end
+        flow.add { type = "drop-down", items = qualities, selected_index = current_quality, name = "default_recipe_quality" }
+    end
+
+    flow.add { type = "label", caption = { np("lab_packs") } }
+    local pack_flow = flow.add { type = "table", direction = "horizontal", name = "lab_packs", column_count = 6 }
+    set_lab_packs(g, pack_flow)
 
     local bpanel = frame.add { type = "flow", direction = "horizontal" }
     local b = bpanel.add { type = "button", caption = { np("save") } }
@@ -195,6 +279,8 @@ function settings_panel.create(player_index)
 
 
     frame.force_auto_center()
+
+    create_list_pack(player)
 end
 
 ---@param e EventData.on_gui_click
@@ -271,6 +357,18 @@ tools.on_named_event(np("preferred_modules"), defines.events.on_gui_elem_changed
         blist_on_gui_elem_changed(e, add_module_button)
     end)
 
+tools.on_named_event(np("lab_pack"), defines.events.on_gui_click,
+---@param e EventData.on_gui_click
+function(e)
+    blist_on_click(e, add_pack_button)
+end)
+
+tools.on_named_event(np("lab_pack"), defines.events.on_gui_elem_changed,
+    ---@param e EventData.on_gui_elem_changed
+    function(e)
+        blist_on_gui_elem_changed(e, add_pack_button)
+    end)
+
 tools.on_named_event(np("close"), defines.events.on_gui_click,
     ---@param e EventData.on_gui_click
     function(e)
@@ -305,10 +403,9 @@ local function save(player, frame)
     g.autosave_on_graph_switching = field_table.autosave_on_graph_switching.state
     g.layout_on_selection = field_table["layout-on-selection"].state
     g.graph_zoom_level = tonumber(field_table.graph_zoom_level.text)
-    g.world_zoom_level = tonumber(field_table.world_zoom_level.text)
     g.show_only_researched = field_table.show_only_researched.state
     g.show_hidden = field_table.show_hidden.state
-    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap  then
+    if grid_size_value ~= g.grid_size or line_gap_value ~= g.line_gap then
         g.grid_size = grid_size_value
         g.line_gap = line_gap_value
         graph.refresh(player, true)
@@ -322,12 +419,29 @@ local function save(player, frame)
     local signal = field_table.current_layer.elem_value --[[@as SignalID]]
     g.current_layer = tools.signal_to_sprite(signal)
     g.use_machine_in_inventory = field_table.use_machine_in_inventory.state
+    g.manual_mode = field_table.manual_mode.state
     g.preferred_machines = blist_values(field_table.preferred_machines)
     g.preferred_modules = blist_values(field_table.preferred_modules)
+    g.lab_packs = blist_values(field_table.lab_packs)
     g.preferred_beacon = tools.signal_to_id(field_table.preferred_beacon.elem_value --[[@as SignalFilter]])
     g.preferred_beacon_count = tonumber(field_table.preferred_beacon_count.text) or 0
     g.preferred_beacon_modules = blist_values(field_table.preferred_beacon_modules)
 
+    local default_quality = field_table.default_recipe_quality
+    if default_quality then
+        local index = default_quality.selected_index
+        if index then
+            for _, q in pairs(prototypes.quality) do
+                if not q.hidden then
+                    index = index - 1
+                    if index == 0 then
+                        g.default_recipe_quality = q.name
+                        break
+                    end
+                end
+            end
+        end
+    end
 
     local visible_layers_flow = field_table.visible_layers
     local visible_layers = {}
@@ -361,13 +475,14 @@ local function save(player, frame)
     end
 
     g.visible_layers = visible_layers
-    if show_hidden_change then
+    if show_hidden_change or layer_change then
         graph.deferred_update(player, { selection_changed = true, do_layout = true })
-    elseif layer_change or need_selection_change then
-        graph.deferred_update(player, { 
-            do_redraw = true, 
-            center_on_graph = false, 
-            selection_changed = true })
+    elseif need_selection_change then
+        graph.deferred_update(player, {
+            do_redraw = true,
+            center_on_graph = false,
+            selection_changed = true
+        })
     else
         gutils.fire_production_data_change(g)
     end

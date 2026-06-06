@@ -1,4 +1,142 @@
 ---------------------------------------------------------------------------------------------------
+Version: 2.0.27
+Date: 31. 05. 2026.
+  Bugfixes:
+    - Fix logistic requests in summary
+    - Fix crash in on summary tooltip
+    - Add settings to view barrel / unbarrel recipes
+---------------------------------------------------------------------------------------------------
+Version: 2.0.26
+Date: 08. 05. 2026.
+  Bugfixes:
+    - Fix machine selection depending on fluid box
+    - Fix recipe selection for dynamic recipe change
+    - Fix drawing crash
+    - Fix invalid migration of recipe with temperature
+---------------------------------------------------------------------------------------------------
+Version: 2.0.25
+Date: 05. 04. 2026.
+  Bugfixes:
+    - Fix synchronization in UI
+  Features:
+    - Add total of items in required machines
+    - Add <CONTROL><LEFT-CLICK> on ingredient/product in recipe list to handcraft item if possible
+    - Manage fluid temperature in recipes. For recipe with fluid using temperature, you can choose temperature and have the same recipe or product multiple time with different temperatures. See description.
+---------------------------------------------------------------------------------------------------
+Version: 2.0.24
+Date: 31. 03. 2026.
+  Features:
+    - Big refactor to use remote views. Now use <Escape> to exit graph view.
+---------------------------------------------------------------------------------------------------
+Version: 2.0.23
+Date: 14. 03. 2026.
+  Bugfixes:
+    - Fix module configuration on migration.
+    - Fix invalid migration on product
+  Features:
+    - In tooltip of a machine, show missing ingredient to handcraft the machine
+    - In machine highlight, show connection for any recipe and not only the machine of the current setup
+    - Improve recipe panel, show technology to have recipe (click to show in tech tree)
+    - In settings, add a list of science pack to restrict the recipe list. Only the recipes with all science pack are in the list are displayed. (to limit to recipe immediatly searchable in hude mods)
+    - Improve tooltips
+    - Improve buttons to navigate between recipe
+---------------------------------------------------------------------------------------------------
+Version: 2.0.22
+Date: 14. 03. 2026.
+  Bugfixes:
+    - Fix crash at first start
+---------------------------------------------------------------------------------------------------
+Version: 2.0.21
+Date: 01. 03. 2026.
+  Bugfixes:
+    - Fix invalid mark of machine with recipe
+    - Fix failed load of specific machine config
+  Features:
+    - mouse <CONTROL><LEFT-CLICK> on a recipe or a product in the graph will lock the display of dash lines
+    - another <CONTROL><LEFT-CLICK> will unlock the display of dash lines.
+    - in the origin surface, <SHIFT><CONTROL><RIGHT-CLICK> on a machine show other machines sharing product or ingredients (view description)
+    - in the graph view <SHIFT><CONTROL><RIGHT-CLICK> on a recipe, highlight the recipe in the production panel
+    - in the origin surface, <MIDDLE-CLICK> on a machine switch to graph view and show the recipe of the machine
+    - in the graph view, <MIDDLE-CLICK> on a recipe exit the graph view and highlight the machines which run the recipe
+    - the "goto" button in the production panel and the machine panel have advanced function for navigation
+    - the production panel displays the layer of a recipe, with a green background if the recipe has some machine
+    - In the origin surface, <SHIFT><CONTROL><RIGHT-CLICK> with an item/ghost in hand (or an selected entities), opens the recipe panel on this item
+---------------------------------------------------------------------------------------------------
+Version: 2.0.20
+Date: 15. 02. 2026.
+  Bugfixes:
+    - manage hidden entity
+    - Fix module/beacon filtering (for Pyanodon use)
+---------------------------------------------------------------------------------------------------
+Version: 2.0.19
+Date: 14. 02. 2026.
+  Bugfixes:
+    - fix crash on default quality
+---------------------------------------------------------------------------------------------------
+Version: 2.0.18
+Date: 15. 01. 2026.
+  Bugfixes:
+    - Fix crash on target definition
+    - Fix bad cleaning after objective changes
+---------------------------------------------------------------------------------------------------
+Version: 2.0.17
+Date: 10. 01. 2026.
+  Features:
+    - Add recipe quality in setting to set quality of product in blueprint
+    - Change de <shift><control>(+) in the setup to recompute the machine count from the first recipe of the setup up to this recipe
+    - Add a simplify computation of production in manual mode
+  Bugfixes:
+    - Fix invalid computation of production with module
+---------------------------------------------------------------------------------------------------
+Version: 2.0.16
+Date: 02. 01. 2026.
+  Bugfixes:
+    - Fix crash on production computation failure
+---------------------------------------------------------------------------------------------------
+Version: 2.0.15
+Date: 30. 12. 2025.
+  Bugfixes:
+    - Fix incompatibility with RSO
+---------------------------------------------------------------------------------------------------
+Version: 2.0.14
+Date: 22. 12. 2025.
+  Changes:
+    - Add manual mode to compute input/output. In the manual mode, it is possible to set individually the count of each machine.
+    - The manual mode is active when there are no target products or when the automatic computation failed
+    - The manual mode can be always activated with the <M> button in the production panel
+    - Improvemment on the save panel (if need, icon and label are set automatically from target products)
+---------------------------------------------------------------------------------------------------
+Version: 2.0.13
+Date: 20. 04. 2025.
+  Bugfixes:
+    - Fix crash when recipe change
+    - Fix crash on configuration changes
+---------------------------------------------------------------------------------------------------
+Version: 2.0.12
+Date: 29. 03. 2025.
+  Changes:
+    - Add modules in the list of required items 
+---------------------------------------------------------------------------------------------------
+Version: 2.0.11
+Date: 24. 03. 2025.
+  Bugfixes:
+    - Fix default configuration with speed module and quality
+    - Fix "path to build" function in recipe list (compute recipes up to a product from already selected recipes)
+  Changes:
+    - Adjust use of speed module if count of machine <= 1
+    - Add SHIFT-CLICK on product in graph to list all recipes in graph that uses the product
+    - Remove recycling recipes by default (add a settings to include). When included, hidden by default.
+---------------------------------------------------------------------------------------------------
+Version: 2.0.9
+Date: 13. 03. 2025.
+  Bugfixes:
+    - Fix character teleport on a space platform
+---------------------------------------------------------------------------------------------------
+Version: 2.0.8
+Date: 22. 02. 2025.
+  Bugfixes:
+    - Fix invalid module selection
+---------------------------------------------------------------------------------------------------
 Version: 2.0.7
 Date: 27. 01. 2025.
   Bugfixes:

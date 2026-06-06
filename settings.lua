@@ -10,8 +10,24 @@ data:extend(
 			type = "int-setting",
 			name = prefix .. "-version",
 			setting_type = "startup",
-			default_value = 1
+			default_value = 1,
+			order = "aa"
 		},
+		{
+			type = "bool-setting",
+			name = prefix .. "-include-recycling-recipes",
+			setting_type = "startup",
+			default_value = false,
+			order = "ab"
+		},
+		{
+			type = "bool-setting",
+			name = prefix .. "-include-barreling-recipes",
+			setting_type = "startup",
+			default_value = false,
+			order = "ac"
+		},
+
 		{
 			type = "int-setting",
 			name = prefix .. "-saving-height",
@@ -24,6 +40,14 @@ data:extend(
 			name = prefix .. "-saving-auto",
 			setting_type = "runtime-per-user",
 			default_value = true
+		},
+		{
+			type = "int-setting",
+			name = prefix .. "-scan-radius",
+			setting_type = "runtime-per-user",
+			default_value = 150,
+			minimum_value = 50,
+			maximum_value = 1000
 		},
 		{
 			type = "string-setting",

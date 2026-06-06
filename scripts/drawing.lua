@@ -52,11 +52,7 @@ local select_modes = {
     "ingredient_and_product"
 }
 
-local recipe_entity_names = {
-    [commons.recipe_symbol_name] = true,
-    [commons.product_symbol_name] = true,
-    [commons.unresearched_symbol_name] = true,
-}
+local recipe_entity_names = commons.recipe_entity_names
 
 local null_value
 
@@ -80,7 +76,7 @@ function dash_line_for_product(product, dash)
                     -- rendering.set_dashes(id, 0.05, 0.1)
                 end
             else
-                if id .dash_length > 0 then
+                if id.dash_length > 0 then
                     id.dash_length = 0.0
                     id.gap_length = 0.0
                     -- rendering.set_dashes(id, 0, 0)
@@ -124,8 +120,9 @@ end
 
 ---@param g Graph
 function drawing.clear_selection(g)
-    if g.selected_recipe then
-        dash_lines(g, g.selected_recipe, false)
+    if g.lock_selected_recipe and not g.selection_lock then
+        dash_lines(g, g.lock_selected_recipe, false)
+        g.lock_selected_recipe = nil
     end
     g.graph_select_ids = gutils.destroy_drawing(g.graph_select_ids)
     g.highlighted_recipes_ids = gutils.destroy_drawing(g.highlighted_recipes_ids)
@@ -366,7 +363,8 @@ local function draw_product_h(x, y, positive)
         x1 = x + marker_offset
         x = x - product_sprite_offset
     end
-    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+    local sprite_name = current_product.derived_from and current_product.derived_from.name or current_product.name
+    local id = rendering.draw_sprite { surface = current_surface, sprite = sprite_name, target = { x, y },
         x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
     table.insert(current_ids, id)
 
@@ -408,7 +406,8 @@ local function draw_product_v(x, y, positive)
         y1 = y + marker_offset
         y = y - product_sprite_offset
     end
-    local id = rendering.draw_sprite { surface = current_surface, sprite = current_product.name, target = { x, y },
+    local sprite_name = current_product.derived_from and current_product.derived_from.name or current_product.name
+    local id = rendering.draw_sprite { surface = current_surface, sprite = sprite_name, target = { x, y },
         x_scale = product_io_sprite_scale, y_scale = product_io_sprite_scale }
     table.insert(current_ids, id)
 
@@ -564,17 +563,19 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
 
     topo_left_top, topo_right_top, topo_left_bottom, topo_right_bottom = 0, 0, 0, 0
     for _, recipe in pairs(connected_recipes) do
-        if recipe.col < routing_col then
-            if recipe.line < routing_line then
-                topo_left_top = topo_left_top + 1
+        if recipe.col then
+            if recipe.col < routing_col then
+                if recipe.line < routing_line then
+                    topo_left_top = topo_left_top + 1
+                else
+                    topo_left_bottom = topo_left_bottom + 1
+                end
             else
-                topo_left_bottom = topo_left_bottom + 1
-            end
-        else
-            if recipe.line < routing_line then
-                topo_right_top = topo_right_top + 1
-            else
-                topo_right_bottom = topo_right_bottom + 1
+                if recipe.line < routing_line then
+                    topo_right_top = topo_right_top + 1
+                else
+                    topo_right_bottom = topo_right_bottom + 1
+                end
             end
         end
     end
@@ -619,6 +620,8 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
                 y = y + disp_y
                 draw_line({ x1, y }, { x2, y })
 
+                ---@cast recipe1 -nil
+                ---@cast recipe2 -nil
                 if recipe1.col > recipe2.col then
                     recipe1, recipe2 = recipe2, recipe1
                 end
@@ -774,6 +777,8 @@ local function draw_recipe_connections(g, ids, product, connected_recipes, color
                 x = x + disp_x
                 draw_line({ x, y1 }, { x, y2 })
 
+                ---@cast recipe1 -nil
+                ---@cast recipe2 -nil
                 if recipe1.line > recipe2.line then
                     recipe1, recipe2 = recipe2, recipe1
                 end
@@ -1005,13 +1010,15 @@ local function redraw_connections(g)
                 product_set[prod.name] = prod
             end
 
-            local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
-            id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
-                left_top = { p.x - margin, p.y - margin },
-                right_bottom = { p.x + margin, p.y + margin },
-                draw_on_ground = true
-            }
-            table.insert(ids, id)
+            if crecipe.col and crecipe.line then
+                local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
+                id = rendering.draw_rectangle { surface = g.surface, color = { 0, 1, 0 },
+                    left_top = { p.x - margin, p.y - margin },
+                    right_bottom = { p.x + margin, p.y + margin },
+                    draw_on_ground = true
+                }
+                table.insert(ids, id)
+            end
         elseif crecipe.col and crecipe.line then
             local p = { x = grid_size * crecipe.col + 0.5, y = grid_size * crecipe.line + 0.5 }
             id = rendering.draw_rectangle { surface = g.surface, color = { 0.4, 0.4, 0.4 },
@@ -1054,7 +1061,7 @@ end
 ---@param g Graph
 ---@param crecipe GRecipe
 function drawing.draw_target(g, crecipe)
-    if not crecipe then
+    if not crecipe or not crecipe.visible then
         return
     end
     local margin = 0.7
@@ -1151,8 +1158,8 @@ local function highlight_recipes(g, recipes, color)
     end
 end
 
-local ingredient_color = { 1, 0, 0 }
-local production_color = { 255, 106, 0 }
+local ingredient_color = colors.ingredient
+local production_color = colors.production
 
 ---@param g Graph
 ---@param recipe GRecipe
@@ -1282,6 +1289,110 @@ function drawing.unmark_all(g)
     drawing.draw_layers(g)
 end
 
+---@param e EventData.on_lua_shortcut
+local function on_control_click(e)
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    if player.surface == g.surface then
+        g.selection_lock = not g.selection_lock
+        if not g.selection_lock then
+            local entity = player.selected
+            drawing.select_entity(g, entity)
+        end
+    end
+end
+
+---@param player LuaPlayer
+local function open_query(player)
+    local product_name
+    if player.cursor_stack and player.cursor_stack.count > 0 then
+        product_name = player.cursor_stack.name
+    elseif player.cursor_ghost and player.cursor_ghost.name then
+        product_name = player.cursor_ghost.name.name
+    else
+        local selected = player.selected
+        if selected and selected.valid then
+            local items = selected.prototype.items_to_place_this
+            if items and #items > 0 then
+                product_name = items[1].name
+            end
+        end
+    end
+    if product_name then
+        tools.fire_user_event(commons.query_product, {
+            player = player,
+            product_name = "item/" .. product_name
+        })
+    end
+end
+
+--- Show detail on
+local function on_control_click4(e)
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    local selected = player.selected
+    if selected == nil or not selected.valid then
+        open_query(player)
+        return
+    end
+
+    if player.surface ~= g.surface then
+        local type = selected.type
+        if type ~= "furnace" and type ~= "assembling-machine" then
+            open_query(player)
+        else
+            local entity = selected
+            local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
+            if recipe then
+                gutils.refresh_machine_list(g, recipe.name)
+                gutils.show_machine(player, recipe.name, true)
+                tools.fire_user_event(commons.open_recipe_selection, { g = g, player = player, recipe = g.recipes[recipe.name], if_opened = true })
+            end
+        end
+    else
+        local grecipe = gutils.get_selected_recipe_in_graph(player)
+        if grecipe then
+            gutils.refresh_machine_list(g, grecipe.name)
+        end
+    end
+end
+
+--- Select a recipe in graph
+local function on_control_click5(e)
+    ---@type LuaPlayer
+    local player = game.players[e.player_index]
+
+    local g = gutils.get_graph(player);
+    if not g then return end
+
+    local selected = player.selected
+    if selected == nil or not selected.valid then return end
+
+    if player.surface ~= g.surface then
+        local type = selected.type
+        if type ~= "furnace" and type ~= "assembling-machine" then return end
+
+        local entity = selected
+        local recipe = entity.get_recipe() or (entity.type == "furnace" and entity.previous_recipe and entity.previous_recipe.name)
+        if recipe then
+            gutils.refresh_machine_list(g, recipe.name)
+            gutils.enter(player, recipe.name)
+        end
+    else
+        gutils.show_machine_from_selection(player)
+    end
+end
+
+script.on_event(prefix .. "-control-click", on_control_click)
+script.on_event(prefix .. "-control-click4", on_control_click4)
+script.on_event(prefix .. "-control-click5", on_control_click5)
+
 ---@param e EventData.on_selected_entity_changed
 local function on_selected_entity_changed(e)
     local player_index = e.player_index
@@ -1297,7 +1408,16 @@ local function on_selected_entity_changed(e)
     if not g then return end
 
     local entity = player.selected
+    drawing.select_entity(g, entity)
+end
 
+
+--- Select an entity
+---@param g Graph
+---@param entity LuaEntity
+function drawing.select_entity(g, entity)
+    local surface = g.surface
+    local player = g.player
     if (g.selector_id) then
         g.selector_id.destroy()
         g.selector_id = nil
@@ -1318,11 +1438,14 @@ local function on_selected_entity_changed(e)
             }
             local grecipe = g.selected_recipe
             if grecipe then
-                local product = drawing.get_product_from_selected(player, entity)
-                if product then
+                local gproduct = drawing.get_product_from_selected(player, entity)
+                if gproduct then
                     if entity.valid then
-                        g.selector_product_name = product.name
-                        local text = gutils.get_product_name(player, product.name)
+                        g.selector_product_name = gproduct.name
+                        local text = gutils.get_product_name(player, gproduct.name)
+                        if gproduct.temperature then
+                            text = text .. " (" .. gproduct.temperature .. " °C)"
+                        end
                         g.selector_product_name_id = rendering.draw_text {
                             color = { 1, 1, 1 },
                             surface = surface,
@@ -1332,9 +1455,12 @@ local function on_selected_entity_changed(e)
                             text = text,
                             scale = 0.4
                         }
-                        draw_connected_by_product(g, grecipe, product)
-                        dash_lines(g, grecipe, false)
-                        dash_line_for_product(product, true)
+                        draw_connected_by_product(g, grecipe, gproduct)
+                        if not g.selection_lock then
+                            dash_lines(g, grecipe, false)
+                            dash_line_for_product(gproduct, true)
+                            g.lock_selected_recipe = grecipe
+                        end
                     end
                 end
             end
@@ -1368,8 +1494,11 @@ local function on_selected_entity_changed(e)
                 g.selected_recipe = grecipe
                 g.selected_recipe_entity = entity
                 g.move_recipe = nil
-                draw_selected_entity(player, entity, grecipe)
-                dash_lines(g, grecipe, true)
+                draw_selected_entity(g.player, entity, grecipe)
+                if not g.selection_lock then
+                    dash_lines(g, grecipe, true)
+                    g.lock_selected_recipe = grecipe
+                end
             end
         end
     end
@@ -1377,6 +1506,7 @@ local function on_selected_entity_changed(e)
         tools.fire_user_event(commons.graph_selection_change_event, { g = g })
     end
 end
+
 tools.on_event(defines.events.on_selected_entity_changed, on_selected_entity_changed)
 
 ---@param e EventData.on_gui_opened
@@ -1416,7 +1546,15 @@ local function on_gui_opened(e)
         elseif entity_name == commons.product_selector_name then
             local product = drawing.get_product_from_selected(player, entity)
             if product then
-                drawing.open_recipe_selection(g, product, grecipe)
+                local action = nil
+                for _, ingredient in pairs(grecipe.ingredients) do
+                    if ingredient.name == product.name then
+                        action = commons.action_producer
+                        break
+                    end
+                end
+                if not action then action = commons.action_consumer end
+                drawing.open_recipe_selection(g, { product = product, action = action })
             end
             player.opened = nil
         end
@@ -1426,6 +1564,7 @@ tools.on_event(defines.events.on_gui_opened, on_gui_opened)
 
 ---@param player LuaPlayer
 ---@param entity LuaEntity
+---@return GProduct?
 function drawing.get_product_from_selected(player, entity)
     local g = gutils.get_graph(player)
     for product_name, selector in pairs(g.product_selectors) do
@@ -1449,6 +1588,7 @@ function drawing.redraw_selection(player)
         g.selected_recipe = nil
         g.selected_recipe_entity = nil
     end
+    -- player.force.rechart(g.surface)
 end
 
 ---@param g Graph
@@ -1458,7 +1598,7 @@ function drawing.delete_content(g, keep_location)
     destroy_graph_ids(g)
     g.layer_ids = gutils.destroy_drawing(g.layer_ids)
 
-    local entities = g.surface.find_entities_filtered {}
+    local entities = g.surface.find_entities_filtered { name = commons.radar_name, invert = true }
     for _, entity in pairs(entities) do
         entity.destroy { raise_destroy = false }
     end
@@ -1476,9 +1616,8 @@ function drawing.delete_content(g, keep_location)
 end
 
 ---@param g Graph
----@param product GProduct
----@param src GRecipe
-function drawing.open_recipe_selection(g, product, src)
+---@param options RecipeSelectionOptions
+function drawing.open_recipe_selection(g, options)
 end
 
 ---@param e EventData.on_lua_shortcut
@@ -1492,10 +1631,19 @@ local function on_control_click2(e)
     local g = gutils.get_graph(player)
     if not g.selected_recipe then return end
 
-    local current_layer = g.current_layer or "virtual-signal/signal-yellow"
+    local entity = player.selected
 
-    g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
-    drawing.draw_layers(g)
+    if entity and entity.valid and entity.name == commons.product_selector_name then
+        local product = drawing.get_product_from_selected(player, entity)
+        if product then
+            drawing.open_recipe_selection(g, { product = product, recipe = g.selected_recipe, related_to_product = true })
+        end
+    else
+        local current_layer = g.current_layer or "virtual-signal/signal-yellow"
+        g.selected_recipe.layer = (g.selected_recipe.layer ~= current_layer) and current_layer or nil
+        drawing.draw_layers(g)
+        gutils.refresh_machine_list(g)
+    end
 end
 
 script.on_event(prefix .. "-control-click2", on_control_click2)
