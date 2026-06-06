@@ -82,10 +82,24 @@ if not settings.startup["factory_graph-include-recycling-recipes"] then
     excluded_categories["recycling-or-hand-crafting"] = true
 end
 
-local excluded_subgroups = {
+local barreling_subgroups = {
     ["empty-barrel"] = true,
     ["fill-barrel"] = true
 }
+
+if settings.startup["factory_graph-include-barreling-recipes"] then
+    excluded_categories.barrelling = nil
+    excluded_categories["barreling-pump"] = nil
+    barreling_subgroups = {}
+end
+
+---@param g Graph
+function main.reload_recipe(g)
+
+    local recipes = g.player.force.recipes
+    graph.update_recipes(g, recipes, excluded_categories, barreling_subgroups)
+
+end
 
 ---@param player LuaPlayer
 ---@param recipe_name string?
@@ -413,8 +427,7 @@ tools.on_event(defines.events.on_player_changed_surface,
                 g = graph.new(to_surface)
                 g.player = player
                 vars.graph = g
-                local recipes = player.force.recipes
-                graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
+                main.reload_recipe(g)
                 if g.visibility == commons.visibility_selection then
                     for _, grecipe in pairs(g.recipes) do
                         grecipe.visible = nil
@@ -597,8 +610,7 @@ tools.on_configuration_changed(
                 if has_command then
                     command.open(player)
                 end
-                local recipes = player.force.recipes
-                graph.update_recipes(g, recipes, excluded_categories, excluded_subgroups)
+                main.reload_recipe(g)
 
                 local need_refresh
                 for _, grecipe in pairs(g.recipes) do

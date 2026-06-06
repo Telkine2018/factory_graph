@@ -18,8 +18,16 @@ data:extend(
 			name = prefix .. "-include-recycling-recipes",
 			setting_type = "startup",
 			default_value = false,
-			order = "aa"
+			order = "ab"
 		},
+		{
+			type = "bool-setting",
+			name = prefix .. "-include-barreling-recipes",
+			setting_type = "startup",
+			default_value = false,
+			order = "ac"
+		},
+
 		{
 			type = "int-setting",
 			name = prefix .. "-saving-height",
