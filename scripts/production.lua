@@ -16,7 +16,8 @@ local math_precision = commons.math_precision
 ---@param product Product
 ---@return number
 local function get_product_amount(machine, product)
-    local probability = (product.probability or 1)
+    local pmax = (product.shared_probability and product.shared_probability.max) or 1
+    local probability = (product.independent_probability or 1) * pmax
     local amount = product.amount or ((product.amount_max + product.amount_min) / 2)
 
     local catalyst_amount = product.catalyst_amount or 0
@@ -58,7 +59,7 @@ end
 ---@param module LuaItemPrototype
 ---@param module_quality string
 ---@param effectivity number
----@return ModuleEffects
+---@return Effect
 function production.get_module_effect(module, module_quality, effectivity)
     local effects = module.module_effects
     local qproto = prototypes.quality[module_quality or "normal"]
@@ -159,7 +160,7 @@ function production.compute_machine(g, grecipe, config)
             end
         end
 
-        ---@param effects ModuleEffects
+        ---@param effects Effect
         ---@param qmodifier number
         ---@param effectivity integer
         local function apply_effect(effects, qmodifier, effectivity)
@@ -239,7 +240,7 @@ function production.compute_machine(g, grecipe, config)
         machine.pollution = pollution
         machine.quality = quality / 10
 
-        if machine.machine then
+        if machine.machine and recipe then
             machine.theorical_craft_s = (1 + speed) * machine.machine.get_crafting_speed(smachine.quality) / recipe.energy
             machine.limited_craft_s = machine.theorical_craft_s
             machine.produced_craft_s = machine.limited_craft_s + productivity * machine.theorical_craft_s

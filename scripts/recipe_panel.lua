@@ -37,8 +37,11 @@ local function get_product_label(player_index, product)
         s = tostring(product.amount_max)
         table.insert(caption, s)
     end
-    if product.probability and product.probability ~= 1 then
-        s = " " .. tostring(product.probability * 100) .. "%"
+    local probability = product.independent_probability or 1
+    local pmax = (product.shared_probability and product.shared_probability.max) or 1
+    probability = probability * pmax
+    if probability ~= 1 then
+        s = " " .. tostring(probability * 100) .. "%"
         table.insert(caption, s)
     end
 
@@ -92,7 +95,7 @@ function recipe_panel.create(player_index, grecipe)
     local machine = grecipe.machine
     if machine and machine.machine then
         if machine.count and machine.count > 0 then
-            local label = flow.add { type = "label", caption = { np("machine-normal"), tools.fround(machine.count), machine.machine.localised_name } }
+            local label = flow.add { type = "label", caption = { np("machine-normal"), tools.fround(machine.count) --[[@as any]], machine.machine.localised_name } }
             label.style.bottom_margin = 3
         else
             local label = flow.add { type = "label", caption = { np("machine-error"), machine.machine.localised_name } }
@@ -165,7 +168,7 @@ function recipe_panel.create(player_index, grecipe)
         end
     end
 
-    local label = flow.add { type = "label", caption = { np("speed"), tostring(recipe.energy) } }
+    local label = flow.add { type = "label", caption = { np("speed"), tostring(recipe.energy) --[[@as any]] } }
     label.style.top_margin = 5
 
     local machines = machinedb.get_machines_for_recipe(recipe.name)
@@ -176,7 +179,7 @@ function recipe_panel.create(player_index, grecipe)
 
         for _, tech in pairs(technologies) do
             local name = translations.get_technology_name(player_index, tech.name)
-            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name } }
+            local label = flow.add { type = "label", caption = { "", "[img=technology/" .. tech.name .. "] ", name --[[@as any]] } }
             label.style.bottom_margin = 3
         end
     end
@@ -198,7 +201,7 @@ function recipe_panel.create(player_index, grecipe)
                 end
                 ::searched::
             end
-            local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] ", localised } }
+            local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] " --[[@as any]], localised --[[@as any]]} }
             label.style.bottom_margin = 3
             ::next_recipe::
         end

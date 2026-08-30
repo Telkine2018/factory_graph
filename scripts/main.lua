@@ -1,6 +1,6 @@
 local mod_gui = require("mod-gui")
 local dictionary = require("__flib__/dictionary")
-local migration = require("__flib__/migration")
+local migration = require("scripts.flib_migration")
 
 local commons = require("scripts.commons")
 local tools = require("scripts.tools")
@@ -95,10 +95,8 @@ end
 
 ---@param g Graph
 function main.reload_recipe(g)
-
     local recipes = g.player.force.recipes
     graph.update_recipes(g, recipes, excluded_categories, barreling_subgroups)
-
 end
 
 ---@param player LuaPlayer
@@ -315,6 +313,8 @@ function main.enter_surface(player, recipe_name)
                 g.highlight_recipe = grecipe.name
             end
         end
+    else
+        g = main.create_graph(player, surface)
     end
 
     local controller_type = defines.controllers.remote
@@ -346,9 +346,9 @@ function main.exit(player)
 
     _log("main.exit")
 
-    if g.surface.index ~= player.surface_index then 
+    if g.surface.index ~= player.surface_index then
         player.game_view_settings.show_surface_list = true
-        return 
+        return
     end
 
     if extern then
@@ -424,17 +424,7 @@ tools.on_event(defines.events.on_player_changed_surface,
             ---@type Graph?
             local g = vars.graph
             if not g then
-                g = graph.new(to_surface)
-                g.player = player
-                vars.graph = g
-                main.reload_recipe(g)
-                if g.visibility == commons.visibility_selection then
-                    for _, grecipe in pairs(g.recipes) do
-                        grecipe.visible = nil
-                    end
-                end
-                graph.do_layout(g)
-                graph.create_recipe_objects(g)
+                g = main.create_graph(player, to_surface)
             else
                 if player.controller_type ~= defines.controllers.remote then
                     player.set_controller { type = defines.controllers.remote, position = g.player_position }
@@ -464,6 +454,28 @@ tools.on_event(defines.events.on_player_changed_surface,
             _log("Enter zoom:" .. player.zoom)
         end
     end)
+
+---@param player LuaPlayer
+---@param surface LuaSurface
+---@return Graph
+function main.create_graph(player, surface)
+    local vars = tools.get_vars(player)
+    local g = vars.graph
+    if not g then
+        g = graph.new(surface)
+        g.player = player
+        vars.graph = g
+        main.reload_recipe(g)
+        if g.visibility == commons.visibility_selection then
+            for _, grecipe in pairs(g.recipes) do
+                grecipe.visible = nil
+            end
+        end
+        graph.do_layout(g)
+        graph.create_recipe_objects(g)
+    end
+    return g
+end
 
 ---@param player LuaPlayer
 function main.legacy_exit(player)
@@ -633,17 +645,17 @@ tools.on_configuration_changed(
                 if data.mod_changes
                     and data.mod_changes.factory_graph
                     and data.mod_changes.factory_graph.old_version then
-                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.3") then
+                    if helpers.compare_versions(data.mod_changes.factory_graph.old_version, "1.0.3") < 0 then
                         g.surface.generate_with_lab_tiles = commons.generate_with_lab_tiles
                         g.surface.clear()
                     end
 
-                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "1.0.7") then
+                    if helpers.compare_versions(data.mod_changes.factory_graph.old_version, "1.0.7") < 0 then
                         g.line_gap = 0.2
                         g.always_use_full_selection = false
                     end
 
-                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "2.0.0") then
+                    if helpers.compare_versions(data.mod_changes.factory_graph.old_version, "2.0.0") < 0 then
                         g.graph_ids = tools.render_translate_table(g.graph_ids)
                         g.graph_select_ids = tools.render_translate_table(g.graph_select_ids)
                         g.highlighted_recipes_ids = tools.render_translate_table(g.highlighted_recipes_ids)
@@ -654,7 +666,7 @@ tools.on_configuration_changed(
                             gproduct.ids = tools.render_translate_table(g.ids)
                         end
                     end
-                    if migration.is_newer_version(data.mod_changes.factory_graph.old_version, "2.0.24") then
+                    if helpers.compare_versions(data.mod_changes.factory_graph.old_version, "2.0.24") < 0 then
                         for _, player in pairs(game.players) do
                             local g = gutils.get_graph(player)
                             if g then

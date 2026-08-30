@@ -110,9 +110,8 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     local fluids_with_temperature = {}
 
     for name, recipe in pairs(recipes) do
-        if not excluded_categories[recipe.category]
-            and not excluded_subgroups[recipe.subgroup.name]
-            and not recipe.prototype.is_parameter then
+        if not excluded_categories[recipe.categories[1]]
+            and not excluded_subgroups[recipe.subgroup.name] then
             local grecipe = g.recipes[name]
             if not grecipe then
                 grecipe = {
@@ -195,7 +194,7 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
                         gproduct.is_root = nil
                     end
                 end
-                if #grecipe.products == 1 and recipe.products[1].probability == 0 then
+                if #grecipe.products == 1 and recipe.products[1].independent_probability == 0 then
                     grecipe.is_void = true
                 end
             end

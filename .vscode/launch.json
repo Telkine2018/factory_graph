@@ -2,28 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "factoriomod",
+            "type": "factorio",
             "request": "launch",
             "name": "Factorio Mod Debug (Settings & Data)",
-            "hookSettings": false,
-            "hookData": false,
-            "hookMode": "debug",
-            "hookControl": [
-                "factory_graph"
-            ],
-            "adjustMods": {
-                "factory_graph": true
-            }
+            
         },
         {
-            "type": "factoriomod",
+            "type": "factorio",
             "request": "launch",
             "name": "Factorio Mod Debug (Profile)",
-            "hookMode": "profile",
-            "hookControl": ["factory_graph" ],
-            "adjustMods": {
-                "factory_graph" : true
-            }
         }
 
     ]

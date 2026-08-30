@@ -1410,7 +1410,7 @@ function tools.find_missing_ingredients(character, item_map)
                             goto skip
                         end
                         if recipe.hidden_from_player_crafting then goto skip end
-                        if crafting_categories[recipe.category] then
+                        if crafting_categories[recipe.categories[1]] then
                             -- Get iteration count of recipe
                             for _, product in pairs(recipe.products) do
                                 if product.name == current_item then

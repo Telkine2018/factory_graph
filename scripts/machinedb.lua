@@ -16,7 +16,7 @@ local gutils = require("scripts.gutils")
 
 ---@class ModuleInfo
 ---@field name string
----@field effects ModuleEffects
+---@field effects Effect
 ---@field category string
 
 ---@class MachineDb
@@ -151,7 +151,15 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     end
 
     machinedb.initialize()
-    local machines                 = category_to_machines[recipe.category]
+    local machines = {}
+    for _, category in pairs(recipe.categories) do
+        local machines_2 = category_to_machines[category]
+        if machines_2 then
+            for m_name, m_value in pairs(machines_2) do
+                machines[m_name] = m_value
+            end
+        end
+    end
 
     local preferred_machines       = g.preferred_machines
     local preferred_modules        = g.preferred_modules
@@ -398,7 +406,6 @@ function machinedb.get_machines_for_recipe(recipe_name)
     local recipe = gutils.get_recipe_prototype(recipe_name)
     if not recipe then return {} end
 
-    local category = recipe.category
     if not machinedb.initialized then
         machinedb.initialize()
     end
@@ -436,14 +443,8 @@ function machinedb.get_machines_for_recipe(recipe_name)
         end
     end
 
-    local base_machines = category_to_machines[category]
-    local additional_categories  = recipe.additional_categories 
-    for _, machine in pairs(base_machines) do
-        add_machine(machine)
-    end
-
-    if additional_categories and #recipe.additional_categories > 0 then
-        for _, acategory in pairs(recipe.additional_categories ) do
+    if recipe.categories and #recipe.categories > 0 then
+        for _, acategory in pairs(recipe.categories ) do
             local amachines = machinedb.category_to_machines[acategory]
             if amachines then
                 for _, amachine in pairs(amachines) do
