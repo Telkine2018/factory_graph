@@ -39,7 +39,6 @@ local category_to_machines
 ---@param machine LuaEntityPrototype
 ---@return MachineInfo
 function machinedb.get_machine(machine)
-
     ---@type MachineInfo
     local existing = machinedb.machines[machine.name]
     if existing then
@@ -53,7 +52,7 @@ function machinedb.get_machine(machine)
             if fb.production_type == "input" then
                 fluid_input = fluid_input + 1
             elseif fb.production_type == "output" then
-                fluid_output = fluid_output +1
+                fluid_output = fluid_output + 1
             elseif fb.production_type == "input-output" then
                 fluid_input = fluid_input + 1
                 fluid_output = fluid_output + 1
@@ -152,11 +151,15 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
 
     machinedb.initialize()
     local machines = {}
+    local machine_set = {}
     for _, category in pairs(recipe.categories) do
         local machines_2 = category_to_machines[category]
         if machines_2 then
-            for m_name, m_value in pairs(machines_2) do
-                machines[m_name] = m_value
+            for _, m_machine in pairs(machines_2) do
+                if not machine_set[m_machine.name] then
+                    machine_set[m_machine.name] = true
+                    table.insert(machines, m_machine)
+                end
             end
         end
     end
@@ -165,7 +168,7 @@ function machinedb.get_default_config(g, recipe_name, enabled_cache)
     local preferred_modules        = g.preferred_modules
     local preferred_beacon_modules = g.preferred_beacon_modules
 
-    if not machines or #machines == 0 then
+    if not machines or table_size(machines) == 0 then
         return nil
     end
 
@@ -402,7 +405,6 @@ end
 ---@param recipe_name string
 ---@return MachineInfo[]
 function machinedb.get_machines_for_recipe(recipe_name)
-
     local recipe = gutils.get_recipe_prototype(recipe_name)
     if not recipe then return {} end
 
@@ -428,23 +430,23 @@ function machinedb.get_machines_for_recipe(recipe_name)
             fluid_output = fluid_output + 1
         end
     end
-    
+
     ---@type MachineInfo[]
     local machines = {}
 
     ---@param m MachineInfo
-    local function add_machine(m) 
-        if ingredient_count <= m.ingredient_count 
-                and product_count <= m.max_item_product_count 
-                and fluid_input <= m.fluid_input
-                and fluid_output <= m.fluid_output
-                then
+    local function add_machine(m)
+        if ingredient_count <= m.ingredient_count
+            and product_count <= m.max_item_product_count
+            and fluid_input <= m.fluid_input
+            and fluid_output <= m.fluid_output
+        then
             table.insert(machines, m);
         end
     end
 
     if recipe.categories and #recipe.categories > 0 then
-        for _, acategory in pairs(recipe.categories ) do
+        for _, acategory in pairs(recipe.categories) do
             local amachines = machinedb.category_to_machines[acategory]
             if amachines then
                 for _, amachine in pairs(amachines) do
@@ -452,9 +454,9 @@ function machinedb.get_machines_for_recipe(recipe_name)
                 end
             end
         end
-   end
+    end
 
-   return machines
+    return machines
 end
 
 return machinedb

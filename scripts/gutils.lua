@@ -660,7 +660,7 @@ function gutils.get_connected_recipes(g, products)
     local connected_recipes = {}
     while (true) do
         local product_name, gproduct = next(to_scan)
-        if not product_name then break end
+        if not product_name or not gproduct then break end
         to_scan[product_name] = nil
         done_scan[product_name] = true
         for _, grecipe in pairs(gproduct.product_of) do
@@ -956,7 +956,7 @@ function gutils.show_machine(player, recipe_name, move_player)
             end
         end
     end
-    player.print({ np("machine_report"), count })
+    player.print({ np("machine_report"), tostring(count) })
 end
 
 ---@param player LuaPlayer
@@ -1246,9 +1246,19 @@ function gutils.craft(player, item, count)
         return nil
     end
     local crafting_categories = player.character.prototype.crafting_categories
+    local function is_crafting_category(categories)
+        if not categories then return false end
+        for _, c in pairs(categories) do
+            if crafting_categories[c] then
+                return true
+            end
+        end
+        return false
+    end
+
     if #recipes > 0 and crafting_categories then
         for recipe_name, recipe in pairs(recipes) do
-            if crafting_categories[recipe.category] then
+            if is_crafting_category(recipe.categories) then
                 local missing = gutils.find_missing_ingredients(player, item, count)
                 if missing and table_size(missing) > 0 then
                     for name, count in pairs(missing) do
