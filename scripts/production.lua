@@ -136,10 +136,8 @@ function production.compute_machine(g, grecipe, config)
             end
         end
 
-        if not g.recipes_productivities then
-            g.recipes_productivities = machinedb.compute_recipes_productivities(g)
-        end
-        local research_productivity = g.recipes_productivities[recipe_name] or 0
+        local frecipe = g.player.force.recipes[recipe_name]
+        local research_productivity = frecipe.productivity_bonus or 0
 
         local speed = 0
         ---@cast speed -nil

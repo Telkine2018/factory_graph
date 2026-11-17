@@ -97,6 +97,7 @@ function graph.update_recipes(g, recipes, excluded_categories, excluded_subgroup
     local changed
     g.excluded_categories = excluded_categories
     g.excluded_subgroups = excluded_subgroups
+    g.recipes_productivities = nil
 
     for _, gproduct in pairs(g.products) do
         if not gproduct.derived_from then

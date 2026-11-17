@@ -385,16 +385,19 @@ function machinedb.compute_recipes_productivities(g)
     local productivities = {}
     for name, force_tech in pairs(techs) do
         local tech = prototypes.technology[name]
-        for _, effect in pairs(tech.effects) do
-            if effect.type == "change-recipe-productivity" then
-                local recipe = effect.recipe
-                local change = effect.change
-                local productivity = productivities[recipe] or 0
-                for level = 1, force_tech.level - 1 do
-                    productivity = productivity + change
-                end
-                if productivity > 0 then
-                    productivities[recipe] = productivity
+        if force_tech.researched or (force_tech.level > tech.level) then
+            for _, effect in pairs(tech.effects) do
+                if effect.type == "change-recipe-productivity" then
+                    local recipe = effect.recipe
+                    local change = effect.change
+                    local productivity = productivities[recipe] or 0
+                    local max_level = force_tech.level
+                    for level = 1, max_level do
+                        productivity = productivity + change
+                    end
+                    if productivity > 0 then
+                        productivities[recipe] = productivity
+                    end
                 end
             end
         end
