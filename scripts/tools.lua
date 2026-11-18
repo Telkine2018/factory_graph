@@ -1199,7 +1199,7 @@ end
 local signal_pattern = "([^/]+)[/]([^/]+)"
 tools.signal_pattern = signal_pattern
 tools.fluid_recipe_pattern = "([^/]+)[/]([^/]+)"
-tools.fluid_pattern ="fluid[/]([^/]+)[/]([^/]+)"
+tools.fluid_pattern = "fluid[/]([^/]+)[/]([^/]+)"
 tools.product_pattern = "([^/]+)[/]([^/]+)"
 
 ---@param signalid string?
@@ -1414,11 +1414,11 @@ function tools.find_missing_ingredients(character, item_map)
                             -- Get iteration count of recipe
                             for _, product in pairs(recipe.products) do
                                 if product.name == current_item then
-                                    if product.amount then
-                                        iter = math.ceil(needed / product.amount)
-                                    else
-                                        iter = math.ceil(needed / ((product.amount_min + product.amount_max) / 2))
-                                    end
+                                    local p = product
+                                    local amount = product.amount or
+                                        ((p.amount_max >= p.amount_min and (p.amount_max + p.amount_min) / 2 or p.amount_min))
+                                    amount = amount + (p.extra_count_fraction or 0)
+                                    iter = math.ceil(needed / amount)
                                     break
                                 end
                             end

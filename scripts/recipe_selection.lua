@@ -728,12 +728,12 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                     amount = tostring(tools.fround(production.get_product_amount(machine, p) * machine.count))
                 else
                     if p.amount then
-                        amount = tostring(p.amount)
+                        amount = tostring(p.amount + (p.extra_count_fraction or 0))
                     elseif p.amount_min and p.amount_max then
-                        amount = tostring(p.amount_min) .. "-" .. tostring(p.amount_max)
+                        amount = tostring(p.amount_min + (p.extra_count_fraction or 0)) .. "-" .. tostring(p.amount_max + (p.extra_count_fraction or 0))
                     end
                     local probability = p.independent_probability or 1
-                    local pmax = (p.shared_probability and p.shared_probability.max) or 1
+                    local pmax = (p.shared_probability and (p.shared_probability.max - p.shared_probability.min)) or 1
                     probability = probability * pmax
                     if probability < 1 then
                         amount = amount .. "(" .. tostring(tools.fround(probability * 100)) .. "%)"
@@ -817,8 +817,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 b.tooltip = { np("ingredient_tooltip") }
                 local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
                 qtlabel.caption = tostring(def.amount)
-                tools.set_name_handler(b, np("product_button"), 
-                    { type="ingredient", product_name = def.name, recipe_name = recipe_name, index = index })
+                tools.set_name_handler(b, np("product_button"),
+                    { type = "ingredient", product_name = def.name, recipe_name = recipe_name, index = index })
             end
             local arrow = recipe_col2.add { type = "sprite", sprite = img_arrow, tooltip = tooltip }
             arrow.style.top_margin = 6
@@ -832,8 +832,8 @@ function recipe_selection.display_recipes(player, recipes, recipe_table)
                 b.tooltip = { np("production_tooltip") }
                 local qtlabel = b.add { type = "label", style = label_style_name, name = "label", ignored_by_interaction = true }
                 qtlabel.caption = tostring(def.amount)
-                tools.set_name_handler(b, np("product_button"), 
-                    { type="product", product_name = def.name, recipe_name = recipe_name, index = index })
+                tools.set_name_handler(b, np("product_button"),
+                    { type = "product", product_name = def.name, recipe_name = recipe_name, index = index })
             end
             recipe_col2.style.horizontally_stretchable = true
 

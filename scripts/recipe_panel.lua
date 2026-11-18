@@ -28,17 +28,17 @@ local function get_product_label(player_index, product)
 
     local s
     if product.amount then
-        s = tostring(product.amount)
+        s = tostring(product.amount + (product.extra_count_fraction or 0))
         table.insert(caption, s)
     elseif product.amount_min then
-        s = tostring(product.amount_min)
+        s = tostring(product.amount_min + (product.extra_count_fraction or 0))
         table.insert(caption, s)
         table.insert(caption, "-")
-        s = tostring(product.amount_max)
+        s = tostring(product.amount_max + (product.extra_count_fraction or 0))
         table.insert(caption, s)
     end
     local probability = product.independent_probability or 1
-    local pmax = (product.shared_probability and product.shared_probability.max) or 1
+    local pmax = (product.shared_probability and (product.shared_probability.max - product.shared_probability.min)) or 1
     probability = probability * pmax
     if probability ~= 1 then
         s = " " .. tostring(probability * 100) .. "%"
@@ -114,9 +114,13 @@ function recipe_panel.create(player_index, grecipe)
             ---@type any
             local maximum_temperature = p.maximum_temperature
             if minimum_temperature and maximum_temperature then
-                if minimum_temperature < -1e38 then temperature_label = " (<=" .. maximum_temperature .. " °C)" 
-                elseif maximum_temperature > 1e38 then temperature_label = " (>=" .. minimum_temperature .. " °C))" 
-                else temperature_label = " (" .. minimum_temperature .. " °C," .. maximum_temperature .. " °C)" end
+                if minimum_temperature < -1e38 then
+                    temperature_label = " (<=" .. maximum_temperature .. " °C)"
+                elseif maximum_temperature > 1e38 then
+                    temperature_label = " (>=" .. minimum_temperature .. " °C))"
+                else
+                    temperature_label = " (" .. minimum_temperature .. " °C," .. maximum_temperature .. " °C)"
+                end
             end
             if machine and machine.count and machine.count > 0 then
                 local per_machine = production.get_ingredient_amount(machine, p)
@@ -201,7 +205,7 @@ function recipe_panel.create(player_index, grecipe)
                 end
                 ::searched::
             end
-            local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] " --[[@as any]], localised --[[@as any]]} }
+            local label = flow.add { type = "label", caption = { "", "[img=entity/" .. machine.name .. "] " --[[@as any]], localised --[[@as any]] } }
             label.style.bottom_margin = 3
             ::next_recipe::
         end

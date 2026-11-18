@@ -943,7 +943,7 @@ local function create_product_line(container, machine, manual_mode, color_values
         else
             b.tooltip = { np("production_tooltip"), s_amount }
         end
-        tools.set_name_handler(b, np("open_product"), {recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
+        tools.set_name_handler(b, np("open_product"), { recipe_name = machine.name, product_name = product_name, action = commons.action_consumer })
 
         b.add { type = "label", style = default_button_label_style, caption = s_amount, ignored_by_interaction = true }
     end
@@ -1089,8 +1089,9 @@ local function get_inventories(player)
                     if p.type == "item" then
                         local amount = p.amount
                         if not amount then
-                            amount = (p.amount_min + p.amount_max) / 2
+                            amount = ((p.amount_max >= p.amount_min and (p.amount_max + p.amount_min) / 2 or p.amount_min))
                         end
+                        amount = amount + (p.extra_count_fraction or 0)
                         craft_queue[p.name] = (craft_queue[p.name] or 0) + amount * c.count
                     end
                 end
@@ -1462,7 +1463,7 @@ function product_panel.request_items(player, item, total_count, quality)
                     name = item,
                     type = "item",
                     quality = has_quality and quality or "normal",
-                    comparator = "=" 
+                    comparator = "="
                 },
                 min = total_count
             })

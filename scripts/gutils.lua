@@ -1182,7 +1182,9 @@ function gutils.create_machine_tooltip(player, machine_entity, machine_count)
                 if machine_recipe then
                     local ingredients = machine_recipe.ingredients
                     for _, p in pairs(ingredients) do
-                        local amount = p.amount or ((p.amount_max + p.amount_min) / 2)
+                        local amount = p.amount or
+                            ((p.amount_max >= p.amount_min and (p.amount_max + p.amount_min) / 2 or p.amount_min))
+                        amount = amount + (p.extra_count_fraction or 0)
                         local label = gutils.get_product_name(player, p.type .. "/" .. p.name)
                         local ptext = {
                             np("machine_product_tooltip"),

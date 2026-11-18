@@ -13,26 +13,21 @@ local math_precision = commons.math_precision
 
 --- Get product amount for one machine
 ---@param machine ProductionMachine
----@param product Product
+---@param p Product
 ---@return number
-local function get_product_amount(machine, product)
-    local pmax = (product.shared_probability and product.shared_probability.max) or 1
-    local probability = (product.independent_probability or 1) * pmax
-    local amount = product.amount or ((product.amount_max + product.amount_min) / 2)
+local function get_product_amount(machine, p)
+    local shared_probability = (p.shared_probability and (p.shared_probability.max - p.shared_probability.min)) or 1
+    local probability = (p.independent_probability or 1) * shared_probability
+    local amount = p.amount or ((p.amount_max >= p.amount_min and (p.amount_max + p.amount_min) / 2 or p.amount_min))
+    local expected_per_craft = (amount + (p.extra_count_fraction or 0)) * probability
 
-    local catalyst_amount = product.catalyst_amount or 0
+    local ignored = p.ignored_by_productivity or 0
+    local productive_amount = math.max(0, expected_per_craft - ignored)
+
     local total
-    if catalyst_amount > 0 then
-        total = (amount * machine.limited_craft_s +
-            math.max(0, amount - catalyst_amount) * machine.productivity * machine.theorical_craft_s
-        ) * probability
-    else
-        total = (amount * machine.limited_craft_s + amount *
-            machine.productivity * machine.theorical_craft_s) * probability
-    end
-    amount = total
+    total = machine.theorical_craft_s * (expected_per_craft + productive_amount * machine.productivity)
 
-    return amount
+    return total
 end
 
 --- Get ingredient amount for one machine
